@@ -167,6 +167,9 @@ flowchart TD
   - `assigned_cp_id` (FK to `channel_partners.partner_id`, nullable; used for high-rent or partner-exclusive leads)
   - `channel_partner_id` (FK to `channel_partners.partner_id`, nullable; partner who sourced the lead)
   - `partner_protection_until` (timestamp, nullable)
+  - `assignment_mode` (`AI_AGENT`, `RULE_ROUND_ROBIN`, `MANUAL_OVERRIDE`, `SELF_CREATED`)
+  - `ai_routing_reason` (text, explainable routing rationale logged by AI assignment agent)
+  - `ai_routing_confidence` (numeric 0.00–1.00)
   - `is_vip` (boolean, default false)
   - `is_test` (boolean, default false)
   - `dnd_status` (boolean, default false)
@@ -245,17 +248,17 @@ flowchart TD
    - Active open lead ($< 45$ days): Do not create duplicate lead. Append an activity note to existing lead and create an urgent task for the owner: *"Repeat enquiry received — re-confirm requirements"*.
    - Closed lead (`Won`/`Lost`) OR last enquiry $> 45$ days: Generate a new lead record (`OB-YYYY-NNNN`) with `linked_previous_lead_id` set to original. Auto-route to the original owner employee if category matches.
 
-### 6.2 Assignment & Routing Engine
-- Priority evaluation order:
-  1. Direct Employee or MD entry $\to$ stays with creator (`Listed By` / `Owner`).
-  2. Web listing enquiry ("I'm interested" on property page) $\to$ assigned directly to the listing's owner employee.
-  3. Dynamic Assignment Rule match (Category, Sub-category, Location Zone, Budget Min–Max, Lead Type).
-     - Single Employee ID $\to$ direct assign.
-     - Role / Pool ID $\to$ Round-robin amongst active members.
-  4. Leave & Capacity Checks:
-     - If assigned employee is on approved leave $\to$ reroute to configured `cover_employee_id`.
-     - If employee's open lead volume exceeds `capacity_cap` $\to$ overflow to least-loaded active employee in the pool.
-  5. Fallback $\to$ assign to system `default_owner_id`.
+### 6.2 Assignment & Routing Engine (AI Agent & Rules Powered)
+- **Routing Decision Hierarchy:**
+  1. **Direct Creator Lock:** Direct Employee or MD entry stays with creator (`Listed By` / `Owner`).
+  2. **Direct Inventory Enquiry:** Web listing enquiry ("I'm interested" on property page) is assigned directly to the listing's verified owner employee.
+  3. **AI Smart Lead Router (Default for Inbound Traffic):** For all inbound digital leads (post AI pre-qualification or direct intake), **Agent 3 (AI Lead Routing Agent)** analyzes lead attributes (budget, category, location, urgency, buyer temperature) against sales rep performance profiles (historical win rates, sub-market expertise, current lead capacity, active shift/leave status) and assigns the lead with an explainable `ai_routing_reason` and `ai_routing_confidence` score.
+  4. **Rule Table & Round-Robin Fallback:** If AI Routing confidence is below threshold or disabled in settings, falls back to the deterministic MD assignment rules table (category, location zone, budget band $\to$ round-robin pool).
+  5. **Hard Operational Guardrails:**
+     - **Leave Cover Check:** If target employee is on approved leave in HR table, auto-reroutes to `cover_employee_id`.
+     - **Capacity Cap Check:** If target employee's open lead volume reaches `capacity_cap` (e.g. 25 active leads), automatically overflows to the least-loaded qualified peer.
+     - **System Default:** Unmatched leads route to system `default_owner_id`.
+  6. **Automated WhatsApp Introduction:** Once assigned, dispatches an automated WhatsApp message to the buyer introducing their dedicated property advisor with a digital visiting card, and instantly alerts the employee with the AI summary dossier.
 
 ### 6.3 SLA & Escalation Engine
 - **3-Hour Untouched Reminder:** Lead in `NEW` with no activity logged for 3 hours $\to$ WhatsApp reminder to owner.
@@ -286,29 +289,35 @@ flowchart TD
 
 ## 7. AI Agent Automation Framework & Architecture
 
-The Omshiv platform integrates four purpose-built autonomous and semi-autonomous AI agents designed to handle repetitive customer interactions, pre-qualify high-volume traffic, and provide executive intelligence.
+The Omshiv platform integrates five purpose-built autonomous and semi-autonomous AI agents designed to eliminate repetitive operational overhead, intelligently distribute leads, optimize customer conversions, and furnish executive intelligence.
 
 ```mermaid
 flowchart TD
-    subgraph Inbound & Outbound AI
+    subgraph Inbound & Intake AI
         LeadIn[New Lead from Ads/Web/Bot] --> AIDesk[AI Desk Queue]
         AIDesk --> Agent1[Agent 1: Voice Calling Pre-Qual Agent]
         WAChat[Incoming WhatsApp Chat] --> Agent2[Agent 2: WhatsApp Intake & RAG Bot]
     end
 
-    subgraph Internal Engine & Matching
-        Agent1 -->|Structured Lead Data| Pipeline[CRM Pipeline Stage Machine]
-        Agent2 -->|Requirement Card| Pipeline
-        Pipeline --> Agent3[Agent 3: Two-Sided Matching & Nurture Agent]
-        PropVerified[New Verified Property] --> Agent3
-        Agent3 -->|Broadcast Matches| Buyers[Matched Buyers & Partners]
+    subgraph Intelligence & Assignment
+        Agent1 -->|Extracted Profile| Agent3[Agent 3: Smart Lead Routing AI Agent]
+        Agent2 -->|Extracted Profile| Agent3
+        DirectIn[Walk-in / Front Desk] --> Agent3
+        Agent3 -->|Assigned + Rationale| SalesTeam[Sales Rep Pool / Manager]
     end
 
-    subgraph Executive & Team Support
-        Pipeline --> Agent4[Agent 4: CRM Sales Copilot & MD Briefing Agent]
-        Agent4 --> LeadSummary[3-Line Lead History Summary]
-        Agent4 --> NextAction[Recommended Next Action]
-        Agent4 --> MDBrief[Daily 08:45 AM Executive Briefing]
+    subgraph Lifecycle & Matching
+        SalesTeam --> Pipeline[CRM Pipeline Stage Machine]
+        Pipeline --> Agent4[Agent 4: Two-Sided Matching & Nurture Agent]
+        PropVerified[New Verified Property] --> Agent4
+        Agent4 -->|Broadcast Matches| Buyers[Matched Buyers & Partners]
+    end
+
+    subgraph Executive & Team Copilot
+        Pipeline --> Agent5[Agent 5: CRM Sales Copilot & MD Briefing Agent]
+        Agent5 --> LeadSummary[3-Line Lead History Summary]
+        Agent5 --> NextAction[Recommended Next Action]
+        Agent5 --> MDBrief[Daily 08:45 AM Executive Briefing]
     end
 ```
 
@@ -343,7 +352,24 @@ flowchart TD
   - **Seamless Human Handoff:** If the client types *"Talk to someone"* or asks an unresolvable complex query, the bot halts auto-replies, immediately tags the assigned sales executive, sends a priority WhatsApp alert, and surfaces the chat in the CRM timeline.
   - **Inactivity Revival:** If a user abandons mid-conversation, sends one gentle follow-up prompt after 2 hours before closing the bot session.
 
-### 7.3 Agent 3: Two-Sided Matching & Customer Re-engagement Agent
+### 7.3 Agent 3: AI Lead Routing & Smart Assignment Agent (Intelligent Lead Router)
+- **Role & Objective:** Automatically and optimally matches each incoming qualified or raw lead to the single most effective sales executive in real time, moving far beyond naive round-robin.
+- **Scoring & Evaluation Algorithm:**
+  1. **Lead Persona & Value:** Evaluates budget ticket size ($< 50\text{ Lakh}$, $50\text{L}–1.5\text{ Cr}$, $> 2\text{ Cr}$ VIP/HNI), property category (Residential vs Commercial vs Farmhouse/Agro vs Industrial), and intent urgency.
+  2. **Advisor Performance & Win Velocity:** Analyzes historical win rates and conversion velocity of active sales reps for that specific category, locality, and budget band.
+  3. **Capacity & Real-Time Availability:** Checks real-time open lead volume against individual `capacity_cap` (avoids overloading), verifies current working shift, and checks HR leave approval status.
+  4. **Geographic & Linguistic Affinity:** Matches lead's preferred micro-location (e.g. Alwar bypass, Tijara road, Bhiwadi) with advisors who have strong local inventory knowledge and geographic focus.
+- **Explainable Decision Logging:**
+  - Every assignment creates an immutable audit entry and sets `ai_routing_reason` (e.g., *"Assigned to EMP-0004: Highest 90-day win rate (36%) in Bhiwadi ₹1–2 Cr residential segment; current load 14/25"*).
+  - Stores `ai_routing_confidence` score (e.g. `0.92`).
+- **Safety Overrides & Guardrails:**
+  - Hard caps are never violated: if the highest-scoring advisor is at capacity, the agent smoothly overflows to the next best match.
+  - Managing Director or Sales Head can reassign any lead in 1 tap; the AI agent learns from reassignments.
+- **Instant Two-Way Notification:**
+  - **Advisor Alert:** Dispatches an immediate WhatsApp notification with the lead's full AI profile, recording link, and routing justification.
+  - **Client Introduction:** Automatically sends a professional WhatsApp message to the buyer introducing the assigned advisor with their contact card and direct call link.
+
+### 7.4 Agent 4: Two-Sided Property Matching & Lifecycle Nurture Agent
 - **Role & Objective:** Autonomous background engine that pairs real estate supply and demand while running lifecycle retention workflows.
 - **Match Automation:**
   - **Forward Match:** The instant a property is approved as `VERIFIED_AVAILABLE`, the agent scans all open buyer requirement cards within $\pm 15\%$ budget tolerance and matching zone. Dispatches a digest to each buyer's assigned executive (*"Property OP-2026-412 matches 5 of your active clients"*).
@@ -353,7 +379,7 @@ flowchart TD
   - **Post-Visit & Post-Won Feedback:** Dispatches automated WhatsApp feedback surveys following site visits (1–5 star rating for property and advisor). Low ratings ($\le 2$ stars) trigger an immediate priority escalation to the Sales Head.
   - **Festival & Milestone Campaigns:** Automates anniversary messages (*"1 year since your purchase — looking to invest or rent?"*) and festive greetings with interactive campaign quick-replies.
 
-### 7.4 Agent 4: CRM Sales Copilot & Executive Intelligence Agent (Internal)
+### 7.5 Agent 5: CRM Sales Copilot & Executive Intelligence Agent (Internal)
 - **Role & Objective:** Embedded AI copilot assisting sales executives and leadership inside the CRM web and mobile apps.
 - **Key Features:**
   - **Lead Timeline 3-Line Summary:** Condenses multi-week interaction histories (AI calls, staff calls, WhatsApp chats, site visits) into a 3-bullet executive summary rendered at the top of each lead's profile.
@@ -364,7 +390,7 @@ flowchart TD
     3. Critical SLA breaches and capacity bottlenecks across sales executives.
     4. Top 5 priority managerial interventions for the day.
 
-### 7.5 AI Quality Feedback Loop & Human-in-the-Loop Governance
+### 7.6 AI Quality Feedback Loop & Human-in-the-Loop Governance
 - Every AI-extracted requirement is presented to the human sales representative as a *suggested* field with a 1-tap *"Confirm"* or *"Edit"* action.
 - Telemetry: Staff rate each AI call outcome as `Correct`, `Partially Correct`, or `Incorrect`.
 - Weekly accuracy metrics are tracked on the Tech Admin dashboard to monitor prompt drift, speech recognition accuracy, and conversion efficacy.
