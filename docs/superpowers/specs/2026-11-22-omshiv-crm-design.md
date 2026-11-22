@@ -32,6 +32,7 @@ The purpose of this project is to build a centralized, single-source-of-truth pl
 - **Settings-Driven Engine:** Approximately 90 core business rules (assignment algorithms, SLA windows, VIP thresholds, commission slabs, stage transitions, quiet hours) are configurable via an MD settings table with complete audit logging.
 - **Single Intake Pipeline:** All inbound channels (Website, Meta Lead Ads, Google Ads, WhatsApp Bot, Front Desk, Sales manual entry, Channel Partners, AI Voice) pass through one unified Intake API with standard validation, mobile normalization, and deterministic ID allocation (`OB-YYYY-NNNN`).
 - **Complete Property Taxonomy Integration (Propira Rebuild):** Full native schema and API support for 3 listing types (Sale, Rent, PG), 4 categories (Residential, Commercial, Agriculture, Industry), and 12 sub-categories with specific attribute tables and strict server-side validation.
+- **100% Dynamic Admin-Controlled Property Master Options:** Every dropdown, option list, amenity checkbox, area unit, ownership type, and sub-type in the Property Posting engine is 100% dynamic and configurable by the MD/Admin from the admin panel. Zero hardcoded enum lists or choice arrays in frontend or backend application code.
 - **Deterministic Two-Sided Matching:** Automated matching between verified listings (`OP-YYYY-NNN`) and active buyer requirement cards based on location, budget tolerance ($\pm 15\%$), property type, and transaction intent.
 - **Multi-Channel Automation:** Two-way WhatsApp Business API integration (via DoubleTick) for automated lead qualification, SLA escalation, site visit reminders, and feedback collection; abstracted AI voice calling for automated pre-qualification.
 - **Channel Partner Ecosystem:** Partner tiers (Associate, Partner, Premium Partner) with lead submission, 90-day lead protection, and transparent commission lifecycle tracking (`Due` $\to$ `Approved` $\to$ `Paid`).
@@ -197,19 +198,48 @@ flowchart TD
 - `lost_lead_details`: `id`, `lead_id`, `reason_code`, `remarket_class` (`WITHIN_6_MONTHS`, `AFTER_6_MONTHS`, `NEVER_CONTACT_DND`), `notes`.
 - `nurture_lead_details`: `id`, `lead_id`, `reason`, `revive_date` (date), `is_revived` (boolean).
 
-### 5.4 Seller Inventory & Propira Property Engine
+### 5.4 Seller Inventory & Dynamic Propira Property Engine
+
+#### 5.4.1 Dynamic Property Master Data & Options (100% Admin-Controlled)
+To ensure **zero hardcoded options** anywhere in the system, all choices, dropdown values, units, and checkbox amenities are stored in relational master data tables managed via the Admin Panel:
+
+- `property_master_groups`:
+  - `group_key` (PK, varchar, e.g. `FACING`, `FLOORING`, `POSSESSION`, `TRANSACTION`, `OWNERSHIP`, `RENTAL_ALLOWED_FOR`, `FURNISHED_STATUS`, `FURNITURE_ITEMS`, `WHICH_PART`, `AREA_UNITS`, `SOURCE_TYPE`, `AMENITIES`, `NEARBY_TAGS`, `PG_AVAILABLE_FOR`, `PG_ROOM_TYPES`)
+  - `name` (varchar, e.g. "Property Facing Options", "Flooring Types", "Area Units")
+  - `description` (text)
+  - `allow_multiple` (boolean, indicates whether form renders single dropdown or multi-select/checkboxes)
+  - `is_system` (boolean, prevents accidental deletion of essential system keys)
+  - `created_at` (timestamp)
+- `property_master_options`:
+  - `id` (PK, serial / uuid)
+  - `group_key` (FK to `property_master_groups.group_key`, indexed)
+  - `option_code` (varchar/int, preserves legacy codes like 1, 2, 3 so historical data migrates seamlessly)
+  - `label` (varchar, e.g. "North-East", "Granite", "Biswa", "Power Backup", "Beds")
+  - `applicable_categories` (int array / JSONB, e.g. `[1, 2]` — scopes options so "Bigha" only appears for Agriculture, "Lift" only appears for Apartments/Commercial)
+  - `applicable_sub_categories` (int array / JSONB, optional finer scoping)
+  - `display_order` (int, controls visual order in frontend dropdowns)
+  - `is_active` (boolean, default true; deactivated options are hidden from new posts but preserved on existing ads)
+  - `metadata` (JSONB, e.g. unit multiplier conversion to sq.ft, SVG icon name for amenities)
+  - `created_by` (FK to `employees.employee_id`)
+  - `updated_at` (timestamp)
+
+#### 5.4.2 Core Property & Attribute Schemas
 - `properties`:
   - `listing_id` (PK, format `OP-YYYY-NNN`, sequence backed)
-  - `listing_type` (1=Rent, 2=Sale, 3=PG)
-  - `category_code` (1=Residential, 2=Commercial, 3=Agriculture, 4=Industry)
-  - `sub_category_code` (1=Flat, 2=House, 4=ResPlot, 5=Shop, 6=Office, 7=CommPlot, 8=AgriLand, 9=Farmhouse, 10=IndPlot, 11=Warehouse, 12=ColdStorage, 13=Factory)
-  - `sub_type_code` (int, nullable)
-  - `state`, `city` (defaults to "Alwar"), `sub_locality`, `location_address`, `street_no`, `pincode`
-  - `latitude`, `longitude` (decimal, mandatory map pin)
-  - `expected_price` (numeric), `price_type` (`TOTAL`, `PER_UNIT`)
-  - `price_per_unit` (numeric, computed), `price_negotiable` (boolean)
-  - `facing` (varchar), `corner_property` (boolean), `description` (text)
-  - `ownership_type` (master list code)
+  - `listing_type` (FK to `property_master_options` where group=`LISTING_TYPE`: Rent=1, Sale=2, PG=3)
+  - `category_code` (FK to `property_master_options` where group=`CATEGORY`: 1=Residential, 2=Commercial, 3=Agriculture, 4=Industry)
+  - `sub_category_code` (FK to `property_master_options` where group=`SUB_CATEGORY`: 1=Flat, 2=House, 4=ResPlot, 5=Shop, 6=Office, 7=CommPlot, 8=AgriLand, 9=Farmhouse, 10=IndPlot, 11=Warehouse, 12=ColdStorage, 13=Factory)
+  - `sub_type_code` (FK to `property_master_options` where group=`SUB_TYPE`, nullable)
+  - `state`, `city` (defaults to "Alwar", configurable in settings), `sub_locality`, `location_address`, `street_no`, `pincode`
+  - `latitude`, `longitude` (decimal, mandatory map pin; submission blocked without it)
+  - `expected_price` (numeric, greater than 0)
+  - `price_type` (FK to `property_master_options`: `TOTAL`, `PER_UNIT`)
+  - `price_per_unit` (numeric, auto-calculated as price ÷ area)
+  - `price_negotiable` (boolean)
+  - `facing_code` (FK to `property_master_options` where group=`FACING`)
+  - `corner_property` (boolean)
+  - `description` (text)
+  - `ownership_type_code` (FK to `property_master_options` where group=`OWNERSHIP`)
   - `status` (`UNVERIFIED`, `PENDING_VERIFICATION`, `VERIFIED_AVAILABLE`, `HOLD`, `SOLD`, `RENTED`, `WITHDRAWN`, `REJECTED`, `EXPIRED`)
   - `rejection_reason` (text, nullable)
   - `is_live_website` (boolean, default false)
@@ -220,14 +250,15 @@ flowchart TD
   - `expires_at` (timestamp, nullable; auto-calculated as +90 days for sale, +30 days for rent upon going live)
   - `created_at`, `verified_at`, `sold_at`
 - Sub-category specific child tables (1-to-1 with `properties`):
-  - `prop_residential_flats`: `bhk`, `rooms` (must equal BHK unless Studio), `total_floors`, `property_floor` ($\le$ total_floors), `balconies`, `bathrooms`, `super_area`, `super_area_unit`, `carpet_area`, `carpet_area_unit` (enforced carpet < super), `flooring`, `furnished_status`, `furniture_items` (JSONB), `transaction_type`, `possession_status`, `construction_age`.
-  - `prop_houses_villas`: `constructed_floors`, `plot_area`, `plot_unit`, `rooms`, `kitchens`, `bathrooms`, `balconies`, `facing_road_width_ft`, `flooring`, `furnished_status`, `transaction_type`, `possession_status`.
-  - `prop_plots`: `plot_area`, `plot_unit`, `boundary_wall` (bool), `facing_road_width_ft`.
-  - `prop_commercial`: `total_floors`, `sell_part` (`FULL`, `PART`), `floor_level`, `super_area`, `carpet_area`, `road_width_ft`.
-  - `prop_agriculture`: `area`, `unit` (`Bigha`, `Biswa`, `Acre`, `Hectare`), `boundary` (bool), `road_width_ft`, `corridor_distance_expressway_km`.
+  - `prop_residential_flats`: `bhk`, `rooms` (must equal BHK unless Studio), `total_floors`, `property_floor` ($\le$ total_floors), `balconies`, `bathrooms`, `super_area`, `super_area_unit_id`, `carpet_area`, `carpet_area_unit_id` (enforced carpet < super), `flooring_code`, `furnished_status_code`, `furniture_item_ids` (int array referencing `property_master_options`), `transaction_type_code`, `possession_status_code`, `construction_age`.
+  - `prop_houses_villas`: `constructed_floors`, `plot_area`, `plot_unit_id`, `rooms`, `kitchens`, `bathrooms`, `balconies`, `facing_road_width_ft`, `flooring_code`, `furnished_status_code`, `transaction_type_code`, `possession_status_code`.
+  - `prop_plots`: `plot_area`, `plot_unit_id`, `boundary_wall` (bool), `facing_road_width_ft`.
+  - `prop_commercial`: `total_floors`, `sell_part_code`, `floor_level`, `super_area`, `carpet_area`, `road_width_ft`.
+  - `prop_agriculture`: `area`, `unit_id` (Bigha, Biswa, Acre, Hectare), `boundary` (bool), `road_width_ft`, `corridor_distance_expressway_km`.
   - `prop_industrial_warehouses`: `plot_area`, `covered_area`, `storage_capacity_mt` (for cold storage), `shed` (bool), `office` (bool), `toilet` (bool).
-  - `prop_pg`: `pg_name`, `available_for`, `gender`, `room_type`, `food_included` (bool), `meals_type`, `notice_period_days`, `electricity_charges_type`.
-- `property_amenities`: `property_id`, `amenity_code` (power_backup, water, park, parking, security, gated, lift, gym, pool).
+  - `prop_pg`: `pg_name`, `available_for_code`, `gender`, `room_type_code`, `food_included` (bool), `meals_type_code`, `notice_period_days`, `electricity_charges_type`.
+- `property_amenity_mappings`: `property_id`, `option_id` (FK to `property_master_options` where group=`AMENITIES`).
+- `property_nearby_distances`: `property_id`, `tag_option_id` (FK to `property_master_options` where group=`NEARBY_TAGS`), `distance_km` (decimal).
 - `property_media`: `id`, `property_id`, `media_type` (`PHOTO`, `VIDEO_LINK`, `MAP`), `url`, `display_order`, `is_cover` (boolean).
 - `property_verification`: `property_id`, `verified_by_emp_id`, `visit_date`, `is_physically_verified`, `area_confirmed`, `photos_genuine_confirmed`, `ownership_confirmed`, `verifier_notes`, `manager_approval_emp_id`, `approved_at`.
 
@@ -284,6 +315,13 @@ flowchart TD
 ### 6.6 WhatsApp Communications & Shared Inbox Boundary
 - **Transactional & Event Outbound:** Automated messages (OTP, assignment notifications, reminders, match broadcasts, feedback requests) are processed directly by FastAPI and the DoubleTick REST API with real delivery status webhooks (`sent`, `delivered`, `read`, `failed`).
 - **Conversational 1-to-1 Messaging:** Sales executives and managers interact with leads via one-tap WhatsApp deep links (`https://wa.me/` / DoubleTick web & mobile apps). All incoming webhook messages from DoubleTick are recorded in the lead's activity timeline, keeping the CRM lean and avoiding the massive overhead of building a duplicate custom WebSocket chat engine.
+
+### 6.7 Dynamic Master Option Engine & Admin Governance
+Every single dropdown, unit, amenity, and choice in the Property Posting Engine is 100% dynamic and editable from the MD/Admin Panel:
+1. **Zero Hardcoded Enums:** Frontend components (React, React Native, Next.js) and backend validators never define hardcoded arrays for facing directions, flooring types, possession stages, ownership documents, rental tenant permissions, or amenities. All forms dynamically fetch their schema definitions from `/v1/public/property-schema` (cached in Redis, invalidated on admin edit).
+2. **Category & Sub-Category Scoping:** When the MD creates or edits an option in the Admin Panel, they specify which categories/sub-categories it applies to (e.g., *Bigha* is enabled exclusively for Agriculture; *Lift* is enabled for Flats and Commercial buildings, but automatically hidden for Plots).
+3. **Safe Soft-Deactivation:** To protect data integrity, options in `property_master_options` cannot be deleted if referenced by existing properties. Instead, setting `is_active = false` hides the option from future property posting forms while preserving it on historical listings and search filters.
+4. **Audit Trail on Master Changes:** Every modification to a master option (creating a new flooring type, changing display order, modifying labels) writes an entry to `audit_logs` capturing `performed_by` (`EMP-XXXX`), timestamp, old value, and new value.
 
 ---
 
