@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   Users,
@@ -15,10 +16,6 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
-  Search,
-  Bell,
-  Sparkles,
-  Command,
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 
@@ -34,32 +31,37 @@ export type AdminTab =
 
 interface AdminLayoutProps {
   user: any;
-  activeTab: AdminTab;
-  onSelectTab: (tab: AdminTab) => void;
+  activeTab?: AdminTab;
+  onSelectTab?: (tab: AdminTab) => void;
   onLogout: () => void;
-  children: React.ReactNode;
+  children?: React.ReactNode;
 }
 
-interface NavCategory {
+export interface NavItem {
+  id: AdminTab;
+  path: string;
+  label: string;
+  shortLabel: string;
+  icon: React.ComponentType<{ className?: string }>;
+  badge?: string;
+  badgeColor?: string;
+}
+
+export interface NavCategory {
   title: string;
-  items: {
-    id: AdminTab;
-    label: string;
-    shortLabel: string;
-    icon: React.ComponentType<{ className?: string }>;
-    badge?: string;
-    badgeColor?: string;
-  }[];
+  items: NavItem[];
 }
 
 export const AdminLayout: React.FC<AdminLayoutProps> = ({
   user,
-  activeTab,
+  activeTab: activeTabProp,
   onSelectTab,
   onLogout,
   children,
 }) => {
   const { toggleTheme, isDark } = useTheme();
+  const location = useLocation();
+  const navigate = useNavigate();
 
   // Collapsible sidebar state (persisted in localStorage)
   const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
@@ -73,6 +75,22 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
     localStorage.setItem('omshiv_sidebar_collapsed', String(isCollapsed));
   }, [isCollapsed]);
 
+  // Derive activeTab from URL pathname if not explicitly passed
+  const activeTab = useMemo<AdminTab>(() => {
+    if (activeTabProp) return activeTabProp;
+    const p = location.pathname;
+    if (p.startsWith('/staff')) return 'STAFF';
+    if (p.startsWith('/leads')) {
+      if (p.length > 7) return 'LEAD_DETAIL';
+      return 'MY_WORK';
+    }
+    if (p.startsWith('/verifications')) return 'VERIFICATION';
+    if (p.startsWith('/recycle-bin')) return 'RECYCLE_BIN';
+    if (p.startsWith('/masters')) return 'DYNAMIC_MASTERS';
+    if (p.startsWith('/settings')) return 'SETTINGS';
+    return 'DASHBOARD';
+  }, [activeTabProp, location.pathname]);
+
   const isSuperAdmin = user?.role === 'SUPER_ADMIN' || user?.role === 'MD';
 
   const navCategories: NavCategory[] = [
@@ -81,6 +99,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
       items: [
         {
           id: 'DASHBOARD',
+          path: '/dashboard',
           label: 'Executive Dashboard',
           shortLabel: 'Dashboard',
           icon: LayoutDashboard,
@@ -94,6 +113,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
       items: [
         {
           id: 'STAFF',
+          path: '/staff',
           label: 'Staff & Roles Manager',
           shortLabel: 'Staff',
           icon: Users,
@@ -107,12 +127,14 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
       items: [
         {
           id: 'MY_WORK',
+          path: '/leads',
           label: 'Sales Queue & Leads',
           shortLabel: 'Leads',
           icon: CheckSquare,
         },
         {
           id: 'VERIFICATION',
+          path: '/verifications',
           label: 'Property Verifications',
           shortLabel: 'Verify',
           icon: Building2,
@@ -121,6 +143,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
         },
         {
           id: 'RECYCLE_BIN',
+          path: '/recycle-bin',
           label: 'Recycle Bin & Requests',
           shortLabel: 'Recycle',
           icon: Trash2,
@@ -132,12 +155,14 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
       items: [
         {
           id: 'DYNAMIC_MASTERS',
+          path: '/masters',
           label: 'Dynamic Master Options',
           shortLabel: 'Masters',
           icon: Sliders,
         },
         {
           id: 'SETTINGS',
+          path: '/settings',
           label: 'System Settings & Audit',
           shortLabel: 'Settings',
           icon: Settings,
@@ -148,9 +173,14 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
 
   // Flat list for header lookup
   const flatNavItems = navCategories.flatMap((c) => c.items);
-  const currentNav = flatNavItems.find(
-    (n) => n.id === activeTab || (n.id === 'MY_WORK' && activeTab === 'LEAD_DETAIL')
-  );
+  const currentNav =
+    flatNavItems.find(
+      (n) =>
+        n.id === activeTab ||
+        (n.id === 'MY_WORK' && activeTab === 'LEAD_DETAIL') ||
+        n.path === location.pathname ||
+        (n.path !== '/dashboard' && n.path !== '/' && location.pathname.startsWith(n.path))
+    ) || flatNavItems[0];
 
   return (
     <div
@@ -182,7 +212,10 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
             isDark ? 'border-slate-800/80' : 'border-slate-200'
           }`}
         >
-          <div className="flex items-center gap-3 overflow-hidden">
+          <div
+            onClick={() => navigate('/dashboard')}
+            className="flex items-center gap-3 overflow-hidden cursor-pointer"
+          >
             <div className="relative p-2.5 bg-gradient-to-tr from-emerald-600 to-green-500 rounded-xl shadow-md shadow-emerald-900/30 flex-shrink-0 group">
               <Building2 className="w-5 h-5 text-white" />
               <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 rounded-full animate-ping opacity-75"></span>
@@ -233,13 +266,16 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                 const Icon = item.icon;
                 const isActive =
                   activeTab === item.id ||
-                  (item.id === 'MY_WORK' && activeTab === 'LEAD_DETAIL');
+                  (item.id === 'MY_WORK' && activeTab === 'LEAD_DETAIL') ||
+                  location.pathname === item.path ||
+                  (item.path !== '/dashboard' && item.path !== '/' && location.pathname.startsWith(item.path));
 
                 return (
                   <button
                     key={item.id}
                     onClick={() => {
-                      onSelectTab(item.id);
+                      navigate(item.path);
+                      if (onSelectTab) onSelectTab(item.id);
                       setIsMobileOpen(false);
                     }}
                     title={isCollapsed && !isMobileOpen ? item.label : undefined}
@@ -449,7 +485,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
             >
               {isDark ? (
                 <>
-                  <Sun className="w-4 h-4 text-amber-400 animate-spin-slow" />
+                  <Sun className="w-4 h-4 text-amber-400" />
                   <span>Light Mode</span>
                 </>
               ) : (

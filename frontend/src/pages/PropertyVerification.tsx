@@ -1,8 +1,29 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { CheckCircle2, PhoneCall, FileText, RefreshCw, Trash2, ArrowUpRight, Building2, ShieldCheck } from 'lucide-react';
 
 export const PropertyVerification: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'VERIFY' | 'RECYCLE'>('VERIFY');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab')?.toUpperCase();
+
+  const activeTab = useMemo<'VERIFY' | 'RECYCLE'>(() => {
+    return tabParam === 'RECYCLE' ? 'RECYCLE' : 'VERIFY';
+  }, [tabParam]);
+
+  const setActiveTab = (tab: 'VERIFY' | 'RECYCLE') => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (tab === 'VERIFY') {
+          next.delete('tab');
+        } else {
+          next.set('tab', tab.toLowerCase());
+        }
+        return next;
+      },
+      { replace: true }
+    );
+  };
   const [properties, setProperties] = useState<any[]>([]);
   const [recycleBin, setRecycleBin] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);

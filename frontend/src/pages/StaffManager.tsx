@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Users,
   UserPlus,
@@ -22,7 +23,31 @@ import {
 } from 'lucide-react';
 
 export const StaffManager: React.FC = () => {
-  const [activeSubTab, setActiveSubTab] = useState<'ROSTER' | 'ROLES' | 'PERMISSIONS'>('ROSTER');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab')?.toUpperCase();
+  const roleParam = searchParams.get('role');
+
+  const activeSubTab = useMemo<'ROSTER' | 'ROLES' | 'PERMISSIONS'>(() => {
+    if (tabParam === 'ROLES' || tabParam === 'PERMISSIONS' || tabParam === 'ROSTER') {
+      return tabParam as 'ROSTER' | 'ROLES' | 'PERMISSIONS';
+    }
+    return 'ROSTER';
+  }, [tabParam]);
+
+  const setActiveSubTab = (tab: 'ROSTER' | 'ROLES' | 'PERMISSIONS') => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (tab === 'ROSTER') {
+          next.delete('tab');
+        } else {
+          next.set('tab', tab.toLowerCase());
+        }
+        return next;
+      },
+      { replace: true }
+    );
+  };
   const [staff, setStaff] = useState<any[]>([]);
   const [roles, setRoles] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
@@ -123,12 +148,31 @@ export const StaffManager: React.FC = () => {
     fetchAllData();
   }, []);
 
+  useEffect(() => {
+    if (roleParam && roles.length > 0) {
+      const target = roles.find((r) => r.code === roleParam);
+      if (target) {
+        setSelectedRoleCode(target.code);
+        setRolePermissions(target.permissions || {});
+      }
+    }
+  }, [roles, roleParam]);
+
   const handleSelectRole = (code: string) => {
     setSelectedRoleCode(code);
     const target = roles.find((r) => r.code === code);
     if (target) {
       setRolePermissions(target.permissions || {});
     }
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set('tab', 'permissions');
+        next.set('role', code);
+        return next;
+      },
+      { replace: true }
+    );
     setSuccessMsg('');
     setError('');
   };
