@@ -59,7 +59,7 @@ function startBackend(): ChildProcess {
     ['-m', 'uvicorn', 'app.main:app', '--reload', '--host', '127.0.0.1', '--port', '8000'],
     {
       cwd: backendDir,
-      env: { ...process.env, PYTHONUNBUFFERED: '1' },
+      env: { ...process.env, PYTHONUNBUFFERED: '1', PYTHONPATH: backendDir },
       shell: isWin,
     }
   );

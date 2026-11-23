@@ -2,11 +2,40 @@ import os
 import time
 import logging
 from typing import Dict, Any
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, status
 from fastapi.middleware.cors import CORSMiddleware
+from app.core.database import engine, Base, AsyncSessionLocal
+from app.services.identity_seed import seed_departments_and_roles, seed_admin_user
+from app.services.property_master_service import seed_property_masters
 from app.api.v1.endpoints import auth, admin_auth, admin_staff, settings, intake, leads, property_master, properties, property_verification, owner_operations
 
+# Ensure all database models are registered in Base.metadata for auto-migration
+import app.models.identity
+import app.models.settings
+import app.models.leads
+import app.models.properties
+import app.models.property_master
+
 logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Initializes tables and seeds default admin, roles, and master options on server startup."""
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+
+        async with AsyncSessionLocal() as session:
+            await seed_departments_and_roles(session)
+            await seed_admin_user(session)
+            await seed_property_masters(session)
+        logger.info("Database initialized and default admin seeded successfully.")
+    except Exception as exc:
+        logger.warning("Startup database initialization notice: %s", exc)
+    yield
+
 
 app = FastAPI(
     title="Omshiv CRM API",
@@ -14,6 +43,7 @@ app = FastAPI(
     version="0.1.0",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 app.add_middleware(

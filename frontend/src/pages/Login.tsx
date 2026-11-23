@@ -32,9 +32,16 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
       });
-      const data = await res.json();
+      const text = await res.text();
+      let data: any = null;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        // Not JSON
+      }
+
       if (!res.ok) {
-        throw new Error(data.detail || 'Invalid username or password');
+        throw new Error(data?.detail || text || `Server error (${res.status})`);
       }
       localStorage.setItem('access_token', data.access_token);
       localStorage.setItem('user', JSON.stringify(data.user));
@@ -64,8 +71,10 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mobile }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Failed to request OTP');
+      const text = await res.text();
+      let data: any = null;
+      try { data = JSON.parse(text); } catch {}
+      if (!res.ok) throw new Error(data?.detail || text || 'Failed to request OTP');
       setSessionId(data.session_id);
       setChannel(data.channel);
     } catch (err: any) {
@@ -85,8 +94,10 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ session_id: sessionId, otp }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Invalid OTP');
+      const text = await res.text();
+      let data: any = null;
+      try { data = JSON.parse(text); } catch {}
+      if (!res.ok) throw new Error(data?.detail || text || 'Invalid OTP');
       localStorage.setItem('access_token', data.access_token);
       localStorage.setItem('user', JSON.stringify(data.user));
       onLoginSuccess(data.user, data.access_token);

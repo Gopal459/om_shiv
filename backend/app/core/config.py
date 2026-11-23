@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = os.environ.get("ENVIRONMENT", "development")
     DATABASE_URL: str = os.environ.get(
         "DATABASE_URL",
-        "postgresql+asyncpg://postgres:postgres@localhost:5432/omshiv_crm",
+        "sqlite+aiosqlite:///./omshiv_dev.db",
     )
     REDIS_URL: str = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
     SECRET_KEY: str = os.environ.get(
