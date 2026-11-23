@@ -12,6 +12,36 @@
 
 ---
 
+## Architecture Decisions (Resolved from Builder Review)
+
+1. **Database Schema Integration**:
+   - `tbl_leads` is created via migration `0005_tbl_leads_schema.py` with all 54 legacy columns.
+   - The SQLAlchemy model `Lead` is configured with `__tablename__ = "tbl_leads"` and provides transparent hybrid properties / column aliases (`full_name` ↔ `contact_name`, `lead_id` ↔ `lead_unique_id`, `id` ↔ `leads_id`, `created_at` ↔ `created_date`).
+   - Foreign key relations (`lead_activities.lead_id -> tbl_leads.lead_unique_id`) and all 60 existing tests remain 100% green without breaking.
+
+2. **Property Type Taxonomy (`Buy`, `Rent`, `PG`)**:
+   - Stored in `lead_table_name` (or `lead_type`) with canonical values `'BUY'`, `'RENT'`, `'PG'`, allowing exact filtering via query parameter `?type=buy|rent|pg`.
+
+3. **Kanban State Mapping**:
+   - The 6 Kanban columns map to deterministic pairs of `(lead_status, stage)`:
+     - **New**: `(lead_status=0, stage=1)`
+     - **In Progress**: `(lead_status=1, stage=1)`
+     - **Site Visit Planned / Completed**: `(lead_status=1, stage=2 or 3)`
+     - **Qualified**: `(lead_status=4, stage=1)`
+     - **Deal Closed / Converted**: `(lead_status=5, stage=3)`
+     - **Disqualified / Lost**: `(lead_status=2, stage=1)` (with optional reason dialog)
+
+4. **Inflow Ingestion Scope**:
+   - Focus on CRM-side ingestion tools: Manual Lead Creation modal (`createLeads` with 24 sources), Bulk CSV/Excel import endpoint (`importLeads`), and 1-click conversion from website inquiries, while integrating with existing `/v1/intake/lead`.
+
+5. **Dual-Mode UI Scope at `/leads`**:
+   - The `/leads` route becomes the unified Enterprise Leads Command Center.
+   - Includes view switcher: `[Kanban Board View]` ⇄ `[Table View]`.
+   - Includes filter tabs: `All Leads`, `My Work (3h SLA)`, `Buy`, `Rent`, `PG`.
+   - Clicking `Create Lead` or `Import Lead` opens dedicated interactive modals.
+
+---
+
 ## Global Constraints
 - Full backward compatibility with existing lead routes (`/v1/leads/my-work`, `/v1/leads/{id}`) so all 60 existing pytest tests pass without regression.
 - Exact visual reproduction of Screenshot 1 (Sidebar submenus), Screenshot 2 (Header & Contact Details), and Screenshot 3 (Property Details & Others).
@@ -36,7 +66,7 @@
 - Test: `backend/tests/test_tbl_leads_schema.py`
 
 **Interfaces:**
-- Produces: `tbl_leads` table with all 54 columns, soft-delete column `deleted_at`, and `TblLead` / updated `Lead` model.
+- Produces: `tbl_leads` table with all 54 columns, soft-delete column `deleted_at`, and `Lead` / `TblLead` entity with bidirectional property aliases.
 
 - [ ] **Step 1: Write the failing test for `tbl_leads` migration**
 
@@ -68,20 +98,26 @@ Expected: FAIL with "no such table: tbl_leads"
 
 Create `backend/app/db/migrations/0005_tbl_leads_schema.py` defining the full 54-column table `tbl_leads` with indexes on `mobile`, `lead_status`, `stage`, `deleted_at`, and add `"app.db.migrations.0005_tbl_leads_schema"` to `MIGRATION_STEPS` in `runner.py`.
 
-- [ ] **Step 4: Update `backend/app/models/leads.py` with `TblLead` entity**
+- [ ] **Step 4: Update `backend/app/models/leads.py` with `tbl_leads` entity and hybrid property shims**
 
-Define SQLAlchemy mapped model for `tbl_leads` with properties aliasing both legacy (`leads_id`, `contact_name`) and modern (`lead_id`, `full_name`) accessors for seamless interoperability.
+Map `Lead` to `tbl_leads` with property aliases:
+- `id` ↔ `leads_id`
+- `lead_id` ↔ `lead_unique_id`
+- `full_name` ↔ `contact_name`
+- `lead_type` ↔ `lead_table_name`
+- `created_at` ↔ `created_date`
+- `updated_at` ↔ `modified_date`
 
-- [ ] **Step 5: Run tests to verify migration and model pass**
+- [ ] **Step 5: Run tests to verify migration and all 60 existing tests pass**
 
-Run: `.venv\Scripts\pytest backend/tests/test_tbl_leads_schema.py -v`
-Expected: PASS
+Run: `.venv\Scripts\pytest backend/tests -q`
+Expected: 61+ passed (100% green)
 
 - [ ] **Step 6: Commit**
 
 ```bash
 git add backend/app/db/migrations/ backend/app/models/leads.py backend/tests/test_tbl_leads_schema.py
-git commit -m "feat(db): add 0005_tbl_leads_schema migration and TblLead model"
+git commit -m "feat(db): add 0005_tbl_leads_schema migration and tbl_leads model aliases"
 ```
 
 ---
@@ -89,9 +125,7 @@ git commit -m "feat(db): add 0005_tbl_leads_schema migration and TblLead model"
 ### Task 2: Backend Inflow Handlers, CSV Bulk Import & Kanban API
 
 **Files:**
-- Create: `backend/app/api/v1/endpoints/lead_inflow.py`
 - Modify: `backend/app/api/v1/endpoints/leads.py`
-- Modify: `backend/app/api/v1/__init__.py` or router inclusion
 - Modify: `backend/app/repositories/lead_repo.py`
 - Test: `backend/tests/test_lead_inflow_and_kanban.py`
 
