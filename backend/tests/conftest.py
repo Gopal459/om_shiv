@@ -40,3 +40,69 @@ async def test_client(db_session: AsyncSession):
         yield client
     app.dependency_overrides.clear()
 
+
+@pytest_asyncio.fixture
+async def auth_client_md(db_session: AsyncSession):
+    """Provides an AsyncClient authenticated as MD (EMP-0001) with seed data."""
+    from app.models.identity import Department, Role, Employee
+    from app.core.security import create_access_token
+    from sqlalchemy import select
+
+    # Ensure Managing Director employee exists
+    res = await db_session.execute(select(Employee).where(Employee.employee_id == "EMP-0001"))
+    emp = res.scalar_one_or_none()
+    if not emp:
+        dept = Department(name="Management", code="MGMT")
+        db_session.add(dept)
+        await db_session.flush()
+
+        role = Role(
+            department_id=dept.id,
+            name="Managing Director",
+            code="MD",
+            permissions={"all": ["*"]},
+        )
+        db_session.add(role)
+        await db_session.flush()
+
+        emp = Employee(
+            employee_id="EMP-0001",
+            name="Managing Director",
+            email="md@omshiv.com",
+            mobile="9829000001",
+            department_id=dept.id,
+            role_id=role.id,
+            is_active=True,
+        )
+        db_session.add(emp)
+        await db_session.commit()
+        await db_session.refresh(emp)
+
+    # Seed system settings if seeding function is available
+    try:
+        from app.services.settings_service import seed_system_settings
+        await seed_system_settings(db_session)
+    except ImportError:
+        pass
+
+    token = create_access_token({
+        "sub": "EMP-0001",
+        "employee_id": emp.id,
+        "name": emp.name,
+        "mobile": emp.mobile,
+        "role": "MD",
+        "department": "MGMT",
+        "permissions": {"all": ["*"]},
+    })
+
+    async def override_get_db():
+        yield db_session
+
+    app.dependency_overrides[get_db] = override_get_db
+    transport = ASGITransport(app=app)
+    headers = {"Authorization": f"Bearer {token}"}
+    async with AsyncClient(transport=transport, base_url="http://test", headers=headers) as client:
+        yield client
+    app.dependency_overrides.clear()
+
+
