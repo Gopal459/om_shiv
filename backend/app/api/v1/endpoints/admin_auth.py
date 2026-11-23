@@ -8,7 +8,7 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy import select, func, or_
 
 from app.core.database import get_db
-from app.models.identity import Employee, Role, Department
+from app.repositories import staff_repo
 from app.core.passwords import verify_password
 from app.core.security import create_access_token
 
@@ -49,24 +49,8 @@ async def admin_login(
     payload: AdminLoginRequest,
     db: AsyncSession = Depends(get_db),
 ) -> AdminLoginResponse:
-    query_str = payload.username.strip()
-    query_lower = query_str.lower()
-
-    # Query Employee by username (case-insensitive), email, or employee_id
-    stmt = (
-        select(Employee)
-        .options(selectinload(Employee.role), selectinload(Employee.department))
-        .where(
-            Employee.deleted_at.is_(None),
-            or_(
-                func.lower(Employee.username) == query_lower,
-                func.lower(Employee.email) == query_lower,
-                Employee.employee_id == query_str.upper(),
-            )
-        )
-    )
-    res = await db.execute(stmt)
-    employee = res.scalar_one_or_none()
+    # Query Employee by username (case-insensitive), email, or employee_id via Repository
+    employee = await staff_repo.get_by_username_or_email(db, payload.username)
 
     if not employee:
         raise HTTPException(

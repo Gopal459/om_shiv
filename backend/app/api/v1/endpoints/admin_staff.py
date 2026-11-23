@@ -3,14 +3,13 @@ import re
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
-from sqlalchemy import select, func, or_
 
 from app.core.database import get_db
-from app.models.identity import Employee, Role, Department
+from app.models.identity import Employee, Role
 from app.core.passwords import hash_password
+from app.repositories import staff_repo, role_repo, department_repo
 
 logger = logging.getLogger(__name__)
 
@@ -104,18 +103,12 @@ class UpdatePermissionsRequest(BaseModel):
     "/admin/departments",
     response_model=List[DepartmentResponse],
     status_code=status.HTTP_200_OK,
-    summary="List all active departments",
+    summary="List all active departments via DepartmentRepository",
 )
 async def list_departments(
     db: AsyncSession = Depends(get_db),
 ) -> List[DepartmentResponse]:
-    stmt = (
-        select(Department)
-        .where(Department.deleted_at.is_(None))
-        .order_by(Department.name.asc())
-    )
-    res = await db.execute(stmt)
-    depts = res.scalars().all()
+    depts = await department_repo.list_active(db)
     return [
         DepartmentResponse(
             id=d.id,
@@ -133,32 +126,15 @@ async def list_departments(
     "/admin/roles",
     response_model=List[RoleResponse],
     status_code=status.HTTP_200_OK,
-    summary="List all dynamic roles and active employee counts",
+    summary="List all dynamic roles via RoleRepository",
 )
 async def list_roles(
     db: AsyncSession = Depends(get_db),
 ) -> List[RoleResponse]:
-    # Query non-deleted roles
-    stmt = (
-        select(Role)
-        .options(selectinload(Role.department), selectinload(Role.employees))
-        .where(Role.deleted_at.is_(None))
-        .order_by(Role.id.asc())
-    )
-    res = await db.execute(stmt)
-    roles = res.scalars().all()
-
-    # Query active counts per role
-    count_stmt = (
-        select(Employee.role_id, func.count(Employee.id))
-        .where(Employee.deleted_at.is_(None), Employee.is_active.is_(True))
-        .group_by(Employee.role_id)
-    )
-    count_res = await db.execute(count_stmt)
-    count_map = {row[0]: row[1] for row in count_res.all()}
-
+    role_items = await role_repo.list_active_with_counts(db)
     output = []
-    for r in roles:
+    for item in role_items:
+        r = item["role"]
         output.append(
             RoleResponse(
                 id=r.id,
@@ -169,7 +145,7 @@ async def list_roles(
                 department_code=r.department.code if r.department else None,
                 permissions=r.permissions or {},
                 is_active=r.is_active,
-                employee_count=count_map.get(r.id, 0),
+                employee_count=item["employee_count"],
                 created_at=r.created_at,
             )
         )
@@ -180,22 +156,20 @@ async def list_roles(
     "/admin/roles",
     response_model=RoleResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Create a new dynamic role with custom permissions",
+    summary="Create a new dynamic role via RoleRepository",
 )
 async def create_role(
     payload: RoleCreateRequest,
     db: AsyncSession = Depends(get_db),
 ) -> RoleResponse:
-    # 1. Generate or normalize code
+    # 1. Normalize code
     if payload.code and payload.code.strip():
         code = re.sub(r'[^A-Z0-9_]', '_', payload.code.strip().upper())
     else:
         code = re.sub(r'[^A-Z0-9_]', '_', payload.name.strip().upper())
 
-    # 2. Check if code already exists and is not deleted
-    stmt_check = select(Role).where(Role.code == code)
-    res_check = await db.execute(stmt_check)
-    existing = res_check.scalar_one_or_none()
+    # 2. Check existing
+    existing = await role_repo.get_by_code(db, code, include_deleted=True)
     if existing:
         if existing.deleted_at is None:
             raise HTTPException(
@@ -208,8 +182,7 @@ async def create_role(
             existing.is_active = True
             existing.name = payload.name.strip()
             existing.permissions = payload.permissions or {}
-            await db.commit()
-            await db.refresh(existing)
+            await role_repo.update(db, existing)
             return RoleResponse(
                 id=existing.id,
                 name=existing.name,
@@ -222,12 +195,7 @@ async def create_role(
             )
 
     # 3. Resolve department
-    stmt_dept = select(Department).where(
-        Department.code == payload.department_code.strip().upper(),
-        Department.deleted_at.is_(None),
-    )
-    res_dept = await db.execute(stmt_dept)
-    dept = res_dept.scalar_one_or_none()
+    dept = await department_repo.get_by_code(db, payload.department_code)
     if not dept:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -243,21 +211,19 @@ async def create_role(
         is_active=True,
         deleted_at=None,
     )
-    db.add(new_role)
-    await db.commit()
-    await db.refresh(new_role)
+    saved_role = await role_repo.create(db, new_role)
 
     return RoleResponse(
-        id=new_role.id,
-        name=new_role.name,
-        code=new_role.code,
+        id=saved_role.id,
+        name=saved_role.name,
+        code=saved_role.code,
         department_id=dept.id,
         department_name=dept.name,
         department_code=dept.code,
-        permissions=new_role.permissions or {},
-        is_active=new_role.is_active,
+        permissions=saved_role.permissions or {},
+        is_active=saved_role.is_active,
         employee_count=0,
-        created_at=new_role.created_at,
+        created_at=saved_role.created_at,
     )
 
 
@@ -265,20 +231,14 @@ async def create_role(
     "/admin/roles/{code}",
     response_model=RoleResponse,
     status_code=status.HTTP_200_OK,
-    summary="Update a dynamic role's details, department, or active state",
+    summary="Update a dynamic role via RoleRepository",
 )
 async def update_role(
     code: str,
     payload: RoleUpdateRequest,
     db: AsyncSession = Depends(get_db),
 ) -> RoleResponse:
-    stmt = (
-        select(Role)
-        .options(selectinload(Role.department), selectinload(Role.employees))
-        .where(Role.code == code.strip().upper(), Role.deleted_at.is_(None))
-    )
-    res = await db.execute(stmt)
-    role = res.scalar_one_or_none()
+    role = await role_repo.get_by_code(db, code)
     if not role:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -289,12 +249,7 @@ async def update_role(
         role.name = payload.name.strip()
 
     if payload.department_code is not None and payload.department_code.strip():
-        stmt_dept = select(Department).where(
-            Department.code == payload.department_code.strip().upper(),
-            Department.deleted_at.is_(None),
-        )
-        res_dept = await db.execute(stmt_dept)
-        dept = res_dept.scalar_one_or_none()
+        dept = await department_repo.get_by_code(db, payload.department_code)
         if not dept:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -308,28 +263,27 @@ async def update_role(
     if payload.permissions is not None:
         role.permissions = payload.permissions
 
-    await db.commit()
-    await db.refresh(role)
+    updated = await role_repo.update(db, role)
+    active_employees = await role_repo.get_assigned_active_employees(db, updated.id)
 
-    active_staff = [e for e in (role.employees or []) if e.deleted_at is None and e.is_active]
     return RoleResponse(
-        id=role.id,
-        name=role.name,
-        code=role.code,
-        department_id=role.department_id,
-        department_name=role.department.name if role.department else None,
-        department_code=role.department.code if role.department else None,
-        permissions=role.permissions or {},
-        is_active=role.is_active,
-        employee_count=len(active_staff),
-        created_at=role.created_at,
+        id=updated.id,
+        name=updated.name,
+        code=updated.code,
+        department_id=updated.department_id,
+        department_name=updated.department.name if updated.department else None,
+        department_code=updated.department.code if updated.department else None,
+        permissions=updated.permissions or {},
+        is_active=updated.is_active,
+        employee_count=len(active_employees),
+        created_at=updated.created_at,
     )
 
 
 @router.delete(
     "/admin/roles/{code}",
     status_code=status.HTTP_200_OK,
-    summary="Soft delete a role (with safety protection for Super Admin and assigned staff)",
+    summary="Soft delete a role via RoleRepository",
 )
 async def delete_role(
     code: str,
@@ -342,42 +296,26 @@ async def delete_role(
             detail="System roles (SUPER_ADMIN) cannot be deleted.",
         )
 
-    stmt = (
-        select(Role)
-        .options(selectinload(Role.employees))
-        .where(Role.code == norm_code, Role.deleted_at.is_(None))
-    )
-    res = await db.execute(stmt)
-    role = res.scalar_one_or_none()
+    role = await role_repo.get_by_code(db, norm_code)
     if not role:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Role with code '{code}' not found.",
         )
 
-    # Check for active employees assigned to this role
-    stmt_emp = select(Employee).where(
-        Employee.role_id == role.id,
-        Employee.deleted_at.is_(None),
-        Employee.is_active.is_(True),
-    )
-    res_emp = await db.execute(stmt_emp)
-    active_assigned = [e.employee_id for e in res_emp.scalars().all()]
+    active_assigned = await role_repo.get_assigned_active_employees(db, role.id)
     if active_assigned:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Cannot delete role '{code}': {len(active_assigned)} active staff member(s) ({', '.join(active_assigned[:3])}) are assigned to it. Please reassign them first.",
         )
 
-    # Soft delete role
-    role.deleted_at = datetime.now(timezone.utc)
-    role.is_active = False
-    await db.commit()
+    await role_repo.soft_delete(db, role)
 
     return {
         "status": "success",
         "message": f"Role '{role.name}' ({role.code}) soft-deleted successfully.",
-        "deleted_at": role.deleted_at.isoformat(),
+        "deleted_at": role.deleted_at.isoformat() if role.deleted_at else datetime.now(timezone.utc).isoformat(),
     }
 
 
@@ -392,14 +330,7 @@ async def update_role_permissions(
     payload: UpdatePermissionsRequest,
     db: AsyncSession = Depends(get_db),
 ) -> RoleResponse:
-    stmt = (
-        select(Role)
-        .options(selectinload(Role.department), selectinload(Role.employees))
-        .where(Role.code == code.strip().upper(), Role.deleted_at.is_(None))
-    )
-    res = await db.execute(stmt)
-    role = res.scalar_one_or_none()
-
+    role = await role_repo.get_by_code(db, code)
     if not role:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -407,21 +338,20 @@ async def update_role_permissions(
         )
 
     role.permissions = payload.permissions
-    await db.commit()
-    await db.refresh(role)
+    updated = await role_repo.update(db, role)
+    active_employees = await role_repo.get_assigned_active_employees(db, updated.id)
 
-    active_staff = [e for e in (role.employees or []) if e.deleted_at is None and e.is_active]
     return RoleResponse(
-        id=role.id,
-        name=role.name,
-        code=role.code,
-        department_id=role.department_id,
-        department_name=role.department.name if role.department else None,
-        department_code=role.department.code if role.department else None,
-        permissions=role.permissions or {},
-        is_active=role.is_active,
-        employee_count=len(active_staff),
-        created_at=role.created_at,
+        id=updated.id,
+        name=updated.name,
+        code=updated.code,
+        department_id=updated.department_id,
+        department_name=updated.department.name if updated.department else None,
+        department_code=updated.department.code if updated.department else None,
+        permissions=updated.permissions or {},
+        is_active=updated.is_active,
+        employee_count=len(active_employees),
+        created_at=updated.created_at,
     )
 
 
@@ -431,20 +361,12 @@ async def update_role_permissions(
     "/admin/staff",
     response_model=List[StaffResponse],
     status_code=status.HTTP_200_OK,
-    summary="List all active staff members and their assigned roles (soft-deleted excluded)",
+    summary="List all active staff members via StaffRepository",
 )
 async def list_staff(
     db: AsyncSession = Depends(get_db),
 ) -> List[StaffResponse]:
-    stmt = (
-        select(Employee)
-        .options(selectinload(Employee.department), selectinload(Employee.role))
-        .where(Employee.deleted_at.is_(None))
-        .order_by(Employee.id.asc())
-    )
-    res = await db.execute(stmt)
-    employees = res.scalars().all()
-
+    employees = await staff_repo.list_active(db)
     output = []
     for emp in employees:
         output.append(
@@ -471,23 +393,19 @@ async def list_staff(
     "/admin/staff",
     response_model=StaffResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Create a new staff member with credentials and dynamic role assignment",
+    summary="Create a new staff member via StaffRepository",
 )
 async def create_staff(
     payload: StaffCreateRequest,
     db: AsyncSession = Depends(get_db),
 ) -> StaffResponse:
-    # 1. Check for duplicates in username, email, or mobile among non-deleted staff
-    conditions = [
-        func.lower(Employee.username) == payload.username.strip().lower(),
-        Employee.mobile == payload.mobile.strip(),
-    ]
-    if payload.email:
-        conditions.append(func.lower(Employee.email) == payload.email.strip().lower())
-
-    stmt_check = select(Employee).where(Employee.deleted_at.is_(None), or_(*conditions))
-    res_check = await db.execute(stmt_check)
-    existing = res_check.scalar_one_or_none()
+    # 1. Duplicate check
+    existing = await staff_repo.check_duplicate(
+        db,
+        username=payload.username,
+        mobile=payload.mobile,
+        email=payload.email,
+    )
     if existing:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -495,12 +413,7 @@ async def create_staff(
         )
 
     # 2. Resolve Department
-    stmt_dept = select(Department).where(
-        Department.code == payload.department_code.strip().upper(),
-        Department.deleted_at.is_(None),
-    )
-    res_dept = await db.execute(stmt_dept)
-    dept = res_dept.scalar_one_or_none()
+    dept = await department_repo.get_by_code(db, payload.department_code)
     if not dept:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -508,25 +421,17 @@ async def create_staff(
         )
 
     # 3. Resolve Dynamic Role
-    stmt_role = select(Role).where(
-        Role.code == payload.role_code.strip().upper(),
-        Role.deleted_at.is_(None),
-    )
-    res_role = await db.execute(stmt_role)
-    role = res_role.scalar_one_or_none()
+    role = await role_repo.get_by_code(db, payload.role_code)
     if not role:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Role with code '{payload.role_code}' not found.",
         )
 
-    # 4. Generate EMP-XXXX sequence
-    stmt_count = select(func.count(Employee.id))
-    res_count = await db.execute(stmt_count)
-    count = res_count.scalar() or 0
-    generated_emp_id = f"EMP-{count + 1:04d}"
+    # 4. Generate EMP-XXXX ID
+    generated_emp_id = await staff_repo.generate_emp_id(db)
 
-    # 5. Create employee with hashed password
+    # 5. Create employee
     new_employee = Employee(
         employee_id=generated_emp_id,
         name=payload.name.strip(),
@@ -539,24 +444,22 @@ async def create_staff(
         is_active=True,
         deleted_at=None,
     )
-    db.add(new_employee)
-    await db.commit()
-    await db.refresh(new_employee)
+    saved_emp = await staff_repo.create(db, new_employee)
 
     return StaffResponse(
-        id=new_employee.id,
-        employee_id=new_employee.employee_id,
-        name=new_employee.name,
-        username=new_employee.username,
-        email=new_employee.email,
-        mobile=new_employee.mobile,
+        id=saved_emp.id,
+        employee_id=saved_emp.employee_id,
+        name=saved_emp.name,
+        username=saved_emp.username,
+        email=saved_emp.email,
+        mobile=saved_emp.mobile,
         department_id=dept.id,
         department_name=dept.name,
         role_id=role.id,
         role_name=role.name,
         role_code=role.code,
-        is_active=new_employee.is_active,
-        created_at=new_employee.created_at,
+        is_active=saved_emp.is_active,
+        created_at=saved_emp.created_at,
     )
 
 
@@ -564,20 +467,14 @@ async def create_staff(
     "/admin/staff/{employee_id}",
     response_model=StaffResponse,
     status_code=status.HTTP_200_OK,
-    summary="Update staff member details, department, role, or active status",
+    summary="Update staff member via StaffRepository",
 )
 async def update_staff(
     employee_id: str,
     payload: StaffUpdateRequest,
     db: AsyncSession = Depends(get_db),
 ) -> StaffResponse:
-    stmt = (
-        select(Employee)
-        .options(selectinload(Employee.department), selectinload(Employee.role))
-        .where(Employee.employee_id == employee_id.strip(), Employee.deleted_at.is_(None))
-    )
-    res = await db.execute(stmt)
-    emp = res.scalar_one_or_none()
+    emp = await staff_repo.get_by_emp_id(db, employee_id)
     if not emp:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -594,12 +491,7 @@ async def update_staff(
         emp.mobile = payload.mobile.strip()
 
     if payload.department_code is not None and payload.department_code.strip():
-        stmt_dept = select(Department).where(
-            Department.code == payload.department_code.strip().upper(),
-            Department.deleted_at.is_(None),
-        )
-        res_dept = await db.execute(stmt_dept)
-        dept = res_dept.scalar_one_or_none()
+        dept = await department_repo.get_by_code(db, payload.department_code)
         if not dept:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -608,12 +500,7 @@ async def update_staff(
         emp.department_id = dept.id
 
     if payload.role_code is not None and payload.role_code.strip():
-        stmt_role = select(Role).where(
-            Role.code == payload.role_code.strip().upper(),
-            Role.deleted_at.is_(None),
-        )
-        res_role = await db.execute(stmt_role)
-        role = res_role.scalar_one_or_none()
+        role = await role_repo.get_by_code(db, payload.role_code)
         if not role:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -624,30 +511,29 @@ async def update_staff(
     if payload.is_active is not None:
         emp.is_active = payload.is_active
 
-    await db.commit()
-    await db.refresh(emp)
+    updated = await staff_repo.update(db, emp)
 
     return StaffResponse(
-        id=emp.id,
-        employee_id=emp.employee_id,
-        name=emp.name,
-        username=emp.username,
-        email=emp.email,
-        mobile=emp.mobile,
-        department_id=emp.department_id,
-        department_name=emp.department.name if emp.department else None,
-        role_id=emp.role_id,
-        role_name=emp.role.name if emp.role else None,
-        role_code=emp.role.code if emp.role else None,
-        is_active=emp.is_active,
-        created_at=emp.created_at,
+        id=updated.id,
+        employee_id=updated.employee_id,
+        name=updated.name,
+        username=updated.username,
+        email=updated.email,
+        mobile=updated.mobile,
+        department_id=updated.department_id,
+        department_name=updated.department.name if updated.department else None,
+        role_id=updated.role_id,
+        role_name=updated.role.name if updated.role else None,
+        role_code=updated.role.code if updated.role else None,
+        is_active=updated.is_active,
+        created_at=updated.created_at,
     )
 
 
 @router.delete(
     "/admin/staff/{employee_id}",
     status_code=status.HTTP_200_OK,
-    summary="Soft delete a staff member (safeguards Super Admin from deletion)",
+    summary="Soft delete a staff member via StaffRepository",
 )
 async def delete_staff(
     employee_id: str,
@@ -660,9 +546,7 @@ async def delete_staff(
             detail="The root Super Administrator account (EMP-0001) cannot be deleted.",
         )
 
-    stmt = select(Employee).where(Employee.employee_id == norm_id, Employee.deleted_at.is_(None))
-    res = await db.execute(stmt)
-    emp = res.scalar_one_or_none()
+    emp = await staff_repo.get_by_emp_id(db, norm_id)
     if not emp:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -675,13 +559,10 @@ async def delete_staff(
             detail="The Super Administrator account cannot be deleted.",
         )
 
-    # Soft delete
-    emp.deleted_at = datetime.now(timezone.utc)
-    emp.is_active = False
-    await db.commit()
+    await staff_repo.soft_delete(db, emp)
 
     return {
         "status": "success",
         "message": f"Staff member '{emp.name}' ({emp.employee_id}) soft-deleted successfully.",
-        "deleted_at": emp.deleted_at.isoformat(),
+        "deleted_at": emp.deleted_at.isoformat() if emp.deleted_at else datetime.now(timezone.utc).isoformat(),
     }

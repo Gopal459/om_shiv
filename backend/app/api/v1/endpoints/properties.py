@@ -5,6 +5,7 @@ from sqlalchemy import select, or_
 
 from app.core.database import get_db
 from app.models.properties import Property
+from app.repositories import property_repo
 from app.schemas.property_schemas import PropertyPostRequest, QuickListingRequest
 from app.services.property_service import create_property, create_quick_listing
 
@@ -64,11 +65,7 @@ async def get_property(
     db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """Retrieves property details by alphanumeric OP-YYYY-NNNNN or numeric id."""
-    stmt = select(Property).where(
-        or_(Property.property_id == id, Property.id == (int(id) if id.isdigit() else -1))
-    )
-    res = await db.execute(stmt)
-    prop = res.scalar_one_or_none()
+    prop = await property_repo.get_by_id_or_code(db, id)
     if not prop:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

@@ -6,6 +6,7 @@ from sqlalchemy import select
 
 from app.core.database import get_db
 from app.models.properties import Property
+from app.repositories import property_repo
 from app.services.owner_service import (
     submit_owner_request,
     approve_delete,
@@ -100,9 +101,7 @@ async def endpoint_recycle_bin_restore(
 async def endpoint_list_recycle_bin(
     db: AsyncSession = Depends(get_db),
 ) -> List[Dict[str, Any]]:
-    stmt = select(Property).where(Property.is_recycled == True)
-    res = await db.execute(stmt)
-    properties = res.scalars().all()
+    properties = await property_repo.list_recycled(db)
     return [
         {
             "id": p.id,

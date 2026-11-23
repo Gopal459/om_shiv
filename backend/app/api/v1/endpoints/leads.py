@@ -11,6 +11,7 @@ from sqlalchemy import select, and_, or_, desc, asc
 from app.core.database import get_db
 from app.core.security import decode_access_token
 from app.models.leads import Lead, LeadActivity, LeadActionLog
+from app.repositories import lead_repo
 from app.services.pipeline_service import pipeline_service
 
 router = APIRouter()
@@ -92,29 +93,8 @@ def get_actor_from_token(
 
 
 async def find_lead_by_id_or_lead_id(db: AsyncSession, lead_identifier: str) -> Optional[Lead]:
-    """Helper to locate lead by either numeric id or sequence lead_id (OB-YYYY-NNNNNN)."""
-    # Try by lead_id first
-    stmt = (
-        select(Lead)
-        .options(selectinload(Lead.activities))
-        .where(Lead.lead_id == lead_identifier, Lead.deleted_at.is_(None))
-    )
-    result = await db.execute(stmt)
-    lead = result.scalar_one_or_none()
-    if lead:
-        return lead
-
-    # If numeric, try by primary key id
-    if lead_identifier.isdigit():
-        stmt_pk = (
-            select(Lead)
-            .options(selectinload(Lead.activities))
-            .where(Lead.id == int(lead_identifier), Lead.deleted_at.is_(None))
-        )
-        result_pk = await db.execute(stmt_pk)
-        return result_pk.scalar_one_or_none()
-
-    return None
+    """Helper delegating to LeadRepository."""
+    return await lead_repo.get_by_id_or_lead_id(db, lead_identifier)
 
 
 # --- Sales Rep Queue & Leads Endpoints ---
@@ -143,20 +123,8 @@ async def get_my_work_queue(
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     today_end = now.replace(hour=23, minute=59, second=59, microsecond=999999)
 
-    # Fetch all active open leads assigned to this rep
-    stmt = (
-        select(Lead)
-        .options(selectinload(Lead.activities))
-        .where(
-            and_(
-                Lead.deleted_at.is_(None),
-                Lead.assigned_to == target_rep,
-                Lead.stage.not_in(["WON", "LOST", "NURTURE"]),
-            )
-        )
-    )
-    res = await db.execute(stmt)
-    leads = res.scalars().all()
+    # Fetch all active open leads assigned to this rep via Repository
+    leads = await lead_repo.get_work_queue(db, target_rep)
 
     overdue: List[Lead] = []
     untouched: List[Lead] = []
