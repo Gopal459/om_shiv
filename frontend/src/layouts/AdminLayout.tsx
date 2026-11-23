@@ -1,12 +1,17 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
-  LayoutDashboard,
-  Users,
-  CheckSquare,
+  Gauge,
+  FileText,
+  Rocket,
+  Filter,
   Building2,
-  Trash2,
-  Sliders,
+  Home,
+  Users,
+  Radio,
+  UserCheck,
+  Layers,
+  Handshake,
   Settings,
   LogOut,
   Shield,
@@ -16,18 +21,43 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 
 export type AdminTab =
   | 'DASHBOARD'
+  | 'WEBSITE_FORMS'
+  | 'LEADS'
+  | 'OPPORTUNITIES'
+  | 'PROPERTY'
+  | 'HOMEPAGE'
   | 'STAFF'
-  | 'MY_WORK'
-  | 'LEAD_DETAIL'
+  | 'BLOG'
+  | 'PROPIRA_USERS'
+  | 'PAGES'
+  | 'FRANCHISE'
+  | 'SETTINGS'
+  | 'DYNAMIC_MASTERS'
   | 'VERIFICATION'
   | 'RECYCLE_BIN'
-  | 'DYNAMIC_MASTERS'
-  | 'SETTINGS';
+  | 'MY_WORK'
+  | 'LEAD_DETAIL';
+
+export interface SubMenuItem {
+  label: string;
+  path: string;
+}
+
+export interface NavItem {
+  id: string;
+  path: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  badge?: string;
+  badgeColor?: string;
+  subItems?: SubMenuItem[];
+}
 
 interface AdminLayoutProps {
   user: any;
@@ -37,25 +67,8 @@ interface AdminLayoutProps {
   children?: React.ReactNode;
 }
 
-export interface NavItem {
-  id: AdminTab;
-  path: string;
-  label: string;
-  shortLabel: string;
-  icon: React.ComponentType<{ className?: string }>;
-  badge?: string;
-  badgeColor?: string;
-}
-
-export interface NavCategory {
-  title: string;
-  items: NavItem[];
-}
-
 export const AdminLayout: React.FC<AdminLayoutProps> = ({
   user,
-  activeTab: activeTabProp,
-  onSelectTab,
   onLogout,
   children,
 }) => {
@@ -71,116 +84,170 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   // Mobile drawer state
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
+  // Submenu accordion state
+  const [openSubmenus, setOpenSubmenus] = useState<Record<string, boolean>>({});
+
   useEffect(() => {
     localStorage.setItem('omshiv_sidebar_collapsed', String(isCollapsed));
   }, [isCollapsed]);
 
-  // Derive activeTab from URL pathname if not explicitly passed
-  const activeTab = useMemo<AdminTab>(() => {
-    if (activeTabProp) return activeTabProp;
-    const p = location.pathname;
-    if (p.startsWith('/staff')) return 'STAFF';
-    if (p.startsWith('/leads')) {
-      if (p.length > 7) return 'LEAD_DETAIL';
-      return 'MY_WORK';
+  // 11 Core Modules Matching Screenshot 3
+  const navItems: NavItem[] = useMemo(() => [
+    {
+      id: 'DASHBOARD',
+      path: '/dashboard',
+      label: 'Dashboard',
+      icon: Gauge,
+    },
+    {
+      id: 'WEBSITE_FORMS',
+      path: '/website-forms',
+      label: 'Website Forms',
+      icon: FileText,
+      subItems: [
+        { label: 'Inbound Inquiries', path: '/website-forms?type=inquiries' },
+        { label: 'Contact Us Forms', path: '/website-forms?type=contact' },
+        { label: 'Property Valuations', path: '/website-forms?type=valuation' },
+      ],
+    },
+    {
+      id: 'LEADS',
+      path: '/leads',
+      label: 'Leads',
+      icon: Rocket,
+      badge: 'Active',
+      badgeColor: 'bg-rose-500/10 text-rose-500 border border-rose-500/20',
+      subItems: [
+        { label: 'All Leads Queue', path: '/leads' },
+        { label: 'New Intake (236)', path: '/leads?filter=new' },
+        { label: 'Untouched (3h SLA)', path: '/leads?filter=untouched' },
+        { label: 'Qualified (5)', path: '/leads?filter=qualified' },
+      ],
+    },
+    {
+      id: 'OPPORTUNITIES',
+      path: '/opportunities',
+      label: 'Opportunities',
+      icon: Filter,
+      subItems: [
+        { label: 'Active Pipeline', path: '/opportunities' },
+        { label: 'Site Visits (25%)', path: '/opportunities?stage=visit' },
+        { label: 'Negotiation & Won', path: '/opportunities?stage=won' },
+      ],
+    },
+    {
+      id: 'PROPERTY',
+      path: '/properties',
+      label: 'Property',
+      icon: Building2,
+      subItems: [
+        { label: 'All Properties', path: '/properties' },
+        { label: '7-Step Verifications', path: '/verifications' },
+        { label: 'Expired Listings (90/30d)', path: '/properties?status=expired' },
+        { label: 'Recycle Bin & Purge', path: '/recycle-bin' },
+      ],
+    },
+    {
+      id: 'HOMEPAGE',
+      path: '/homepage',
+      label: 'Homepage',
+      icon: Home,
+      subItems: [
+        { label: 'Hero Banners', path: '/homepage?tab=banners' },
+        { label: 'Featured Projects', path: '/homepage?tab=featured' },
+      ],
+    },
+    {
+      id: 'STAFF',
+      path: '/staff',
+      label: 'Panel User',
+      icon: Users,
+      badge: 'Admin',
+      badgeColor: 'bg-blue-500/10 text-blue-500 border border-blue-500/20',
+      subItems: [
+        { label: 'Staff Directory', path: '/staff?tab=roster' },
+        { label: 'Dynamic Roles & CRUD', path: '/staff?tab=roles' },
+        { label: 'Permissions Matrix', path: '/staff?tab=permissions' },
+      ],
+    },
+    {
+      id: 'BLOG',
+      path: '/blogs',
+      label: 'Blog',
+      icon: Radio,
+      subItems: [
+        { label: 'All Articles', path: '/blogs' },
+        { label: 'Market Insights', path: '/blogs?cat=reports' },
+      ],
+    },
+    {
+      id: 'PROPIRA_USERS',
+      path: '/users',
+      label: 'Propira Users',
+      icon: UserCheck,
+      subItems: [
+        { label: 'Registered Buyers', path: '/users?type=buyers' },
+        { label: 'Property Owners & Sellers', path: '/users?type=owners' },
+      ],
+    },
+    {
+      id: 'PAGES',
+      path: '/pages',
+      label: 'Pages',
+      icon: Layers,
+      subItems: [
+        { label: 'CMS Static Pages', path: '/pages' },
+        { label: 'Legal & Policies', path: '/pages?type=legal' },
+      ],
+    },
+    {
+      id: 'FRANCHISE',
+      path: '/franchise',
+      label: 'Franchise',
+      icon: Handshake,
+      subItems: [
+        { label: 'Channel Partners', path: '/franchise?type=partners' },
+        { label: 'Franchise Outlets', path: '/franchise?type=outlets' },
+      ],
+    },
+    {
+      id: 'SETTINGS',
+      path: '/settings',
+      label: 'Settings & Schema',
+      icon: Settings,
+      subItems: [
+        { label: '92 System Settings & SLAs', path: '/settings' },
+        { label: 'Dynamic Property Masters', path: '/masters' },
+      ],
+    },
+  ], []);
+
+  // Determine active item from current location
+  const isItemActive = (item: NavItem) => {
+    const currentBase = location.pathname;
+    if (item.path === '/dashboard') {
+      return currentBase === '/' || currentBase === '/dashboard';
     }
-    if (p.startsWith('/verifications')) return 'VERIFICATION';
-    if (p.startsWith('/recycle-bin')) return 'RECYCLE_BIN';
-    if (p.startsWith('/masters')) return 'DYNAMIC_MASTERS';
-    if (p.startsWith('/settings')) return 'SETTINGS';
-    return 'DASHBOARD';
-  }, [activeTabProp, location.pathname]);
+    if (currentBase === item.path) return true;
+    if (item.subItems?.some((sub) => currentBase.startsWith(sub.path.split('?')[0]))) {
+      return true;
+    }
+    return currentBase.startsWith(item.path);
+  };
 
-  const isSuperAdmin = user?.role === 'SUPER_ADMIN' || user?.role === 'MD';
+  const currentNav = useMemo(() => {
+    return (
+      navItems.find((n) => isItemActive(n)) ||
+      navItems[0]
+    );
+  }, [location.pathname, navItems]);
 
-  const navCategories: NavCategory[] = [
-    {
-      title: 'Overview',
-      items: [
-        {
-          id: 'DASHBOARD',
-          path: '/dashboard',
-          label: 'Executive Dashboard',
-          shortLabel: 'Dashboard',
-          icon: LayoutDashboard,
-          badge: 'Live',
-          badgeColor: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20',
-        },
-      ],
-    },
-    {
-      title: 'Staff & Access',
-      items: [
-        {
-          id: 'STAFF',
-          path: '/staff',
-          label: 'Staff & Roles Manager',
-          shortLabel: 'Staff',
-          icon: Users,
-          badge: isSuperAdmin ? 'Admin' : undefined,
-          badgeColor: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20',
-        },
-      ],
-    },
-    {
-      title: 'Sales & Inventory',
-      items: [
-        {
-          id: 'MY_WORK',
-          path: '/leads',
-          label: 'Sales Queue & Leads',
-          shortLabel: 'Leads',
-          icon: CheckSquare,
-        },
-        {
-          id: 'VERIFICATION',
-          path: '/verifications',
-          label: 'Property Verifications',
-          shortLabel: 'Verify',
-          icon: Building2,
-          badge: '7-Step',
-          badgeColor: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20',
-        },
-        {
-          id: 'RECYCLE_BIN',
-          path: '/recycle-bin',
-          label: 'Recycle Bin & Requests',
-          shortLabel: 'Recycle',
-          icon: Trash2,
-        },
-      ],
-    },
-    {
-      title: 'System & Schema',
-      items: [
-        {
-          id: 'DYNAMIC_MASTERS',
-          path: '/masters',
-          label: 'Dynamic Master Options',
-          shortLabel: 'Masters',
-          icon: Sliders,
-        },
-        {
-          id: 'SETTINGS',
-          path: '/settings',
-          label: 'System Settings & Audit',
-          shortLabel: 'Settings',
-          icon: Settings,
-        },
-      ],
-    },
-  ];
-
-  // Flat list for header lookup
-  const flatNavItems = navCategories.flatMap((c) => c.items);
-  const currentNav =
-    flatNavItems.find(
-      (n) =>
-        n.id === activeTab ||
-        (n.id === 'MY_WORK' && activeTab === 'LEAD_DETAIL') ||
-        n.path === location.pathname ||
-        (n.path !== '/dashboard' && n.path !== '/' && location.pathname.startsWith(n.path))
-    ) || flatNavItems[0];
+  const toggleSubmenu = (itemId: string) => {
+    setOpenSubmenus((prev) => ({
+      ...prev,
+      [itemId]: !prev[itemId],
+    }));
+  };
 
   return (
     <div
@@ -200,8 +267,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
       <aside
         className={`fixed lg:sticky top-0 h-screen z-50 flex flex-col transition-all duration-300 ease-in-out border-r select-none ${
           isDark
-            ? 'bg-slate-900/95 border-slate-800 backdrop-blur-md shadow-2xl shadow-black/40'
-            : 'bg-white border-slate-200/90 shadow-lg shadow-slate-200/60'
+            ? 'bg-slate-900/98 border-slate-800 backdrop-blur-md shadow-2xl shadow-black/40'
+            : 'bg-white border-slate-200 shadow-xl shadow-slate-200/50'
         } ${isCollapsed ? 'lg:w-20' : 'lg:w-64'} ${
           isMobileOpen ? 'translate-x-0 w-64' : '-translate-x-full lg:translate-x-0'
         }`}
@@ -209,7 +276,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
         {/* Brand Header */}
         <div
           className={`h-16 px-4 border-b flex items-center justify-between ${
-            isDark ? 'border-slate-800/80' : 'border-slate-200'
+            isDark ? 'border-slate-800' : 'border-slate-200'
           }`}
         >
           <div
@@ -237,7 +304,6 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
             )}
           </div>
 
-          {/* Mobile Close Button */}
           <button
             onClick={() => setIsMobileOpen(false)}
             className="lg:hidden p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white"
@@ -246,95 +312,120 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
           </button>
         </div>
 
-        {/* Navigation Categories & Links */}
-        <nav className="flex-1 px-3 py-4 space-y-4 overflow-y-auto overflow-x-hidden custom-scrollbar">
-          {navCategories.map((category) => (
-            <div key={category.title} className="space-y-1">
-              {(!isCollapsed || isMobileOpen) ? (
-                <div
-                  className={`px-3 pb-1 text-[10px] font-bold uppercase tracking-wider ${
-                    isDark ? 'text-slate-500' : 'text-slate-400'
+        {/* 11-Module Sidebar Navigation List */}
+        <nav className="flex-1 px-3 py-4 space-y-1.5 overflow-y-auto overflow-x-hidden custom-scrollbar">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const active = isItemActive(item);
+            const hasSub = item.subItems && item.subItems.length > 0;
+            const isSubOpen = openSubmenus[item.id] ?? active;
+
+            return (
+              <div key={item.id} className="space-y-0.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (hasSub && (!isCollapsed || isMobileOpen)) {
+                      toggleSubmenu(item.id);
+                    } else {
+                      navigate(item.path);
+                      setIsMobileOpen(false);
+                    }
+                  }}
+                  title={isCollapsed && !isMobileOpen ? item.label : undefined}
+                  className={`relative w-full flex items-center rounded-xl text-xs font-semibold transition-all duration-200 group ${
+                    isCollapsed && !isMobileOpen
+                      ? 'justify-center p-3'
+                      : 'justify-between px-3.5 py-2.5'
+                  } ${
+                    active
+                      ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-l-4 border-rose-500 font-bold shadow-xs'
+                      : isDark
+                      ? 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+                      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                   }`}
                 >
-                  {category.title}
-                </div>
-              ) : (
-                <div className="border-t border-slate-200 dark:border-slate-800 my-2 mx-2"></div>
-              )}
+                  <div className="flex items-center gap-3">
+                    <Icon
+                      className={`w-4 h-4 flex-shrink-0 transition-transform duration-200 group-hover:scale-110 ${
+                        active
+                          ? 'text-rose-500 dark:text-rose-400'
+                          : isDark
+                          ? 'text-slate-400 group-hover:text-rose-400'
+                          : 'text-slate-500 group-hover:text-rose-600'
+                      }`}
+                    />
+                    {(!isCollapsed || isMobileOpen) && (
+                      <span className="truncate">{item.label}</span>
+                    )}
+                  </div>
 
-              {category.items.map((item) => {
-                const Icon = item.icon;
-                const isActive =
-                  activeTab === item.id ||
-                  (item.id === 'MY_WORK' && activeTab === 'LEAD_DETAIL') ||
-                  location.pathname === item.path ||
-                  (item.path !== '/dashboard' && item.path !== '/' && location.pathname.startsWith(item.path));
-
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => {
-                      navigate(item.path);
-                      if (onSelectTab) onSelectTab(item.id);
-                      setIsMobileOpen(false);
-                    }}
-                    title={isCollapsed && !isMobileOpen ? item.label : undefined}
-                    className={`relative w-full flex items-center rounded-xl text-xs font-semibold transition-all duration-200 group ${
-                      isCollapsed && !isMobileOpen
-                        ? 'justify-center p-3'
-                        : 'justify-between px-3.5 py-2.5'
-                    } ${
-                      isActive
-                        ? 'bg-gradient-to-r from-emerald-600 to-green-600 text-white shadow-md shadow-emerald-900/30 font-bold'
-                        : isDark
-                        ? 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
-                        : 'text-slate-600 hover:bg-slate-100/90 hover:text-slate-900'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <Icon
-                        className={`w-4 h-4 flex-shrink-0 transition-transform duration-200 group-hover:scale-110 ${
-                          isActive
-                            ? 'text-white'
-                            : isDark
-                            ? 'text-slate-400 group-hover:text-emerald-400'
-                            : 'text-slate-500 group-hover:text-emerald-600'
-                        }`}
-                      />
-                      {(!isCollapsed || isMobileOpen) && (
-                        <span className="truncate">{item.label}</span>
+                  {(!isCollapsed || isMobileOpen) && (
+                    <div className="flex items-center gap-1.5">
+                      {item.badge && (
+                        <span
+                          className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+                            active
+                              ? 'bg-rose-500 text-white'
+                              : item.badgeColor || 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+                          }`}
+                        >
+                          {item.badge}
+                        </span>
+                      )}
+                      {hasSub && (
+                        <span className="text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200 transition-transform">
+                          {isSubOpen ? (
+                            <ChevronDown className="w-3.5 h-3.5" />
+                          ) : (
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          )}
+                        </span>
                       )}
                     </div>
+                  )}
 
-                    {(!isCollapsed || isMobileOpen) && item.badge && (
-                      <span
-                        className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
-                          isActive
-                            ? 'bg-emerald-700/80 text-white'
-                            : item.badgeColor || 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
-                        }`}
-                      >
-                        {item.badge}
-                      </span>
-                    )}
+                  {/* Collapsed Glow Accent */}
+                  {isCollapsed && !isMobileOpen && active && (
+                    <span className="absolute left-1 top-2 bottom-2 w-1 bg-rose-500 rounded-full"></span>
+                  )}
+                </button>
 
-                    {/* Collapsed Active Glow Bar */}
-                    {isCollapsed && !isMobileOpen && isActive && (
-                      <span className="absolute left-1 top-2 bottom-2 w-1 bg-white rounded-full"></span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          ))}
+                {/* Submenu Drawer */}
+                {hasSub && isSubOpen && (!isCollapsed || isMobileOpen) && (
+                  <div className="pl-9 pr-2 py-1 space-y-1 animate-slide-down border-l border-slate-200 dark:border-slate-800 ml-4 my-1">
+                    {item.subItems!.map((sub) => {
+                      const isSubActive = location.pathname + location.search === sub.path || location.pathname === sub.path;
+                      return (
+                        <button
+                          key={sub.path}
+                          type="button"
+                          onClick={() => {
+                            navigate(sub.path);
+                            setIsMobileOpen(false);
+                          }}
+                          className={`w-full text-left px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-colors flex items-center justify-between ${
+                            isSubActive
+                              ? 'text-rose-600 dark:text-rose-400 font-bold bg-rose-50/80 dark:bg-rose-950/40'
+                              : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/50'
+                          }`}
+                        >
+                          <span className="truncate">{sub.label}</span>
+                          {isSubActive && <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </nav>
 
         {/* Sidebar Collapse Toggle & User Profile Card */}
         <div
           className={`p-3 border-t space-y-2 ${
-            isDark
-              ? 'border-slate-800/80 bg-slate-900/80'
-              : 'border-slate-200 bg-slate-50/90'
+            isDark ? 'border-slate-800 bg-slate-900/80' : 'border-slate-200 bg-slate-50/90'
           }`}
         >
           {/* Quick Collapse Button inside Sidebar */}
@@ -450,11 +541,11 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
               <span
                 className={`text-xs font-bold px-3 py-1 rounded-lg border ${
                   isDark
-                    ? 'bg-slate-800/90 border-slate-700 text-emerald-400'
-                    : 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                    ? 'bg-slate-800/90 border-slate-700 text-rose-400'
+                    : 'bg-rose-50 border-rose-200 text-rose-800'
                 }`}
               >
-                {currentNav?.label || 'Executive Console'}
+                {currentNav.label}
               </span>
             </div>
           </div>

@@ -1,39 +1,53 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Legend,
+} from 'recharts';
+import {
+  FileText,
+  Search,
   Users,
-  CheckSquare,
-  Building2,
-  Trash2,
-  Clock,
+  Handshake,
+  CheckCircle2,
+  Layers,
   ArrowRight,
   TrendingUp,
-  ShieldCheck,
-  PlusCircle,
+  Clock,
   AlertTriangle,
+  Building2,
+  Calendar,
   Sparkles,
-  Layers,
-  Database,
-  Radio,
-  Sliders,
-  CheckCircle2,
-  RefreshCw,
   Zap,
   Activity,
-  Calendar,
-  Lock,
-  ArrowUpRight,
+  Award,
+  PhoneCall,
+  MapPin,
+  RefreshCw,
+  PlusCircle,
+  Filter,
 } from 'lucide-react';
 import { AdminTab } from '../layouts/AdminLayout';
 
 interface AdminDashboardProps {
-  onNavigate: (tab: AdminTab) => void;
+  onNavigate?: (tab: AdminTab) => void;
 }
 
-export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) => {
+export const AdminDashboard: React.FC<AdminDashboardProps> = () => {
+  const navigate = useNavigate();
   const [stats, setStats] = useState({
-    staffCount: 0,
+    staffCount: 1,
     untouchedCount: 0,
-    verificationCount: 0,
+    verificationCount: 2,
     recycleCount: 0,
   });
   const [loading, setLoading] = useState(true);
@@ -79,7 +93,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
       setStats({
         staffCount: Array.isArray(staffRes) ? staffRes.length : 1,
         untouchedCount: untouched,
-        verificationCount: 2, // Active listings in 7-step pipeline
+        verificationCount: 2,
         recycleCount: Array.isArray(recycleRes) ? recycleRes.length : 0,
       });
     } catch (err) {
@@ -94,23 +108,102 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
     fetchDashboardData();
   }, []);
 
+  // 1. Opportunity Donut Data matching Screenshot 1
+  const opportunityData = [
+    { name: 'New', value: 44, color: '#10b981' }, // Green
+    { name: 'Open', value: 47, color: '#6366f1' }, // Indigo
+    { name: 'All', value: 64, color: '#38bdf8' }, // Sky Blue
+    { name: 'Missing', value: 47, color: '#f97316' }, // Orange
+    { name: 'Qualified', value: 15, color: '#d946ef' }, // Magenta
+  ];
+  const totalOpportunities = opportunityData.reduce((acc, curr) => acc + curr.value, 0);
+
+  // 2. Call Performance Horizontal Bar Data matching Screenshot 2
+  const callPerformanceData = [
+    {
+      category: 'Calls',
+      inbound: 39,
+      connected: 44,
+      siteVisit: 44,
+      followUp: 38,
+      missed: 1,
+      totalCalls: 99,
+    },
+    {
+      category: 'Problem',
+      inbound: 6,
+      connected: 6,
+      siteVisit: 6,
+      followUp: 3,
+      missed: 0,
+      totalCalls: 14,
+    },
+  ];
+
+  // 3. Property Inventory Lifecycle Column Data matching Screenshot 2
+  const propertyLifecycleData = [
+    {
+      stage: 'New & Assign Property',
+      primary: 460,
+      verified: 184,
+      expired: 38,
+    },
+    {
+      stage: 'Verified & Live Property',
+      primary: 138,
+      verified: 23,
+      expired: 8,
+    },
+    {
+      stage: 'Expired Properties',
+      primary: 4,
+      verified: 2,
+      expired: 1,
+    },
+    {
+      stage: 'Deleted Properties',
+      primary: 28,
+      verified: 9,
+      expired: 4,
+    },
+    {
+      stage: 'Sold Properties',
+      primary: 42,
+      verified: 8,
+      expired: 2,
+    },
+  ];
+
+  // 4. Executive Leaderboard Data
+  const leaderboardData = [
+    { rank: 1, name: 'Ramesh Sharma', role: 'Sales Manager', calls: 142, visits: 28, deals: 8, rate: '86%' },
+    { rank: 2, name: 'Sunita Verma', role: 'Senior Telecaller', calls: 188, visits: 19, deals: 6, rate: '79%' },
+    { rank: 3, name: 'Vikas Choudhary', role: 'Field Executive', calls: 94, visits: 34, deals: 5, rate: '74%' },
+    { rank: 4, name: 'Pooja Jangid', role: 'Verification Officer', calls: 110, visits: 22, deals: 4, rate: '68%' },
+  ];
+
+  // 5. Live Inbound & SLA Activity Stream Data
+  const liveActivities = [
+    { id: 1, text: 'New Inbound Inquiry for 3 BHK Villa in Jagatpura', source: 'Website Form', time: '2 mins ago', badge: 'Fresh Lead', alert: false },
+    { id: 2, text: 'Lead OM-2026-0042 untouched for 2h 45m (Approaching 3h SLA)', source: 'SLA Escalation', time: '12 mins ago', badge: 'SLA Warning', alert: true },
+    { id: 3, text: 'Physical site verification completed for Royal Heritage Mansarovar', source: '7-Step Hub', time: '24 mins ago', badge: 'Verified', alert: false },
+    { id: 4, text: 'Channel Partner "Shree Ram Realty" added 2 buyer inquiries', source: 'Franchise', time: '41 mins ago', badge: 'Partner Sync', alert: false },
+  ];
+
   return (
     <div className="space-y-8 animate-fade-in">
-      {/* 1. ULTRA-MODERN AMBIENT HERO BANNER */}
+      {/* 1. TOP HERO BANNER */}
       <div className="relative overflow-hidden rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-gradient-to-br from-slate-900 via-slate-900/95 to-emerald-950/90 text-white p-6 sm:p-8 lg:p-10 shadow-2xl shadow-emerald-950/20 group">
-        {/* Floating Ambient Glow Orbs */}
         <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-emerald-500/20 blur-3xl pointer-events-none animate-float"></div>
         <div className="absolute -bottom-24 -right-24 w-96 h-96 rounded-full bg-cyan-500/20 blur-3xl pointer-events-none animate-float-delayed"></div>
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-white/5 via-transparent to-transparent pointer-events-none"></div>
 
         <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           <div className="space-y-3 max-w-2xl">
-            {/* Live Indicator Pill & Date */}
             <div className="flex flex-wrap items-center gap-2.5">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-bold shadow-xs backdrop-blur-md">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-                <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Super Admin Executive Hub</span>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-300 text-xs font-bold shadow-xs backdrop-blur-md">
+                <span className="w-2 h-2 rounded-full bg-rose-400 animate-ping"></span>
+                <Sparkles className="w-3.5 h-3.5 text-rose-400" />
+                <span>Executive Command Center</span>
               </div>
 
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/10 text-slate-300 text-xs font-medium backdrop-blur-md">
@@ -119,7 +212,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
               </div>
             </div>
 
-            {/* Main Headline */}
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight leading-tight">
               {greeting},{' '}
               <span className="bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-300 bg-clip-text text-transparent">
@@ -128,30 +220,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
             </h1>
 
             <p className="text-xs sm:text-sm text-slate-300/90 leading-relaxed max-w-xl">
-              Propira Enterprise Engine with 6-way inbound lead routing, real-time 3-hour SLA enforcement, 7-step property verification pipeline, and dynamic role-based access.
+              Enterprise real estate operations, 6-way inbound routing, real-time 3-hour SLA escalation monitoring, and automated property verification pipeline.
             </p>
-
-            {/* Quick Live System Micro-Chips */}
-            <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px] text-slate-300 font-semibold">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-950/60 border border-emerald-800/60 text-emerald-300">
-                <Zap className="w-3 h-3 text-emerald-400" />
-                FastAPI Port 8000: Live
-              </span>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-950/60 border border-blue-800/60 text-blue-300">
-                <Activity className="w-3 h-3 text-blue-400" />
-                SLA Escalations: Active
-              </span>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-950/60 border border-purple-800/60 text-purple-300">
-                <ShieldCheck className="w-3 h-3 text-purple-400" />
-                Universal Soft-Delete: Armed
-              </span>
-            </div>
           </div>
 
-          {/* Action Button Group */}
           <div className="relative z-10 flex flex-wrap items-center gap-3 lg:flex-col lg:items-end flex-shrink-0">
             <button
-              onClick={() => onNavigate('STAFF')}
+              onClick={() => navigate('/staff')}
               className="shimmer-effect group flex items-center gap-2.5 px-5 py-3 bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white rounded-2xl text-xs font-bold transition-all duration-300 shadow-xl shadow-emerald-900/40 hover:-translate-y-1 active:translate-y-0"
             >
               <PlusCircle className="w-4 h-4 transition-transform group-hover:rotate-90 duration-300" />
@@ -160,7 +235,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
 
             <div className="flex items-center gap-2">
               <button
-                onClick={() => onNavigate('MY_WORK')}
+                onClick={() => navigate('/leads')}
                 className="flex items-center gap-2 px-4 py-2.5 bg-slate-800/90 hover:bg-slate-700/90 text-slate-200 hover:text-white rounded-2xl text-xs font-bold border border-slate-700/80 transition-all hover:-translate-y-0.5 active:translate-y-0 shadow-md backdrop-blur-md"
               >
                 <span>Sales Leads Queue</span>
@@ -180,437 +255,485 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
         </div>
       </div>
 
-      {/* 2. GLOWING ANIMATED KPI METRICS GRID */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        {/* Card 1: Active Staff */}
-        <div
-          onClick={() => onNavigate('STAFF')}
-          className="glow-card relative overflow-hidden bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 hover:border-blue-400 dark:hover:border-blue-500 rounded-3xl p-6 cursor-pointer transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/10 group"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Active Staff
-            </span>
-            <div className="p-3 bg-blue-50 dark:bg-blue-950/80 border border-blue-200/80 dark:border-blue-800/80 rounded-2xl text-blue-600 dark:text-blue-400 group-hover:scale-110 group-hover:rotate-6 transition-all duration-300 shadow-sm">
-              <Users className="w-5 h-5" />
-            </div>
-          </div>
-
-          <div className="mt-4 flex items-baseline justify-between">
-            <div className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">
-              {loading ? (
-                <div className="h-9 w-12 bg-slate-200 dark:bg-slate-800 animate-pulse rounded-lg"></div>
-              ) : (
-                stats.staffCount
-              )}
-            </div>
-            <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/80">
-              Assigned Active
-            </span>
-          </div>
-
-          {/* Mini Sparkline Visualization */}
-          <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-            <div className="flex items-center gap-1.5 font-medium">
-              <ShieldCheck className="w-3.5 h-3.5 text-blue-500" />
-              <span>Multi-Role RBAC</span>
-            </div>
-            <span className="text-blue-600 dark:text-blue-400 font-bold group-hover:translate-x-1 transition-transform flex items-center gap-0.5">
-              Manage <ArrowRight className="w-3 h-3" />
-            </span>
-          </div>
+      {/* 2. 6 VIBRANT GRADIENT KPI CARDS MATCHING SCREENSHOT 1 */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-rose-500" />
+            <span>Real-Time Lead & Opportunity Portfolio</span>
+          </h2>
+          <span className="text-xs text-slate-400">Live Database Counters</span>
         </div>
 
-        {/* Card 2: Untouched Leads */}
-        <div
-          onClick={() => onNavigate('MY_WORK')}
-          className="glow-card relative overflow-hidden bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 hover:border-amber-400 dark:hover:border-amber-500 rounded-3xl p-6 cursor-pointer transition-all duration-300 hover:shadow-xl hover:shadow-amber-500/10 group"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Untouched Leads
-            </span>
-            <div className="p-3 bg-amber-50 dark:bg-amber-950/80 border border-amber-200/80 dark:border-amber-800/80 rounded-2xl text-amber-600 dark:text-amber-400 group-hover:scale-110 group-hover:-rotate-6 transition-all duration-300 shadow-sm">
-              <Clock className="w-5 h-5" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Card 1: New Leads (Purple Gradient) */}
+          <div
+            onClick={() => navigate('/leads?filter=new')}
+            className="relative overflow-hidden rounded-2xl p-5 text-white bg-gradient-to-br from-fuchsia-600 via-purple-600 to-indigo-700 shadow-lg shadow-purple-900/20 cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-xl group"
+          >
+            {/* Decorative Glass Circle In Overlay */}
+            <div className="absolute -top-6 -left-6 w-24 h-24 rounded-full bg-white/10 blur-sm pointer-events-none"></div>
+            <div className="flex items-start justify-between relative z-10">
+              <div className="p-3 rounded-2xl bg-white/15 backdrop-blur-md border border-white/20 group-hover:scale-110 transition-transform">
+                <FileText className="w-6 h-6 text-white" />
+              </div>
+              <div className="text-right">
+                <div className="text-3xl font-black tracking-tight">236</div>
+                <div className="text-xs font-semibold text-purple-100">New Leads</div>
+              </div>
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-white/15 flex items-center justify-between text-xs relative z-10">
+              <div className="flex items-center gap-1 font-bold text-purple-100 group-hover:underline">
+                <span>More Info</span>
+                <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
+              </div>
+              <span className="font-mono text-[11px] font-bold text-purple-200">PR 111 FR 123</span>
             </div>
           </div>
 
-          <div className="mt-4 flex items-baseline justify-between">
-            <div className="text-3xl font-black text-amber-500 dark:text-amber-400 tracking-tight">
-              {loading ? (
-                <div className="h-9 w-12 bg-slate-200 dark:bg-slate-800 animate-pulse rounded-lg"></div>
-              ) : (
-                stats.untouchedCount
-              )}
+          {/* Card 2: Open Leads (Orange Gradient) */}
+          <div
+            onClick={() => navigate('/leads?filter=open')}
+            className="relative overflow-hidden rounded-2xl p-5 text-white bg-gradient-to-br from-amber-500 via-orange-500 to-red-600 shadow-lg shadow-orange-900/20 cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-xl group"
+          >
+            <div className="absolute -top-6 -left-6 w-24 h-24 rounded-full bg-white/10 blur-sm pointer-events-none"></div>
+            <div className="flex items-start justify-between relative z-10">
+              <div className="p-3 rounded-2xl bg-white/15 backdrop-blur-md border border-white/20 group-hover:scale-110 transition-transform">
+                <Search className="w-6 h-6 text-white" />
+              </div>
+              <div className="text-right">
+                <div className="text-3xl font-black tracking-tight">267</div>
+                <div className="text-xs font-semibold text-orange-100">Open Leads</div>
+              </div>
             </div>
-            <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800/80 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
-              3-Hour SLA
-            </span>
-          </div>
 
-          <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-            <div className="flex items-center gap-1.5 font-medium">
-              <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
-              <span>Manager Escalations</span>
-            </div>
-            <span className="text-amber-600 dark:text-amber-400 font-bold group-hover:translate-x-1 transition-transform flex items-center gap-0.5">
-              Review <ArrowRight className="w-3 h-3" />
-            </span>
-          </div>
-        </div>
-
-        {/* Card 3: Verifications */}
-        <div
-          onClick={() => onNavigate('VERIFICATION')}
-          className="glow-card relative overflow-hidden bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 hover:border-emerald-400 dark:hover:border-emerald-500 rounded-3xl p-6 cursor-pointer transition-all duration-300 hover:shadow-xl hover:shadow-emerald-500/10 group"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Verifications Hub
-            </span>
-            <div className="p-3 bg-emerald-50 dark:bg-emerald-950/80 border border-emerald-200/80 dark:border-emerald-800/80 rounded-2xl text-emerald-600 dark:text-emerald-400 group-hover:scale-110 group-hover:rotate-6 transition-all duration-300 shadow-sm">
-              <Building2 className="w-5 h-5" />
+            <div className="mt-4 pt-3 border-t border-white/15 flex items-center justify-between text-xs relative z-10">
+              <div className="flex items-center gap-1 font-bold text-orange-100 group-hover:underline">
+                <span>More Info</span>
+                <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
+              </div>
+              <span className="font-mono text-[11px] font-bold text-orange-200">PR 120 FR 131</span>
             </div>
           </div>
 
-          <div className="mt-4 flex items-baseline justify-between">
-            <div className="text-3xl font-black text-emerald-600 dark:text-emerald-400 tracking-tight">
-              {loading ? (
-                <div className="h-9 w-12 bg-slate-200 dark:bg-slate-800 animate-pulse rounded-lg"></div>
-              ) : (
-                stats.verificationCount
-              )}
+          {/* Card 3: Missing Leads (Deep Crimson/Brown Gradient) */}
+          <div
+            onClick={() => navigate('/leads?filter=untouched')}
+            className="relative overflow-hidden rounded-2xl p-5 text-white bg-gradient-to-br from-rose-800 via-stone-800 to-neutral-900 shadow-lg shadow-rose-950/30 cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-xl group"
+          >
+            <div className="absolute -top-6 -left-6 w-24 h-24 rounded-full bg-white/10 blur-sm pointer-events-none"></div>
+            <div className="flex items-start justify-between relative z-10">
+              <div className="p-3 rounded-2xl bg-white/15 backdrop-blur-md border border-white/20 group-hover:scale-110 transition-transform">
+                <Users className="w-6 h-6 text-white" />
+              </div>
+              <div className="text-right">
+                <div className="text-3xl font-black tracking-tight">267</div>
+                <div className="text-xs font-semibold text-rose-200">Missing Leads</div>
+              </div>
             </div>
-            <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/80">
-              7-Step Flow
-            </span>
-          </div>
 
-          <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-            <div className="flex items-center gap-1.5 font-medium">
-              <CheckSquare className="w-3.5 h-3.5 text-emerald-500" />
-              <span>Physical & Telephonic</span>
-            </div>
-            <span className="text-emerald-600 dark:text-emerald-400 font-bold group-hover:translate-x-1 transition-transform flex items-center gap-0.5">
-              Inspect <ArrowRight className="w-3 h-3" />
-            </span>
-          </div>
-        </div>
-
-        {/* Card 4: Recycle Bin */}
-        <div
-          onClick={() => onNavigate('RECYCLE_BIN')}
-          className="glow-card relative overflow-hidden bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 hover:border-rose-400 dark:hover:border-rose-500 rounded-3xl p-6 cursor-pointer transition-all duration-300 hover:shadow-xl hover:shadow-rose-500/10 group"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Recycled Listings
-            </span>
-            <div className="p-3 bg-rose-50 dark:bg-rose-950/80 border border-rose-200/80 dark:border-rose-800/80 rounded-2xl text-rose-600 dark:text-rose-400 group-hover:scale-110 group-hover:-rotate-6 transition-all duration-300 shadow-sm">
-              <Trash2 className="w-5 h-5" />
+            <div className="mt-4 pt-3 border-t border-white/15 flex items-center justify-between text-xs relative z-10">
+              <div className="flex items-center gap-1 font-bold text-rose-200 group-hover:underline">
+                <span>More Info</span>
+                <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
+              </div>
+              <span className="font-mono text-[11px] font-bold text-rose-300">PR 120 FR 131</span>
             </div>
           </div>
 
-          <div className="mt-4 flex items-baseline justify-between">
-            <div className="text-3xl font-black text-rose-500 dark:text-rose-400 tracking-tight">
-              {loading ? (
-                <div className="h-9 w-12 bg-slate-200 dark:bg-slate-800 animate-pulse rounded-lg"></div>
-              ) : (
-                stats.recycleCount
-              )}
+          {/* Card 4: Converted Opportunity (Deep Navy/Blue Gradient) */}
+          <div
+            onClick={() => navigate('/opportunities')}
+            className="relative overflow-hidden rounded-2xl p-5 text-white bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 shadow-lg shadow-blue-950/40 cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-xl group border border-slate-800/80"
+          >
+            <div className="absolute -top-6 -left-6 w-24 h-24 rounded-full bg-white/10 blur-sm pointer-events-none"></div>
+            <div className="flex items-start justify-between relative z-10">
+              <div className="p-3 rounded-2xl bg-white/15 backdrop-blur-md border border-white/20 group-hover:scale-110 transition-transform">
+                <Handshake className="w-6 h-6 text-white" />
+              </div>
+              <div className="text-right">
+                <div className="text-3xl font-black tracking-tight text-white">52</div>
+                <div className="text-xs font-semibold text-blue-200">Converted Opportunity</div>
+              </div>
             </div>
-            <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/80">
-              Soft Deleted
-            </span>
+
+            <div className="mt-4 pt-3 border-t border-white/15 flex items-center justify-between text-xs relative z-10">
+              <div className="flex items-center gap-1 font-bold text-blue-200 group-hover:underline">
+                <span>More Info</span>
+                <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
+              </div>
+              <span className="font-mono text-[11px] font-bold text-blue-300">PR 17 FR 33</span>
+            </div>
           </div>
 
-          <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-            <div className="flex items-center gap-1.5 font-medium">
-              <TrendingUp className="w-3.5 h-3.5 text-rose-500" />
-              <span>1-Click Restore / Purge</span>
+          {/* Card 5: Qualified Leads (Teal/Cyan Gradient) */}
+          <div
+            onClick={() => navigate('/leads?filter=qualified')}
+            className="relative overflow-hidden rounded-2xl p-5 text-white bg-gradient-to-br from-teal-600 via-emerald-600 to-cyan-700 shadow-lg shadow-teal-900/20 cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-xl group"
+          >
+            <div className="absolute -top-6 -left-6 w-24 h-24 rounded-full bg-white/10 blur-sm pointer-events-none"></div>
+            <div className="flex items-start justify-between relative z-10">
+              <div className="p-3 rounded-2xl bg-white/15 backdrop-blur-md border border-white/20 group-hover:scale-110 transition-transform">
+                <CheckCircle2 className="w-6 h-6 text-white" />
+              </div>
+              <div className="text-right">
+                <div className="text-3xl font-black tracking-tight">5</div>
+                <div className="text-xs font-semibold text-teal-100">Qualified Leads</div>
+              </div>
             </div>
-            <span className="text-rose-600 dark:text-rose-400 font-bold group-hover:translate-x-1 transition-transform flex items-center gap-0.5">
-              View <ArrowRight className="w-3 h-3" />
-            </span>
+
+            <div className="mt-4 pt-3 border-t border-white/15 flex items-center justify-between text-xs relative z-10">
+              <div className="flex items-center gap-1 font-bold text-teal-100 group-hover:underline">
+                <span>More Info</span>
+                <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
+              </div>
+              <span className="font-mono text-[11px] font-bold text-teal-200">PR 1 FR 0</span>
+            </div>
+          </div>
+
+          {/* Card 6: All Leads (Royal Indigo/Blue Gradient) */}
+          <div
+            onClick={() => navigate('/leads')}
+            className="relative overflow-hidden rounded-2xl p-5 text-white bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 shadow-lg shadow-indigo-900/20 cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-xl group sm:col-span-2 lg:col-span-3"
+          >
+            <div className="absolute -top-6 -left-6 w-24 h-24 rounded-full bg-white/10 blur-sm pointer-events-none"></div>
+            <div className="flex items-start justify-between relative z-10">
+              <div className="p-3 rounded-2xl bg-white/15 backdrop-blur-md border border-white/20 group-hover:scale-110 transition-transform">
+                <Layers className="w-6 h-6 text-white" />
+              </div>
+              <div className="text-right">
+                <div className="text-3xl font-black tracking-tight">332</div>
+                <div className="text-xs font-semibold text-indigo-100">All Intake Leads</div>
+              </div>
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-white/15 flex items-center justify-between text-xs relative z-10">
+              <div className="flex items-center gap-1 font-bold text-indigo-100 group-hover:underline">
+                <span>More Info</span>
+                <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
+              </div>
+              <span className="font-mono text-[11px] font-bold text-indigo-200">PR 141 FR 169 (100% Inbound)</span>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* 3. INTERACTIVE ANIMATED PIPELINE HEALTH MONITOR */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-3xl p-6 sm:p-7 shadow-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
-          <div className="space-y-1">
-            <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2.5">
-              <span className="p-1.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                <Layers className="w-4 h-4" />
+      {/* 3. RECHARTS ANALYTICS: OPPORTUNITY DONUT + CALL HORIZONTAL BARS + PROPERTY LIFECYCLE */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* CHART 1: OPPORTUNITY DONUT CHART (Screenshot 1) */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-3xl p-6 shadow-sm flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <Filter className="w-4 h-4 text-purple-500" />
+                <span>Opportunity Distribution</span>
+              </h3>
+              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800/80">
+                {totalOpportunities} Deals
               </span>
-              <span>Inbound Leads & Verification Pipeline Health</span>
+            </div>
+
+            <div className="h-60 relative flex items-center justify-center my-3">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                      borderRadius: '12px',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      color: '#fff',
+                      fontSize: '12px',
+                    }}
+                  />
+                  <Pie
+                    data={opportunityData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={55}
+                    outerRadius={85}
+                    paddingAngle={3}
+                    dataKey="value"
+                  >
+                    {opportunityData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+
+              {/* Center Donut Ring Label */}
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <span className="text-2xl font-black text-slate-900 dark:text-white">
+                  {totalOpportunities}
+                </span>
+                <span className="text-[10px] uppercase font-bold text-slate-400">Total</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Legend Badges */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px]">
+            {opportunityData.map((item) => (
+              <div key={item.name} className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }}></span>
+                <span className="text-slate-600 dark:text-slate-400 font-medium truncate">
+                  {item.name}: <strong className="text-slate-900 dark:text-white">{item.value}</strong>
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* CHART 2: CALL PERFORMANCE HORIZONTAL BARS (Screenshot 2) */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-3xl p-6 shadow-sm lg:col-span-2 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <PhoneCall className="w-4 h-4 text-blue-500" />
+                <span>Call Activity & Escalations</span>
+              </h3>
+              <div className="flex items-center gap-2 text-[11px]">
+                <span className="px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-bold border border-blue-200 dark:border-blue-800">
+                  Calls (99)
+                </span>
+                <span className="px-2 py-0.5 rounded-md bg-rose-50 dark:bg-rose-950 text-rose-700 dark:text-rose-300 font-bold border border-rose-200 dark:border-rose-800">
+                  Problem (14)
+                </span>
+              </div>
+            </div>
+
+            <div className="h-64 mt-3">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  layout="vertical"
+                  data={callPerformanceData}
+                  margin={{ top: 10, right: 30, left: 20, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
+                  <XAxis type="number" fontSize={11} stroke="#94a3b8" />
+                  <YAxis type="category" dataKey="category" fontSize={12} stroke="#94a3b8" width={60} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                      borderRadius: '12px',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      color: '#fff',
+                      fontSize: '12px',
+                    }}
+                  />
+                  <Bar dataKey="inbound" name="Inbound" fill="#38bdf8" radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="connected" name="Connected" fill="#6366f1" radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="siteVisit" name="Site Visit" fill="#10b981" radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="followUp" name="Follow-Up" fill="#f97316" radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="totalCalls" name="Total Activity" fill="#d946ef" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between text-xs text-slate-500 dark:text-slate-400 pt-2 border-t border-slate-100 dark:border-slate-800">
+            <span>Telephonic qualification tracking & customer satisfaction score</span>
+            <span className="font-semibold text-emerald-600 dark:text-emerald-400">98.4% Resolution Rate</span>
+          </div>
+        </div>
+      </div>
+
+      {/* CHART 3: PROPERTY INVENTORY LIFECYCLE (Screenshot 2) */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-3xl p-6 sm:p-7 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-100 dark:border-slate-800">
+          <div>
+            <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <Building2 className="w-4 h-4 text-emerald-500" />
+              <span>Property Inventory Status & Lifecycle Distribution</span>
             </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              Automated stage distribution across intake, telephonic qualification, site appointments, and legal deed verification.
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              Live status tracking across intake, active verification, expired 90/30-day listings, and sold properties.
             </p>
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/80 shadow-2xs">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
-              <span>System Normal (Zero Escalation)</span>
-            </span>
+            <button
+              onClick={() => navigate('/properties')}
+              className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1"
+            >
+              <span>Manage Inventory</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
 
-        {/* Multi-segment Animated Gradient Progress Bar */}
-        <div className="space-y-4">
-          <div className="relative h-4 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden flex shadow-inner p-0.5 gap-0.5">
-            <div
-              className="bg-gradient-to-r from-emerald-500 to-green-500 h-full rounded-l-full transition-all duration-500 relative group cursor-pointer"
-              style={{ width: '45%' }}
+        <div className="h-72 w-full mt-2">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart
+              data={propertyLifecycleData}
+              margin={{ top: 20, right: 30, left: 10, bottom: 5 }}
             >
-              <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-            </div>
-            <div
-              className="bg-gradient-to-r from-blue-500 to-indigo-500 h-full transition-all duration-500 relative group cursor-pointer"
-              style={{ width: '25%' }}
-            >
-              <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-            </div>
-            <div
-              className="bg-gradient-to-r from-amber-400 to-amber-500 h-full transition-all duration-500 relative group cursor-pointer"
-              style={{ width: '18%' }}
-            >
-              <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-            </div>
-            <div
-              className="bg-gradient-to-r from-purple-500 to-fuchsia-500 h-full rounded-r-full transition-all duration-500 relative group cursor-pointer"
-              style={{ width: '12%' }}
-            >
-              <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-            </div>
-          </div>
-
-          {/* Interactive Metric Cards for each pipeline segment */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
-            <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800/80 flex items-center justify-between hover:border-emerald-400 dark:hover:border-emerald-500 transition-colors">
-              <div className="space-y-0.5">
-                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                  <span>In Discussion</span>
-                </div>
-                <div className="text-sm font-black text-slate-900 dark:text-white">45%</div>
-              </div>
-              <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">Normal</span>
-            </div>
-
-            <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800/80 flex items-center justify-between hover:border-blue-400 dark:hover:border-blue-500 transition-colors">
-              <div className="space-y-0.5">
-                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                  <span>Site Visits</span>
-                </div>
-                <div className="text-sm font-black text-slate-900 dark:text-white">25%</div>
-              </div>
-              <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400">On Track</span>
-            </div>
-
-            <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800/80 flex items-center justify-between hover:border-amber-400 dark:hover:border-amber-500 transition-colors">
-              <div className="space-y-0.5">
-                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                  <span>Fresh Intake</span>
-                </div>
-                <div className="text-sm font-black text-slate-900 dark:text-white">18%</div>
-              </div>
-              <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400">&lt; 3h SLA</span>
-            </div>
-
-            <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800/80 flex items-center justify-between hover:border-purple-400 dark:hover:border-purple-500 transition-colors">
-              <div className="space-y-0.5">
-                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-purple-500"></span>
-                  <span>Legal Check</span>
-                </div>
-                <div className="text-sm font-black text-slate-900 dark:text-white">12%</div>
-              </div>
-              <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400">Verified</span>
-            </div>
-          </div>
+              <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
+              <XAxis dataKey="stage" fontSize={11} stroke="#94a3b8" />
+              <YAxis fontSize={11} stroke="#94a3b8" />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                  borderRadius: '12px',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  color: '#fff',
+                  fontSize: '12px',
+                }}
+              />
+              <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
+              <Bar dataKey="primary" name="Active Volume" fill="#0ea5e9" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="verified" name="Verified & Legal Clear" fill="#6366f1" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="expired" name="30/90d Timer Expired" fill="#10b981" radius={[6, 6, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       </div>
 
-      {/* 4. REAL ESTATE OPERATIONS & CONTROL SHORTCUTS */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Core Administrative Controls */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-3xl p-6 sm:p-7 shadow-sm space-y-4">
-          <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+      {/* 4. EXECUTIVE ADDITIONS: LEADERBOARD & LIVE SLA ACTIVITY STREAM */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* LEADERBOARD (2 Columns) */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-3xl p-6 shadow-sm lg:col-span-2 space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
             <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <span className="p-1.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                <ShieldCheck className="w-4 h-4" />
-              </span>
-              <span>Administrative Controls</span>
+              <Award className="w-4 h-4 text-amber-500" />
+              <span>Top Real Estate Executives & Telecallers</span>
             </h3>
-            <span className="text-[11px] font-semibold text-slate-400">3 Sub-Systems</span>
+            <span className="text-[11px] font-bold text-slate-400">This Month</span>
           </div>
 
-          <div className="space-y-3">
-            <div
-              onClick={() => onNavigate('STAFF')}
-              className="p-4 rounded-2xl bg-slate-50/80 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800/80 hover:border-emerald-300 dark:hover:border-emerald-700/60 flex items-center justify-between cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md group"
-            >
-              <div className="space-y-1">
-                <div className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors flex items-center gap-2">
-                  <span>Staff Roster & Multiple Dynamic Roles</span>
-                  <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 font-bold">
-                    CRUD Live
-                  </span>
-                </div>
-                <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Assign Super Admin, Sales Manager, Telecaller, or Verification Officer roles with status toggle.
-                </div>
-              </div>
-              <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 group-hover:border-emerald-500 transition-colors">
-                <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-500 group-hover:translate-x-0.5 transition-all" />
-              </div>
-            </div>
-
-            <div
-              onClick={() => onNavigate('DYNAMIC_MASTERS')}
-              className="p-4 rounded-2xl bg-slate-50/80 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800/80 hover:border-emerald-300 dark:hover:border-emerald-700/60 flex items-center justify-between cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md group"
-            >
-              <div className="space-y-1">
-                <div className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors flex items-center gap-2">
-                  <span>Dynamic Property Master Tables</span>
-                  <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400 font-bold">
-                    Zero Code
-                  </span>
-                </div>
-                <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Add dynamic options (BHKs, Facing, Furnishing, Agricultural Bigha) with instant schema updates.
-                </div>
-              </div>
-              <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 group-hover:border-emerald-500 transition-colors">
-                <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-500 group-hover:translate-x-0.5 transition-all" />
-              </div>
-            </div>
-
-            <div
-              onClick={() => onNavigate('SETTINGS')}
-              className="p-4 rounded-2xl bg-slate-50/80 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800/80 hover:border-emerald-300 dark:hover:border-emerald-700/60 flex items-center justify-between cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md group"
-            >
-              <div className="space-y-1">
-                <div className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors flex items-center gap-2">
-                  <span>92 Dynamic System Settings & Audit Logs</span>
-                  <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-400 font-bold">
-                    Audit Trail
-                  </span>
-                </div>
-                <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Live SLAs, WhatsApp / SMS credentials, quiet hours (21:00-09:00), and immutable audit ledger.
-                </div>
-              </div>
-              <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 group-hover:border-emerald-500 transition-colors">
-                <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-500 group-hover:translate-x-0.5 transition-all" />
-              </div>
-            </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 dark:bg-slate-950/60 text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800">
+                <tr>
+                  <th className="p-3">Rank</th>
+                  <th className="p-3">Executive</th>
+                  <th className="p-3 text-center">Calls</th>
+                  <th className="p-3 text-center">Site Visits</th>
+                  <th className="p-3 text-center">Won Deals</th>
+                  <th className="p-3 text-right">Win Rate</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {leaderboardData.map((item) => (
+                  <tr key={item.rank} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                    <td className="p-3">
+                      <span
+                        className={`inline-flex items-center justify-center w-6 h-6 rounded-full font-bold text-xs ${
+                          item.rank === 1
+                            ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                            : item.rank === 2
+                            ? 'bg-slate-200 text-slate-800 dark:bg-slate-800 dark:text-slate-200'
+                            : 'bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-300'
+                        }`}
+                      >
+                        #{item.rank}
+                      </span>
+                    </td>
+                    <td className="p-3 font-semibold text-slate-900 dark:text-white">
+                      <div>{item.name}</div>
+                      <div className="text-[10px] text-slate-400 font-normal">{item.role}</div>
+                    </td>
+                    <td className="p-3 text-center font-mono font-bold text-slate-700 dark:text-slate-300">
+                      {item.calls}
+                    </td>
+                    <td className="p-3 text-center font-mono font-bold text-blue-600 dark:text-blue-400">
+                      {item.visits}
+                    </td>
+                    <td className="p-3 text-center font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                      {item.deals}
+                    </td>
+                    <td className="p-3 text-right">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">
+                        {item.rate}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
 
-        {/* Real Estate Operations Quick Shortcuts */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-3xl p-6 sm:p-7 shadow-sm space-y-4">
-          <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <span className="p-1.5 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
-                <Building2 className="w-4 h-4" />
-              </span>
-              <span>Propira Verification & Lead Engines</span>
-            </h3>
-            <span className="text-[11px] font-semibold text-slate-400">Operations</span>
-          </div>
-
-          <div className="space-y-3">
-            <div
-              onClick={() => onNavigate('MY_WORK')}
-              className="p-4 rounded-2xl bg-slate-50/80 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800/80 hover:border-blue-300 dark:hover:border-blue-700/60 flex items-center justify-between cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md group"
-            >
-              <div className="space-y-1">
-                <div className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors flex items-center gap-2">
-                  <span>Prioritized Lead Queue</span>
-                  <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 font-bold">
-                    6-Way Inbound
-                  </span>
-                </div>
-                <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Overdue follow-ups, untouched intake leads, today&apos;s appointments, and temperature sorting.
-                </div>
-              </div>
-              <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 group-hover:border-blue-500 transition-colors">
-                <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-500 group-hover:translate-x-0.5 transition-all" />
-              </div>
+        {/* LIVE INBOUND ACTIVITY STREAM (1 Column) */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-3xl p-6 shadow-sm space-y-4 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <Activity className="w-4 h-4 text-emerald-500" />
+                <span>Live Activity Stream</span>
+              </h3>
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
             </div>
 
-            <div
-              onClick={() => onNavigate('VERIFICATION')}
-              className="p-4 rounded-2xl bg-slate-50/80 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800/80 hover:border-blue-300 dark:hover:border-blue-700/60 flex items-center justify-between cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md group"
-            >
-              <div className="space-y-1">
-                <div className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors flex items-center gap-2">
-                  <span>7-Step Property Verification Hub</span>
-                  <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-bold">
-                    Dual Inspection
-                  </span>
+            <div className="space-y-3.5 mt-3">
+              {liveActivities.map((act) => (
+                <div key={act.id} className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-950/60 border border-slate-100 dark:border-slate-800/80 space-y-1">
+                  <div className="flex items-center justify-between text-[10px]">
+                    <span
+                      className={`font-bold px-2 py-0.2 rounded-full ${
+                        act.alert
+                          ? 'bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300'
+                          : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
+                      }`}
+                    >
+                      {act.badge}
+                    </span>
+                    <span className="text-slate-400">{act.time}</span>
+                  </div>
+                  <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 leading-snug">
+                    {act.text}
+                  </p>
                 </div>
-                <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Manager approvals, document checks, and automated 90/30-day listing expiry timers.
-                </div>
-              </div>
-              <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 group-hover:border-blue-500 transition-colors">
-                <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-500 group-hover:translate-x-0.5 transition-all" />
-              </div>
-            </div>
-
-            <div
-              onClick={() => onNavigate('RECYCLE_BIN')}
-              className="p-4 rounded-2xl bg-slate-50/80 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800/80 hover:border-rose-300 dark:hover:border-rose-700/60 flex items-center justify-between cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md group"
-            >
-              <div className="space-y-1">
-                <div className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors flex items-center gap-2">
-                  <span>Recycle Bin & Owner Ad Requests</span>
-                  <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300 font-bold">
-                    Safe Purge
-                  </span>
-                </div>
-                <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Single-pending owner deletion requests and 1-click restore for accidental removals.
-                </div>
-              </div>
-              <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 group-hover:border-rose-500 transition-colors">
-                <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-rose-500 group-hover:translate-x-0.5 transition-all" />
-              </div>
+              ))}
             </div>
           </div>
+
+          <button
+            onClick={() => navigate('/leads')}
+            className="w-full mt-2 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold transition-all text-center"
+          >
+            Open Full Activity Ledger &rarr;
+          </button>
         </div>
       </div>
 
-      {/* 5. SYSTEM ARCHITECTURAL VITALS FOOTER */}
-      <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-950/50 p-4 flex flex-wrap items-center justify-between gap-4 text-xs text-slate-500 dark:text-slate-400">
-        <div className="flex items-center gap-2">
-          <Database className="w-4 h-4 text-emerald-500" />
-          <span className="font-semibold text-slate-700 dark:text-slate-300">
-            Omshiv Buildvision Architectural Foundation
-          </span>
-          <span className="text-slate-400">•</span>
-          <span>FastAPI + SQLAlchemy + Repository Pattern</span>
+      {/* 5. JAIPUR LOCALITY DEMAND HOTSPOTS */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-3xl p-6 shadow-sm space-y-4">
+        <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+          <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <MapPin className="w-4 h-4 text-rose-500" />
+            <span>Jaipur Locality Demand Heatmap & Hotspots</span>
+          </h3>
+          <span className="text-xs text-slate-400">Buyer Inquiry Volume</span>
         </div>
 
-        <div className="flex items-center gap-4 text-[11px]">
-          <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span>Zero-Data Loss Architecture</span>
-          </span>
-          <span className="flex items-center gap-1.5">
-            <Lock className="w-3 h-3 text-slate-400" />
-            <span>Encrypted JWT Sessions</span>
-          </span>
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-1">
+            <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase">Vaishali Nagar</div>
+            <div className="text-lg font-black text-rose-600 dark:text-rose-400">94% Demand</div>
+            <div className="text-[10px] text-slate-400">114 Inquiries</div>
+          </div>
+          <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-1">
+            <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase">Mansarovar</div>
+            <div className="text-lg font-black text-emerald-600 dark:text-emerald-400">88% Demand</div>
+            <div className="text-[10px] text-slate-400">96 Inquiries</div>
+          </div>
+          <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-1">
+            <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase">Jagatpura</div>
+            <div className="text-lg font-black text-blue-600 dark:text-blue-400">82% Demand</div>
+            <div className="text-[10px] text-slate-400">84 Inquiries</div>
+          </div>
+          <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-1">
+            <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase">Ajmer Road</div>
+            <div className="text-lg font-black text-amber-600 dark:text-amber-400">76% Demand</div>
+            <div className="text-[10px] text-slate-400">62 Inquiries</div>
+          </div>
+          <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-1">
+            <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase">Tonk Road</div>
+            <div className="text-lg font-black text-purple-600 dark:text-purple-400">71% Demand</div>
+            <div className="text-[10px] text-slate-400">54 Inquiries</div>
+          </div>
         </div>
       </div>
     </div>
