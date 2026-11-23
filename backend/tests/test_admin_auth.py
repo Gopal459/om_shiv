@@ -38,3 +38,58 @@ async def test_seed_admin_user_idempotency(db_session: AsyncSession):
     # Idempotent re-run
     second_run = await seed_admin_user(db_session)
     assert second_run.id == admin_emp.id
+
+
+@pytest.mark.asyncio
+async def test_admin_login_success_and_case_insensitivity(test_client, db_session: AsyncSession):
+    await seed_departments_and_roles(db_session)
+    await seed_admin_user(db_session)
+
+    # 1. Login with lowercase 'admin'
+    resp = await test_client.post("/v1/auth/admin/login", json={"username": "admin", "password": "Admin@123"})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "access_token" in data
+    assert data["user"]["username"] == "admin"
+    assert data["user"]["role"] == "SUPER_ADMIN"
+    assert "leads" in data["user"]["permissions"]
+
+    # 2. Login with uppercase 'ADMIN'
+    resp_upper = await test_client.post("/v1/auth/admin/login", json={"username": "ADMIN", "password": "Admin@123"})
+    assert resp_upper.status_code == 200
+
+    # 3. Login with email
+    resp_email = await test_client.post("/v1/auth/admin/login", json={"username": "admin@omshiv.in", "password": "Admin@123"})
+    assert resp_email.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_admin_login_invalid_password(test_client, db_session: AsyncSession):
+    await seed_departments_and_roles(db_session)
+    await seed_admin_user(db_session)
+
+    resp = await test_client.post("/v1/auth/admin/login", json={"username": "admin", "password": "WrongPassword"})
+    assert resp.status_code == 401
+    assert "Invalid" in resp.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_admin_login_non_existent_user(test_client, db_session: AsyncSession):
+    await seed_departments_and_roles(db_session)
+
+    resp = await test_client.post("/v1/auth/admin/login", json={"username": "non_existent_user", "password": "AnyPassword"})
+    assert resp.status_code == 401
+    assert "Invalid" in resp.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_admin_login_inactive_user(test_client, db_session: AsyncSession):
+    await seed_departments_and_roles(db_session)
+    admin_emp = await seed_admin_user(db_session)
+    admin_emp.is_active = False
+    await db_session.commit()
+
+    resp = await test_client.post("/v1/auth/admin/login", json={"username": "admin", "password": "Admin@123"})
+    assert resp.status_code == 403
+    assert "deactivated" in resp.json()["detail"].lower()
+
