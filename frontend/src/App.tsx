@@ -9,8 +9,9 @@ import PropertyVerification from './pages/PropertyVerification';
 import RecycleBinView from './pages/RecycleBinView';
 import DynamicMastersEditor from './pages/DynamicMastersEditor';
 import SettingsEditor from './pages/SettingsEditor';
+import { ThemeProvider } from './context/ThemeContext';
 
-export const App: React.FC = () => {
+const AppContent: React.FC = () => {
   const [token, setToken] = useState<string | null>(localStorage.getItem('access_token'));
   const [user, setUser] = useState<any>(() => {
     const saved = localStorage.getItem('user');
@@ -91,4 +92,13 @@ export const App: React.FC = () => {
     </AdminLayout>
   );
 };
+
+export const App: React.FC = () => {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
+  );
+};
+
 export default App;

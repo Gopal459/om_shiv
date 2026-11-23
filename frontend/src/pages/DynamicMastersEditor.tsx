@@ -86,13 +86,13 @@ export const DynamicMastersEditor: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
         <div>
-          <h2 className="text-xl font-bold text-white flex items-center gap-2">
-            <Sliders className="w-5 h-5 text-green-400" />
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <Sliders className="w-5 h-5 text-emerald-500" />
             Dynamic Property Master Tables
           </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             100% Dynamic options configured from database (zero hardcoded frontend enums).
           </p>
         </div>
@@ -100,7 +100,7 @@ export const DynamicMastersEditor: React.FC = () => {
         <button
           onClick={fetchSchema}
           disabled={loading}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 font-semibold border border-slate-700 transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs text-slate-700 dark:text-slate-300 font-semibold border border-slate-200 dark:border-slate-700 transition-colors"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           Refresh Schema
@@ -110,8 +110,8 @@ export const DynamicMastersEditor: React.FC = () => {
       {/* Main Grid: Group Selector & Form */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column: Group Tabs */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-1">
-          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-3 pb-2">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-1 shadow-sm">
+          <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider px-3 pb-2">
             Master Groups
           </div>
           {groupKeys.map((group) => (
@@ -120,12 +120,18 @@ export const DynamicMastersEditor: React.FC = () => {
               onClick={() => setSelectedGroup(group)}
               className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-between ${
                 selectedGroup === group
-                  ? 'bg-green-600 text-white shadow-md shadow-green-900/30'
-                  : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-900/30'
+                  : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/80 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               <span>{group}</span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-950/60 font-mono">
+              <span
+                className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold ${
+                  selectedGroup === group
+                    ? 'bg-emerald-700 text-white'
+                    : 'bg-slate-100 dark:bg-slate-950/60 text-slate-600 dark:text-slate-400'
+                }`}
+              >
                 {schema[group]?.length || 0}
               </span>
             </button>
@@ -135,30 +141,31 @@ export const DynamicMastersEditor: React.FC = () => {
         {/* Right Columns: Active Options List & Add Form */}
         <div className="lg:col-span-2 space-y-6">
           {/* Active Options Table */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
-            <h3 className="text-sm font-bold text-white mb-3">
-              Configured Options for <span className="text-green-400 font-mono">{selectedGroup}</span>
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-3">
+              Configured Options for{' '}
+              <span className="text-emerald-600 dark:text-emerald-400 font-mono">{selectedGroup}</span>
             </h3>
 
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="border-b border-slate-800 text-slate-400 font-bold">
+                  <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-bold">
                     <th className="pb-2">Code</th>
                     <th className="pb-2">Label</th>
                     <th className="pb-2">Display Order</th>
                     <th className="pb-2">Scoped Categories</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/60 text-slate-200">
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-slate-800 dark:text-slate-200">
                   {schema[selectedGroup]?.map((opt: any) => (
-                    <tr key={opt.code} className="hover:bg-slate-800/30">
-                      <td className="py-2.5 font-mono text-slate-400">{opt.code}</td>
-                      <td className="py-2.5 font-semibold text-white">{opt.label}</td>
-                      <td className="py-2.5 text-slate-400">{opt.display_order}</td>
+                    <tr key={opt.code} className="hover:bg-slate-50 dark:hover:bg-slate-800/30">
+                      <td className="py-2.5 font-mono text-slate-500 dark:text-slate-400">{opt.code}</td>
+                      <td className="py-2.5 font-semibold text-slate-900 dark:text-white">{opt.label}</td>
+                      <td className="py-2.5 text-slate-500 dark:text-slate-400">{opt.display_order}</td>
                       <td className="py-2.5">
                         {opt.applicable_categories && opt.applicable_categories.length > 0 ? (
-                          <span className="px-2 py-0.5 rounded bg-blue-950 text-blue-300 text-[10px] border border-blue-800">
+                          <span className="px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 text-[10px] border border-blue-200 dark:border-blue-800 font-medium">
                             Category IDs: {opt.applicable_categories.join(', ')}
                           </span>
                         ) : (
@@ -173,28 +180,29 @@ export const DynamicMastersEditor: React.FC = () => {
           </div>
 
           {/* Add Option Form */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
-            <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-1.5">
-              <Plus className="w-4 h-4 text-green-400" />
-              Add Dynamic Option to <span className="text-green-400 font-mono">{selectedGroup}</span>
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-3 flex items-center gap-1.5">
+              <Plus className="w-4 h-4 text-emerald-500" />
+              Add Dynamic Option to{' '}
+              <span className="text-emerald-600 dark:text-emerald-400 font-mono">{selectedGroup}</span>
             </h3>
 
             {msg && (
-              <div className="mb-3 p-2.5 bg-green-950/80 border border-green-700/60 rounded-lg text-green-300 text-xs flex items-center gap-2">
-                <Check className="w-4 h-4 text-green-400 flex-shrink-0" />
+              <div className="mb-3 p-2.5 bg-emerald-50 dark:bg-green-950/80 border border-emerald-200 dark:border-green-700/60 rounded-lg text-emerald-800 dark:text-green-300 text-xs flex items-center gap-2">
+                <Check className="w-4 h-4 text-emerald-600 dark:text-green-400 flex-shrink-0" />
                 <span>{msg}</span>
               </div>
             )}
             {error && (
-              <div className="mb-3 p-2.5 bg-red-950/80 border border-red-700/60 rounded-lg text-red-300 text-xs flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+              <div className="mb-3 p-2.5 bg-rose-50 dark:bg-red-950/80 border border-rose-200 dark:border-red-700/60 rounded-lg text-rose-800 dark:text-red-300 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-600 dark:text-red-400 flex-shrink-0" />
                 <span>{error}</span>
               </div>
             )}
 
             <form onSubmit={handleCreateOption} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   Option Code (e.g. BIGHA, EAST)
                 </label>
                 <input
@@ -203,12 +211,12 @@ export const DynamicMastersEditor: React.FC = () => {
                   value={newCode}
                   onChange={(e) => setNewCode(e.target.value)}
                   placeholder="CODE_UPPERCASE"
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white uppercase focus:ring-2 focus:ring-green-500 focus:outline-none"
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-900 dark:text-white uppercase focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   Human Label (e.g. Bigha)
                 </label>
                 <input
@@ -217,12 +225,12 @@ export const DynamicMastersEditor: React.FC = () => {
                   value={newLabel}
                   onChange={(e) => setNewLabel(e.target.value)}
                   placeholder="e.g. Bigha"
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:ring-2 focus:ring-green-500 focus:outline-none"
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   Display Order
                 </label>
                 <input
@@ -230,12 +238,12 @@ export const DynamicMastersEditor: React.FC = () => {
                   required
                   value={displayOrder}
                   onChange={(e) => setDisplayOrder(Number(e.target.value))}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:ring-2 focus:ring-green-500 focus:outline-none"
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   Category IDs (Optional, e.g. 3 for Agri)
                 </label>
                 <input
@@ -243,7 +251,7 @@ export const DynamicMastersEditor: React.FC = () => {
                   value={categories}
                   onChange={(e) => setCategories(e.target.value)}
                   placeholder="e.g. 3 or leave blank for all"
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:ring-2 focus:ring-green-500 focus:outline-none"
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                 />
               </div>
 
@@ -251,7 +259,7 @@ export const DynamicMastersEditor: React.FC = () => {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-5 py-2.5 bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white font-bold text-xs uppercase tracking-wider rounded-lg shadow-md transition-colors"
+                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs uppercase tracking-wider rounded-lg shadow-md transition-colors"
                 >
                   {submitting ? 'Saving...' : 'Save Dynamic Option'}
                 </button>

@@ -6,8 +6,6 @@ import {
   Check,
   AlertCircle,
   RefreshCw,
-  KeyRound,
-  Building,
   Save,
   CheckSquare,
   X,
@@ -209,13 +207,13 @@ export const StaffManager: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
         <div>
-          <h2 className="text-xl font-bold text-white flex items-center gap-2">
-            <Users className="w-5 h-5 text-blue-400" />
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <Users className="w-5 h-5 text-blue-500" />
             Staff & Role Permissions Hub
           </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             Manage employees, assign multiple organizational roles, and configure granular module permissions.
           </p>
         </div>
@@ -223,7 +221,7 @@ export const StaffManager: React.FC = () => {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-green-600 hover:bg-green-500 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-green-900/30"
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-emerald-900/20"
           >
             <UserPlus className="w-4 h-4" />
             + Add Staff Member
@@ -231,7 +229,7 @@ export const StaffManager: React.FC = () => {
           <button
             onClick={fetchStaffAndRoles}
             disabled={loading}
-            className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs border border-slate-700 transition-colors"
+            className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl text-xs border border-slate-200 dark:border-slate-700 transition-colors"
             title="Refresh"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
@@ -240,13 +238,13 @@ export const StaffManager: React.FC = () => {
       </div>
 
       {/* Sub Tabs */}
-      <div className="flex rounded-xl bg-slate-900 p-1 border border-slate-800 w-fit">
+      <div className="flex rounded-xl bg-slate-100 dark:bg-slate-900 p-1 border border-slate-200 dark:border-slate-800 w-fit">
         <button
           onClick={() => setActiveSubTab('ROSTER')}
           className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${
             activeSubTab === 'ROSTER'
               ? 'bg-blue-600 text-white shadow-sm'
-              : 'text-slate-400 hover:text-white'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
           }`}
         >
           Staff Directory ({staff.length})
@@ -256,7 +254,7 @@ export const StaffManager: React.FC = () => {
           className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${
             activeSubTab === 'PERMISSIONS'
               ? 'bg-blue-600 text-white shadow-sm'
-              : 'text-slate-400 hover:text-white'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
           }`}
         >
           Role & Module Permission Matrix
@@ -264,25 +262,25 @@ export const StaffManager: React.FC = () => {
       </div>
 
       {successMsg && (
-        <div className="p-3 bg-green-950/80 border border-green-700/60 rounded-xl text-green-300 text-xs flex items-center gap-2">
-          <Check className="w-4 h-4 text-green-400 flex-shrink-0" />
+        <div className="p-3 bg-emerald-50 dark:bg-green-950/80 border border-emerald-200 dark:border-green-700/60 rounded-xl text-emerald-800 dark:text-green-300 text-xs flex items-center gap-2">
+          <Check className="w-4 h-4 text-emerald-600 dark:text-green-400 flex-shrink-0" />
           <span>{successMsg}</span>
         </div>
       )}
 
       {error && (
-        <div className="p-3 bg-red-950/80 border border-red-700/60 rounded-xl text-red-300 text-xs flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+        <div className="p-3 bg-rose-50 dark:bg-red-950/80 border border-rose-200 dark:border-red-700/60 rounded-xl text-rose-800 dark:text-red-300 text-xs flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 text-rose-600 dark:text-red-400 flex-shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
       {/* VIEW 1: STAFF DIRECTORY */}
       {activeSubTab === 'ROSTER' && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-950/60 text-slate-400 border-b border-slate-800">
+              <thead className="bg-slate-50 dark:bg-slate-950/60 text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800">
                 <tr>
                   <th className="p-4">Emp ID</th>
                   <th className="p-4">Staff Name</th>
@@ -293,25 +291,25 @@ export const StaffManager: React.FC = () => {
                   <th className="p-4 text-center">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800 text-slate-200">
+              <tbody className="divide-y divide-slate-200 dark:divide-slate-800 text-slate-800 dark:text-slate-200">
                 {staff.map((emp) => (
-                  <tr key={emp.id} className="hover:bg-slate-800/40">
-                    <td className="p-4 font-mono font-bold text-green-400">
+                  <tr key={emp.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                    <td className="p-4 font-mono font-bold text-emerald-600 dark:text-green-400">
                       {emp.employee_id}
                     </td>
-                    <td className="p-4 font-semibold text-white">{emp.name}</td>
-                    <td className="p-4 font-mono text-slate-300">{emp.username || '—'}</td>
+                    <td className="p-4 font-semibold text-slate-900 dark:text-white">{emp.name}</td>
+                    <td className="p-4 font-mono text-slate-600 dark:text-slate-300">{emp.username || '—'}</td>
                     <td className="p-4">
                       <div>{emp.mobile}</div>
                       {emp.email && <div className="text-[11px] text-slate-400">{emp.email}</div>}
                     </td>
                     <td className="p-4">
-                      <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 text-[10px] border border-slate-700">
+                      <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[10px] border border-slate-200 dark:border-slate-700 font-medium">
                         {emp.department_name || 'Management'}
                       </span>
                     </td>
                     <td className="p-4">
-                      <span className="px-2 py-0.5 rounded bg-blue-950 text-blue-300 text-[10px] font-bold border border-blue-800">
+                      <span className="px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 text-[10px] font-bold border border-blue-200 dark:border-blue-800">
                         {emp.role_code || 'STAFF'}
                       </span>
                     </td>
@@ -319,8 +317,8 @@ export const StaffManager: React.FC = () => {
                       <span
                         className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                           emp.is_active
-                            ? 'bg-green-950 text-green-400 border border-green-800'
-                            : 'bg-red-950 text-red-400 border border-red-800'
+                            ? 'bg-emerald-50 dark:bg-green-950 text-emerald-700 dark:text-green-400 border border-emerald-200 dark:border-green-800'
+                            : 'bg-rose-50 dark:bg-red-950 text-rose-700 dark:text-red-400 border border-rose-200 dark:border-red-800'
                         }`}
                       >
                         {emp.is_active ? 'Active' : 'Inactive'}
@@ -338,8 +336,8 @@ export const StaffManager: React.FC = () => {
       {activeSubTab === 'PERMISSIONS' && (
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Roles Selector Sidebar */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-1.5">
-            <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-3 pb-2">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-1.5 shadow-sm">
+            <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider px-3 pb-2">
               Select Role to Configure
             </div>
             {roles.map((r) => (
@@ -349,7 +347,7 @@ export const StaffManager: React.FC = () => {
                 className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-between ${
                   selectedRoleCode === r.code
                     ? 'bg-blue-600 text-white shadow-md shadow-blue-900/30'
-                    : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+                    : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/80 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
                 <div>
@@ -362,21 +360,21 @@ export const StaffManager: React.FC = () => {
           </div>
 
           {/* Module Permissions Grid */}
-          <div className="lg:col-span-3 bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
+          <div className="lg:col-span-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-6 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-4">
               <div>
-                <h3 className="text-base font-bold text-white">
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
                   Configuring Permissions for:{' '}
-                  <span className="text-blue-400 font-mono">{selectedRoleCode}</span>
+                  <span className="text-blue-600 dark:text-blue-400 font-mono">{selectedRoleCode}</span>
                 </h3>
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-slate-500 dark:text-slate-400">
                   Check modules to grant access. Permissions apply across all users holding this role.
                 </p>
               </div>
 
               <button
                 onClick={handleSavePermissions}
-                className="inline-flex items-center gap-1.5 px-4 py-2 bg-green-600 hover:bg-green-500 text-white font-bold text-xs rounded-xl shadow-md transition-colors flex-shrink-0"
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md transition-colors flex-shrink-0"
               >
                 <Save className="w-4 h-4" />
                 Save Permissions
@@ -389,10 +387,10 @@ export const StaffManager: React.FC = () => {
                 return (
                   <div
                     key={modKey}
-                    className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-3"
+                    className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-3"
                   >
-                    <div className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
-                      <CheckSquare className="w-4 h-4 text-green-400" />
+                    <div className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                      <CheckSquare className="w-4 h-4 text-emerald-500" />
                       <span>{modConfig.label}</span>
                     </div>
 
@@ -404,15 +402,15 @@ export const StaffManager: React.FC = () => {
                             key={p.key}
                             className={`flex items-center gap-2.5 p-2 rounded-lg cursor-pointer text-xs transition-colors ${
                               isChecked
-                                ? 'bg-slate-800/80 text-white font-semibold'
-                                : 'text-slate-400 hover:bg-slate-800/30'
+                                ? 'bg-white dark:bg-slate-800/80 text-slate-900 dark:text-white font-semibold shadow-xs border border-slate-200 dark:border-slate-700'
+                                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/30'
                             }`}
                           >
                             <input
                               type="checkbox"
                               checked={isChecked}
                               onChange={() => handleTogglePermission(modKey, p.key)}
-                              className="w-4 h-4 rounded text-green-600 focus:ring-green-500 border-slate-700 bg-slate-900"
+                              className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900"
                             />
                             <span>{p.label}</span>
                           </label>
@@ -429,16 +427,16 @@ export const StaffManager: React.FC = () => {
 
       {/* MODAL: ADD STAFF */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <UserPlus className="w-5 h-5 text-green-400" />
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+              <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <UserPlus className="w-5 h-5 text-emerald-500" />
                 Add New Staff Member
               </h3>
               <button
                 onClick={() => setShowAddModal(false)}
-                className="text-slate-400 hover:text-white p-1"
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-white p-1"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -447,7 +445,7 @@ export const StaffManager: React.FC = () => {
             <form onSubmit={handleCreateStaff} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Full Name *
                   </label>
                   <input
@@ -456,12 +454,12 @@ export const StaffManager: React.FC = () => {
                     value={newName}
                     onChange={(e) => setNewName(e.target.value)}
                     placeholder="e.g. Ramesh Chandra"
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:ring-2 focus:ring-green-500 focus:outline-none"
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Login Username *
                   </label>
                   <input
@@ -470,12 +468,12 @@ export const StaffManager: React.FC = () => {
                     value={newUsername}
                     onChange={(e) => setNewUsername(e.target.value)}
                     placeholder="e.g. ramesh"
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:ring-2 focus:ring-green-500 focus:outline-none"
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Password *
                   </label>
                   <input
@@ -484,12 +482,12 @@ export const StaffManager: React.FC = () => {
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     placeholder="Min 6 characters"
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:ring-2 focus:ring-green-500 focus:outline-none"
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     10-Digit Mobile *
                   </label>
                   <input
@@ -498,12 +496,12 @@ export const StaffManager: React.FC = () => {
                     value={newMobile}
                     onChange={(e) => setNewMobile(e.target.value)}
                     placeholder="e.g. 9829012345"
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:ring-2 focus:ring-green-500 focus:outline-none"
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                   />
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Email Address (Optional)
                   </label>
                   <input
@@ -511,18 +509,18 @@ export const StaffManager: React.FC = () => {
                     value={newEmail}
                     onChange={(e) => setNewEmail(e.target.value)}
                     placeholder="e.g. ramesh@omshiv.in"
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:ring-2 focus:ring-green-500 focus:outline-none"
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Department *
                   </label>
                   <select
                     value={newDept}
                     onChange={(e) => setNewDept(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:ring-2 focus:ring-green-500 focus:outline-none"
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                   >
                     <option value="SALES">Sales & Business Development</option>
                     <option value="OPERATIONS">Operations & Verification</option>
@@ -531,13 +529,13 @@ export const StaffManager: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Assigned Role *
                   </label>
                   <select
                     value={newRole}
                     onChange={(e) => setNewRole(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:ring-2 focus:ring-green-500 focus:outline-none"
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                   >
                     <option value="SUPER_ADMIN">Super Administrator</option>
                     <option value="SALES_MANAGER">Sales Manager</option>
@@ -549,18 +547,18 @@ export const StaffManager: React.FC = () => {
                 </div>
               </div>
 
-              <div className="pt-3 border-t border-slate-800 flex justify-end gap-2">
+              <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs rounded-xl"
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs rounded-xl"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={creating}
-                  className="px-5 py-2 bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-md transition-colors"
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-md transition-colors"
                 >
                   {creating ? 'Creating...' : 'Create Staff Member'}
                 </button>

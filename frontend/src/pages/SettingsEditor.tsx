@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Sliders, Shield, History, Save, CheckCircle } from 'lucide-react';
+import { Sliders, Shield, History, Save, CheckCircle2 } from 'lucide-react';
 
 export const SettingsEditor: React.FC = () => {
   const [settings, setSettings] = useState<any[]>([]);
@@ -70,16 +70,22 @@ export const SettingsEditor: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-slate-900">Dynamic System Settings & Audit Ledger</h2>
-        <p className="text-sm text-slate-500">
-          Runtime configuration parameters governed by immutable audit logging
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
+        <div>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <Sliders className="w-5 h-5 text-emerald-500" />
+            Dynamic System Settings & Audit Ledger
+          </h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Runtime configuration parameters governed by immutable audit logging.
+          </p>
+        </div>
       </div>
 
       {message && (
-        <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800">
-          {message}
+        <div className="p-3 bg-emerald-50 dark:bg-green-950/80 border border-emerald-200 dark:border-green-700/60 rounded-xl text-emerald-800 dark:text-green-300 text-xs flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-green-400 flex-shrink-0" />
+          <span>{message}</span>
         </div>
       )}
 
@@ -89,10 +95,10 @@ export const SettingsEditor: React.FC = () => {
           <button
             key={cat}
             onClick={() => setSelectedCategory(cat)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
               selectedCategory === cat
-                ? 'bg-slate-900 text-white'
-                : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+                ? 'bg-slate-900 dark:bg-emerald-600 text-white shadow-sm'
+                : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
             }`}
           >
             {cat}
@@ -100,120 +106,114 @@ export const SettingsEditor: React.FC = () => {
         ))}
       </div>
 
-      {/* Settings Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-slate-200 bg-slate-50 flex items-center gap-2 font-bold text-sm text-slate-800">
-          <Sliders className="w-4 h-4 text-green-600" /> Configurable System Settings ({filtered.length})
-        </div>
+      {/* Settings Table Card */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase">
+            <thead className="bg-slate-50 dark:bg-slate-950/60 text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800">
               <tr>
-                <th className="p-3">Key / Purpose</th>
-                <th className="p-3">Category</th>
-                <th className="p-3">Current Value</th>
-                <th className="p-3">Action</th>
+                <th className="p-4">Key / Parameter</th>
+                <th className="p-4">Description</th>
+                <th className="p-4">Value</th>
+                <th className="p-4 text-right">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filtered.map((s) => {
-                const isEditing = editingKey === s.key;
-                return (
-                  <tr key={s.key} className="hover:bg-slate-50/50">
-                    <td className="p-3">
-                      <span className="font-mono font-bold text-slate-900">{s.key}</span>
-                      <p className="text-slate-500 text-[11px] mt-0.5">{s.description}</p>
-                    </td>
-                    <td className="p-3">
-                      <span className="px-2 py-0.5 rounded bg-slate-100 font-semibold text-slate-600">
-                        {s.category}
+            <tbody className="divide-y divide-slate-200 dark:divide-slate-800 text-slate-800 dark:text-slate-200">
+              {filtered.map((setting) => (
+                <tr key={setting.key} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                  <td className="p-4 font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                    {setting.key}
+                  </td>
+                  <td className="p-4 text-slate-600 dark:text-slate-400 max-w-xs">{setting.description}</td>
+                  <td className="p-4">
+                    {editingKey === setting.key ? (
+                      <div className="space-y-2">
+                        <input
+                          type="text"
+                          value={editValue}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1 text-xs text-slate-900 dark:text-white"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Mandatory reason for audit..."
+                          value={editReason}
+                          onChange={(e) => setEditReason(e.target.value)}
+                          className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1 text-xs text-slate-900 dark:text-white"
+                        />
+                      </div>
+                    ) : (
+                      <span className="font-mono bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded text-slate-800 dark:text-slate-200">
+                        {typeof setting.value === 'object' ? JSON.stringify(setting.value) : String(setting.value)}
                       </span>
-                    </td>
-                    <td className="p-3 font-mono">
-                      {isEditing ? (
-                        <div className="space-y-2">
-                          <input
-                            type="text"
-                            value={editValue}
-                            onChange={(e) => setEditValue(e.target.value)}
-                            className="w-full border border-slate-300 rounded p-1 text-xs"
-                          />
-                          <input
-                            type="text"
-                            required
-                            placeholder="Mandatory business reason..."
-                            value={editReason}
-                            onChange={(e) => setEditReason(e.target.value)}
-                            className="w-full border border-amber-300 bg-amber-50 rounded p-1 text-xs"
-                          />
-                        </div>
-                      ) : (
-                        <span className="font-bold text-slate-800">
-                          {typeof s.value === 'object' ? JSON.stringify(s.value) : String(s.value)}
-                        </span>
-                      )}
-                    </td>
-                    <td className="p-3">
-                      {isEditing ? (
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleSaveSetting(s.key)}
-                            className="px-2.5 py-1 bg-green-600 text-white font-bold rounded hover:bg-green-700"
-                          >
-                            Save
-                          </button>
-                          <button
-                            onClick={() => setEditingKey(null)}
-                            className="px-2 py-1 bg-slate-200 text-slate-700 rounded hover:bg-slate-300"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      ) : (
+                    )}
+                  </td>
+                  <td className="p-4 text-right">
+                    {editingKey === setting.key ? (
+                      <div className="flex items-center justify-end gap-2">
                         <button
-                          onClick={() => {
-                            setEditingKey(s.key);
-                            setEditValue(s.value);
-                            setEditReason('');
-                          }}
-                          className="text-green-700 hover:underline font-semibold"
+                          onClick={() => handleSaveSetting(setting.key)}
+                          className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs flex items-center gap-1 shadow-sm"
                         >
-                          Edit
+                          <Save className="w-3 h-3" /> Save
                         </button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
+                        <button
+                          onClick={() => setEditingKey(null)}
+                          className="px-2 py-1 text-slate-500 hover:text-slate-700 dark:hover:text-white text-xs"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          setEditingKey(setting.key);
+                          setEditValue(typeof setting.value === 'object' ? JSON.stringify(setting.value) : setting.value);
+                          setEditReason('');
+                        }}
+                        className="px-3 py-1 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
+                      >
+                        Edit
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Audit Log Stream */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-        <h3 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
-          <History className="w-4 h-4 text-slate-600" /> Recent Audit Ledger Entries
+      {/* Audit Logs Preview */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
+        <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
+          <History className="w-4 h-4 text-blue-500" />
+          Recent Security Audit Trail (Last 20 Events)
         </h3>
-        <div className="divide-y divide-slate-100 text-xs">
-          {auditLogs.map((log) => (
-            <div key={log.id} className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div>
-                <span className="font-bold text-slate-800">{log.entity_name}</span> /{' '}
-                <span className="font-mono text-slate-600">{log.entity_id}</span> :{' '}
-                <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-semibold">{log.action}</span>
-                <p className="text-slate-500 text-[11px] mt-0.5">
-                  Changed by <strong className="text-slate-700">{log.performed_by}</strong> • {new Date(log.timestamp).toLocaleString()}
-                </p>
+        <div className="space-y-2 text-xs">
+          {auditLogs.length === 0 ? (
+            <p className="text-slate-500 dark:text-slate-400 py-2">No audit events recorded yet.</p>
+          ) : (
+            auditLogs.map((log) => (
+              <div
+                key={log.id}
+                className="p-3 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center justify-between"
+              >
+                <div>
+                  <span className="font-mono font-bold text-blue-600 dark:text-blue-400 mr-2">{log.action}</span>
+                  <span className="text-slate-700 dark:text-slate-300">{log.entity_name}</span>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Reason: {log.reason || 'None specified'}</p>
+                </div>
+                <span className="text-[10px] text-slate-400">
+                  {new Date(log.created_at).toLocaleString()}
+                </span>
               </div>
-              <div className="font-mono text-[11px] text-slate-600 bg-slate-50 p-1.5 rounded border border-slate-100">
-                {JSON.stringify(log.new_state || log.new_values)}
-              </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </div>
     </div>
   );
 };
+
 export default SettingsEditor;
