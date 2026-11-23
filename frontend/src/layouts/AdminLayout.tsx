@@ -22,6 +22,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
+  Circle,
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 
@@ -118,10 +119,11 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
       badge: 'Active',
       badgeColor: 'bg-rose-500/10 text-rose-500 border border-rose-500/20',
       subItems: [
-        { label: 'All Leads Queue', path: '/leads' },
-        { label: 'New Intake (236)', path: '/leads?filter=new' },
-        { label: 'Untouched (3h SLA)', path: '/leads?filter=untouched' },
-        { label: 'Qualified (5)', path: '/leads?filter=qualified' },
+        { label: 'Buy', path: '/leads?type=buy' },
+        { label: 'Rent', path: '/leads?type=rent' },
+        { label: 'PG', path: '/leads?type=pg' },
+        { label: 'Create Lead', path: '/leads?action=create' },
+        { label: 'Import Lead', path: '/leads?action=import' },
       ],
     },
     {
@@ -393,9 +395,9 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
 
                 {/* Submenu Drawer */}
                 {hasSub && isSubOpen && (!isCollapsed || isMobileOpen) && (
-                  <div className="pl-9 pr-2 py-1 space-y-1 animate-slide-down border-l border-slate-200 dark:border-slate-800 ml-4 my-1">
+                  <div className="pl-7 pr-2 py-1 space-y-1 animate-slide-down border-l border-slate-200 dark:border-slate-800 ml-4 my-1">
                     {item.subItems!.map((sub) => {
-                      const isSubActive = location.pathname + location.search === sub.path || location.pathname === sub.path;
+                      const isSubActive = location.pathname + location.search === sub.path || (location.pathname === sub.path && !location.search);
                       return (
                         <button
                           key={sub.path}
@@ -404,13 +406,16 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                             navigate(sub.path);
                             setIsMobileOpen(false);
                           }}
-                          className={`w-full text-left px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-colors flex items-center justify-between ${
+                          className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center justify-between group/sub ${
                             isSubActive
                               ? 'text-rose-600 dark:text-rose-400 font-bold bg-rose-50/80 dark:bg-rose-950/40'
-                              : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/50'
+                              : 'text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/50'
                           }`}
                         >
-                          <span className="truncate">{sub.label}</span>
+                          <div className="flex items-center gap-2 truncate">
+                            <Circle className={`w-3 h-3 flex-shrink-0 stroke-[2.5] ${isSubActive ? 'text-rose-500' : 'text-slate-400 group-hover/sub:text-slate-200'}`} />
+                            <span className="truncate">{sub.label}</span>
+                          </div>
                           {isSubActive && <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>}
                         </button>
                       );
