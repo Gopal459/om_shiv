@@ -92,14 +92,25 @@ async def test_dynamic_role_crud_and_soft_delete(test_client, db_session: AsyncS
     assert created_role["code"] == "SR_CHANNEL_PARTNER"
     assert created_role["name"] == "Senior Channel Partner"
 
-    # 2. Update the dynamic role
+    # 2. Update the dynamic role and test active status toggle
     update_payload = {
         "name": "Lead Channel Partner",
         "department_code": "SALES",
+        "is_active": False,
     }
     update_resp = await test_client.put("/v1/admin/roles/SR_CHANNEL_PARTNER", json=update_payload)
     assert update_resp.status_code == 200
     assert update_resp.json()["name"] == "Lead Channel Partner"
+    assert update_resp.json()["is_active"] is False
+
+    # 2b. Re-activate role
+    reactivate_resp = await test_client.put("/v1/admin/roles/SR_CHANNEL_PARTNER", json={"is_active": True})
+    assert reactivate_resp.status_code == 200
+    assert reactivate_resp.json()["is_active"] is True
+
+    # 2c. Cannot deactivate SUPER_ADMIN
+    deact_super = await test_client.put("/v1/admin/roles/SUPER_ADMIN", json={"is_active": False})
+    assert deact_super.status_code == 400
 
     # 3. Soft-delete the dynamic role
     del_resp = await test_client.delete("/v1/admin/roles/SR_CHANNEL_PARTNER")
@@ -134,6 +145,20 @@ async def test_staff_soft_delete_and_role_protection(test_client, db_session: As
     create_resp = await test_client.post("/v1/admin/staff", json=staff_payload)
     assert create_resp.status_code == 201
     emp_id = create_resp.json()["employee_id"]
+
+    # Test staff active status toggle
+    toggle_staff = await test_client.put(f"/v1/admin/staff/{emp_id}", json={"is_active": False})
+    assert toggle_staff.status_code == 200
+    assert toggle_staff.json()["is_active"] is False
+
+    # Cannot deactivate EMP-0001
+    deact_admin_fail = await test_client.put("/v1/admin/staff/EMP-0001", json={"is_active": False})
+    assert deact_admin_fail.status_code == 400
+
+    # Re-activate staff so role protection applies
+    reactivate_staff = await test_client.put(f"/v1/admin/staff/{emp_id}", json={"is_active": True})
+    assert reactivate_staff.status_code == 200
+    assert reactivate_staff.json()["is_active"] is True
 
     # Role deletion should fail because an active employee is assigned
     del_role_fail = await test_client.delete("/v1/admin/roles/TELECALLER")

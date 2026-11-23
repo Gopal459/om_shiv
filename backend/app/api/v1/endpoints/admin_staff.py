@@ -258,6 +258,11 @@ async def update_role(
         role.department_id = dept.id
 
     if payload.is_active is not None:
+        if code.strip().upper() in ("SUPER_ADMIN", "MD") and not payload.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="System role (SUPER_ADMIN) cannot be deactivated.",
+            )
         role.is_active = payload.is_active
 
     if payload.permissions is not None:
@@ -509,6 +514,11 @@ async def update_staff(
         emp.role_id = role.id
 
     if payload.is_active is not None:
+        if (emp.employee_id == "EMP-0001" or (emp.username and emp.username.lower() == "admin")) and not payload.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Primary Administrator (EMP-0001) cannot be deactivated.",
+            )
         emp.is_active = payload.is_active
 
     updated = await staff_repo.update(db, emp)
