@@ -107,6 +107,7 @@ class Employee(Base):
     budget_min_cr: Mapped[Optional[float]] = mapped_column(Numeric(10, 2), nullable=True)
     budget_max_cr: Mapped[Optional[float]] = mapped_column(Numeric(10, 2), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    is_on_leave: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     join_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

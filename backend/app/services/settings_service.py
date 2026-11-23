@@ -936,3 +936,9 @@ class SettingsService:
 
 
 settings_service = SettingsService()
+
+
+async def get_system_setting(key: str, db: AsyncSession, default: Any = None) -> Any:
+    """Convenience helper to retrieve a system setting value."""
+    return await settings_service.get_setting(db, key, default)
+
