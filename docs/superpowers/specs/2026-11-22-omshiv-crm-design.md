@@ -209,19 +209,47 @@ To prevent unauthorized access and strictly enforce the anti-goal that **seller 
 
 ### 5.3 Inbound Leads & Buyer Lifecycle
 
+- `builder_projects`:
+  - `id` (PK, format `PRJ-YYYY-NNN`, sequence backed)
+  - `title` (varchar, e.g. "Omshiv Farmhouse Enclave")
+  - `builder_name` (varchar)
+  - `category_code` (int, references `property_master_options`)
+  - `city` (varchar, default "Alwar")
+  - `location_address` (text)
+  - `price_min_cr`, `price_max_cr` (numeric)
+  - `brochure_url` (text)
+  - `is_active` (boolean, default true)
+  - `created_at` (timestamp)
+- `website_inquiries`:
+  - `id` (PK, serial / uuid)
+  - `inquiry_type` (`CALLBACK`, `PROBLEM_REPORT`, `LOAN_SERVICE`, `LEGAL_SERVICE`, `INTERIOR_SERVICE`, `CONTACT_US`)
+  - `customer_name` (varchar)
+  - `mobile` (varchar(10), indexed)
+  - `email` (varchar, nullable)
+  - `preferred_time` (varchar, nullable; for callback)
+  - `message_text` (text, nullable)
+  - `metadata` (JSONB, for service specific inputs like loan amount or property address)
+  - `status` (`NEW`, `CONVERTED_TO_LEAD`, `RESOLVED`, `SPAM`)
+  - `converted_lead_id` (FK to `leads.lead_id`, nullable; tracks 1-click conversion)
+  - `converted_by_emp_id` (FK to `employees.employee_id`, nullable)
+  - `converted_at` (timestamp, nullable)
+  - `created_at` (timestamp)
 - `leads`:
   - `lead_id` (PK, format `OB-YYYY-NNNNNN` — 6 digits zero-padded, sequence backed, immutable, scalable to 1M+ leads/year)
   - `idempotency_key` (varchar(64), unique, nullable; derived from webhook delivery ID or payload hash to prevent duplicate intake)
-  - `source` (`WEBSITE`, `META`, `GOOGLE`, `WHATSAPP_BOT`, `FRONT_DESK`, `SALES_SELF`, `MD`, `PARTNER`, `AI_CALL`)
+  - `source` (`PROPERTY_INQUIRY`, `PROJECT_INQUIRY`, `PARTNER_DIRECT_INQUIRY`, `PUBLIC_FORM_CONVERTED`, `MANUAL_ENTRY`, `BULK_IMPORT`, `META_ADS`, `GOOGLE_ADS`, `WHATSAPP_BOT`, `AI_CALL`)
+  - `source_code_id` (FK to `property_master_options` where group=`LEAD_SOURCES`, covers 24 legacy sources: Newspaper, Poster, Walk-in, Facebook, Google, YouTube, etc.)
   - `full_name`, `mobile` (varchar `91XXXXXXXXXX`, indexed)
   - `email`, `lead_type` (`BUYER`, `SELLER`, `RENT`)
+  - `is_dealer` (boolean, default false; captured on web inquiries: "Dealer have: Yes/No")
   - `current_stage` (`AI_DESK`, `NEW`, `ATTEMPTING`, `CONNECTED`, `REQ_CAPTURED`, `QUALIFIED`, `MEETING_PLANNED`, `SITE_VISIT_PLANNED`, `SITE_VISIT_DONE`, `NEGOTIATION`, `WON`, `LOST`, `NURTURE`)
   - `temperature` (`HOT`, `WARM`, `COLD`)
   - `assigned_to` (FK to `employees.employee_id`, nullable while in `AI_DESK` or if assigned to CP)
   - `assigned_cp_id` (FK to `channel_partners.partner_id`, nullable; used for high-rent or partner-exclusive leads)
-  - `channel_partner_id` (FK to `channel_partners.partner_id`, nullable; partner who sourced the lead)
+  - `channel_partner_id` (FK to `channel_partners.partner_id`, nullable; partner who sourced the lead or whose profile was contacted)
   - `partner_protection_until` (timestamp, nullable)
-  - `related_listing_id` (FK to `properties.listing_id`, nullable; set when lead enquires via "I'm interested" on property page or broadcast reply)
+  - `related_listing_id` (FK to `properties.listing_id`, nullable; set when lead enquires via "I'm interested" / "Contact Owner" on property page)
+  - `related_project_id` (FK to `builder_projects.id`, nullable; set when lead enquires on a builder/project page)
   - `is_md_private` (boolean, default false; MD private leads excluded from team volume counts and managerial views)
   - `assignment_mode` (`AI_AGENT`, `RULE_ROUND_ROBIN`, `MANUAL_OVERRIDE`, `SELF_CREATED`)
   - `ai_routing_reason` (text, explainable routing rationale logged by AI assignment agent)
@@ -308,6 +336,11 @@ To ensure **zero hardcoded options** anywhere in the system, all choices, dropdo
   - `source_friend_name` (varchar, nullable; captured when source is Friend & Relative)
   - `source_friend_mobile` (varchar(10), nullable; captured when source is Friend & Relative)
   - `is_quick_listing` (boolean, default false; true for no-login partial submissions)
+  - `verified_status` (int, default 0; 0=Not Verified, 1=Verified)
+  - `is_live` (boolean, default false; 0=Not Live, 1=Live on Website & Apps)
+  - `is_recycled` (boolean, default false; Soft-delete Recycle Bin flag)
+  - `recycled_at` (timestamp, nullable; timestamp when moved to Recycle Bin)
+  - `assigned_verifier_emp_id` (FK to `employees.employee_id`, nullable; Verification Officer assigned to verify listing)
   - `status` (`UNVERIFIED`, `PENDING_VERIFICATION`, `VERIFIED_AVAILABLE`, `HOLD`, `SOLD`, `RENTED`, `WITHDRAWN`, `REJECTED`, `EXPIRED`)
   - `rejection_reason` (text, nullable)
   - `is_live_website` (boolean, default false)
@@ -328,6 +361,25 @@ To ensure **zero hardcoded options** anywhere in the system, all choices, dropdo
 - `property_amenity_mappings`: `property_id`, `option_id` (FK to `property_master_options` where group=`AMENITIES`).
 - `property_nearby_distances`: `property_id`, `tag_option_id` (FK to `property_master_options` where group=`NEARBY_TAGS`), `distance_km` (decimal).
 - `property_media`: `id`, `property_id`, `media_type` (`PHOTO`, `VIDEO_LINK`, `MAP`), `url`, `display_order`, `is_cover` (boolean).
+- `property_verification_calls`:
+  - `id` (PK, serial / uuid)
+  - `property_id` (FK to `properties.listing_id`, indexed)
+  - `caller_emp_id` (FK to `employees.employee_id`)
+  - `call_outcome` (`AVAILABILITY_CONFIRMED`, `OWNER_BUSY_RESCHEDULED`, `PRICE_MISMATCH`, `NOT_REACHABLE`, `FAKE_LISTING_REJECTED`)
+  - `rescheduled_date` (timestamp, nullable)
+  - `notes` (text)
+  - `site_visit_scheduled_date` (timestamp, nullable)
+  - `created_at` (timestamp)
+- `property_documents`:
+  - `id` (PK, serial / uuid)
+  - `property_id` (FK to `properties.listing_id`, indexed)
+  - `document_type` (`REGISTRY_TITLE_DEED`, `KHASRA_PATTA`, `UTILITY_BILL`, `OWNER_ID_PROOF`, `CONVERSION_CERTIFICATE`, `OTHER`)
+  - `document_url` (text)
+  - `file_name` (varchar)
+  - `uploaded_by_emp_id` (FK to `employees.employee_id`)
+  - `is_verified` (boolean, default false)
+  - `verified_by_emp_id` (FK to `employees.employee_id`, nullable)
+  - `created_at` (timestamp)
 - `property_verification`: `property_id`, `verified_by_emp_id`, `visit_date`, `is_physically_verified`, `area_confirmed`, `photos_genuine_confirmed`, `ownership_confirmed`, `verifier_notes`, `manager_approval_emp_id`, `approved_at`.
 
 #### 5.4.3 Owner Self-Service & Protection Tables
@@ -522,6 +574,61 @@ To maximize organic seller and rent inventory onboarding, the public portal prov
    - Verifier schedules a telephonic or site visit.
    - Verifier completes remaining mandatory fields (pricing, legal registry status, photos, facing, amenities).
    - Once the verifier checklist is completed (Area confirmed, genuine photos uploaded, ownership verified), the listing is submitted for Manager/MD approval before going live for 90 days.
+
+### 6.9 Complete 7-Step Property Verification Architecture & Post-Live Lifecycle
+Preserving and modernizing the proven verification pipeline from the legacy system:
+
+```mermaid
+flowchart TD
+    S1[Step 1: Property Ingestion] --> S2[Step 2: Unverified Initial Entry]
+    S2 --> S3[Step 3: Assign to Verification Officer]
+    S3 --> S4[Step 4: Telephonic Call & Visit Scheduling]
+    S4 --> S5[Step 5: Document Collection & Upload]
+    S5 --> S6[Step 6: Senior Admin Review & Approval]
+    S6 --> S7[Step 7: Live on Portal with Verified Badge]
+    S7 --> S8[Step 8: Post-Live Operations: Sold / Recycle Bin / Renewal]
+```
+
+1. **Step 1 — Property Ingestion:**
+   - Property enters via Owner Web/Mobile App self-post (with 6-digit OTP) or direct manual entry by the Admin/Calling team.
+2. **Step 2 — Unverified Initial Entry:**
+   - Generated with unique `OP-YYYY-NNNNN` ID.
+   - Initial flags: `verified_status = 0` (Not Verified), `is_live = false` (Not Live), `is_recycled = false`, `status = UNVERIFIED`.
+3. **Step 3 — New & Assign Properties:**
+   - Fresh properties appear in the Admin/Manager dashboard under *Property $\to$ New & Assign*.
+   - Supervisor assigns property to a specific Verification Officer (`assigned_verifier_emp_id`).
+4. **Step 4 — Telephonic Calling & Visit Scheduling:**
+   - Verification Officer calls owner (logged in `property_verification_calls`): confirms property availability, expected price, and ownership documents.
+   - If owner is busy, call is rescheduled with a callback timer. If genuine, schedules a physical site visit.
+5. **Step 5 — Document Submission & Verification Upload:**
+   - Field/verification team collects and uploads legal documents to `property_documents`: Title Deed / Registry Paper, Khasra / Patta, Electricity/Water bill, Owner ID proof, and original high-res site photos.
+6. **Step 6 — Senior Admin Review & Verification Approval:**
+   - Senior Manager / Admin reviews uploaded documents, GPS coordinates, boundaries, and site photos.
+   - Admin clicks *"Verify & Approve"*: sets `verified_status = 1`, `is_live = true`, `status = VERIFIED_AVAILABLE`.
+7. **Step 7 — Live on Portal with Verified Badge:**
+   - Property goes live on the Next.js public portal and mobile app with a distinct "Verified" badge; triggers automated two-sided buyer matching broadcasts.
+8. **Step 8 — Post-Live Lifecycle Operations:**
+   - **Sold Request (`request-sold-property`):** Owner or agent requests mark-as-sold; Admin verifies $\to$ status becomes `SOLD`, leaves live portal, tagged "Sold by Omshiv".
+   - **Delete Request & Recycle Bin (`recyclebin_property`):** Owner requests deletion $\to$ Admin approves $\to$ moves to Recycle Bin (`is_recycled = true`, `is_live = false`). Admin can restore it to live portal at any time with one click (`recyclebinLiveProperty`).
+   - **Expiration & Renewal:** Listings expire after 90 days (sale) or 30 days (rent). Automatic WhatsApp reminder sent 3 days before expiration; owner/staff can request renewal (`approveExpPropReq`).
+
+### 6.10 Unified 6-Way Lead Inflow & 1-Click Form Conversion Engine
+The system unifies all lead ingestion into six standardized pathways, ensuring no enquiry is lost:
+1. **Frontend Property Inquiries (`Api::saveLead`):**
+   - Inquiries on Sale, Rent, or PG listings. Captures Name, 10-digit Mobile, Email, Address, and Dealer status (`is_dealer: Yes/No`).
+   - Validates via mobile OTP (`auth_sessions`), saves to `leads`, links `related_listing_id`, and auto-routes to the listing's owner employee or zone pool.
+2. **Builder Projects Enquiry (`Api::saveProjectLead`):**
+   - Inquiries from New Projects / Farmhouse Projects stored with `related_project_id` (`builder_projects`) and routed to the designated Project Manager.
+3. **Agent / Partner Direct Inquiries (`Api::saveAgentContactLead`):**
+   - Inquiries from Channel Partner public profile pages tagged with `channel_partner_id`, locking 90-day commission protection.
+4. **Website Public Forms with 1-Click Lead Conversion:**
+   - Inquiries from Request a Callback (`CALLBACK`), Report a Problem (`PROBLEM_REPORT`), Services Enquiry (`LOAN_SERVICE`, `LEGAL_SERVICE`, `INTERIOR_SERVICE`), and Help Center (`CONTACT_US`) land in `website_inquiries`.
+   - Admin/Staff can convert any inquiry into an active pipeline lead with a single button click (`POST /v1/crm/inquiries/{id}/convert-to-lead`).
+5. **Manual Lead Creation (`createLeads`):**
+   - Telecallers, front desk, and sales reps manually create leads from phone calls, WhatsApp, or office walk-ins.
+   - Selects Property Type (Buy, Rent, PG) and selects from 24 dynamic lead sources (`lead_sources` master group: Newspaper Ads, Facebook, Google, Hoardings, YouTube, Walk-in, etc.).
+6. **Bulk Excel / CSV Import (`importLeads`):**
+   - Batch import tool for external portal leads (99acres, MagicBricks, Meta Ad campaign exports) with column mapping, mobile normalization, idempotency checking, and deduplication.
 
 ---
 
