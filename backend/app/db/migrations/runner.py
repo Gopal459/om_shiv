@@ -12,6 +12,7 @@ MIGRATION_STEPS = [
     "app.db.migrations.0002_soft_delete_columns",
     "app.db.migrations.0003_seed_identity_and_roles",
     "app.db.migrations.0004_seed_property_masters",
+    "app.db.migrations.0005_tbl_leads_schema",
 ]
 
 
