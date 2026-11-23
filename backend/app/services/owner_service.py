@@ -70,6 +70,7 @@ async def approve_delete(property_id_or_code: str, db: AsyncSession) -> Property
 
     prop.is_recycled = True
     prop.recycled_at = now
+    prop.deleted_at = now
     prop.is_live = False
 
     # Mark any pending delete request as approved
@@ -95,6 +96,8 @@ async def recycle_bin_restore(property_id_or_code: str, db: AsyncSession) -> Pro
     prop = await get_property_by_id_or_code(property_id_or_code, db)
 
     prop.is_recycled = False
+    prop.recycled_at = None
+    prop.deleted_at = None
     prop.is_live = True
 
     await db.commit()

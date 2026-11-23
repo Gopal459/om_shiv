@@ -33,6 +33,7 @@ class SystemSetting(Base):
         ForeignKey("employees.employee_id", ondelete="SET NULL"),
         nullable=True,
     )
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),

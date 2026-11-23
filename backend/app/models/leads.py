@@ -66,6 +66,7 @@ class Lead(Base):
     is_untouched: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_duplicate: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_test: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

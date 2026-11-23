@@ -97,7 +97,7 @@ async def find_lead_by_id_or_lead_id(db: AsyncSession, lead_identifier: str) -> 
     stmt = (
         select(Lead)
         .options(selectinload(Lead.activities))
-        .where(Lead.lead_id == lead_identifier)
+        .where(Lead.lead_id == lead_identifier, Lead.deleted_at.is_(None))
     )
     result = await db.execute(stmt)
     lead = result.scalar_one_or_none()
@@ -109,7 +109,7 @@ async def find_lead_by_id_or_lead_id(db: AsyncSession, lead_identifier: str) -> 
         stmt_pk = (
             select(Lead)
             .options(selectinload(Lead.activities))
-            .where(Lead.id == int(lead_identifier))
+            .where(Lead.id == int(lead_identifier), Lead.deleted_at.is_(None))
         )
         result_pk = await db.execute(stmt_pk)
         return result_pk.scalar_one_or_none()
@@ -149,6 +149,7 @@ async def get_my_work_queue(
         .options(selectinload(Lead.activities))
         .where(
             and_(
+                Lead.deleted_at.is_(None),
                 Lead.assigned_to == target_rep,
                 Lead.stage.not_in(["WON", "LOST", "NURTURE"]),
             )
@@ -301,4 +302,30 @@ async def log_sales_action(
     if fresh_lead:
         fresh_lead.activities.sort(key=lambda a: a.created_at, reverse=True)
         return fresh_lead
+    return updated_lead
+
+
+@router.delete(
+    "/{id}",
+    status_code=status.HTTP_200_OK,
+    summary="Soft delete a lead",
+)
+async def delete_lead(
+    id: str,
+    db: AsyncSession = Depends(get_db),
+    actor_id: str = Depends(get_actor_from_token),
+) -> Dict[str, Any]:
+    lead = await find_lead_by_id_or_lead_id(db, id)
+    if not lead:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Lead '{id}' not found",
+        )
+    lead.deleted_at = datetime.now(timezone.utc)
+    await db.commit()
+    return {
+        "status": "success",
+        "message": f"Lead '{lead.lead_id}' soft-deleted successfully.",
+        "deleted_at": lead.deleted_at.isoformat(),
+    }
     return updated_lead

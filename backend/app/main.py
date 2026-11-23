@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, status
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.database import engine, Base, AsyncSessionLocal
+from app.core.soft_delete_migration import ensure_soft_delete_columns
 from app.services.identity_seed import seed_departments_and_roles, seed_admin_user
 from app.services.property_master_service import seed_property_masters
 from app.api.v1.endpoints import auth, admin_auth, admin_staff, settings, intake, leads, property_master, properties, property_verification, owner_operations
@@ -26,6 +27,8 @@ async def lifespan(app: FastAPI):
     try:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+
+        await ensure_soft_delete_columns(engine)
 
         async with AsyncSessionLocal() as session:
             await seed_departments_and_roles(session)

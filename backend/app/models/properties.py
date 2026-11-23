@@ -58,6 +58,7 @@ class Property(Base):
     is_live: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_recycled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     recycled_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(

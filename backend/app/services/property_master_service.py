@@ -147,7 +147,7 @@ async def get_property_schema(db: AsyncSession) -> Dict[str, List[Dict[str, Any]
     if _schema_cache is not None:
         return _schema_cache
 
-    stmt = select(PropertyMasterGroup).order_by(PropertyMasterGroup.id)
+    stmt = select(PropertyMasterGroup).where(PropertyMasterGroup.deleted_at.is_(None)).order_by(PropertyMasterGroup.id)
     res = await db.execute(stmt)
     groups = res.scalars().all()
 
@@ -155,7 +155,7 @@ async def get_property_schema(db: AsyncSession) -> Dict[str, List[Dict[str, Any]
     for g in groups:
         options_list = []
         for opt in g.options:
-            if opt.is_active:
+            if opt.is_active and opt.deleted_at is None:
                 options_list.append(
                     {
                         "id": opt.id,

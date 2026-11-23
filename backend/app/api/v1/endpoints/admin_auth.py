@@ -57,6 +57,7 @@ async def admin_login(
         select(Employee)
         .options(selectinload(Employee.role), selectinload(Employee.department))
         .where(
+            Employee.deleted_at.is_(None),
             or_(
                 func.lower(Employee.username) == query_lower,
                 func.lower(Employee.email) == query_lower,

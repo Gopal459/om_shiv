@@ -70,3 +70,86 @@ async def test_admin_roles_and_update_permissions(test_client, db_session: Async
         json={"permissions": updated_perms},
     )
     assert bad_resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_dynamic_role_crud_and_soft_delete(test_client, db_session: AsyncSession):
+    await seed_departments_and_roles(db_session)
+
+    # 1. Create a dynamic custom role
+    create_payload = {
+        "name": "Senior Channel Partner",
+        "code": "SR_CHANNEL_PARTNER",
+        "department_code": "SALES",
+        "permissions": {
+            "leads": ["create", "view_assigned"],
+            "properties": ["view_all"],
+        },
+    }
+    create_resp = await test_client.post("/v1/admin/roles", json=create_payload)
+    assert create_resp.status_code == 201
+    created_role = create_resp.json()
+    assert created_role["code"] == "SR_CHANNEL_PARTNER"
+    assert created_role["name"] == "Senior Channel Partner"
+
+    # 2. Update the dynamic role
+    update_payload = {
+        "name": "Lead Channel Partner",
+        "department_code": "SALES",
+    }
+    update_resp = await test_client.put("/v1/admin/roles/SR_CHANNEL_PARTNER", json=update_payload)
+    assert update_resp.status_code == 200
+    assert update_resp.json()["name"] == "Lead Channel Partner"
+
+    # 3. Soft-delete the dynamic role
+    del_resp = await test_client.delete("/v1/admin/roles/SR_CHANNEL_PARTNER")
+    assert del_resp.status_code == 200
+    assert del_resp.json()["status"] == "success"
+
+    # 4. Verify role is excluded from active roles list
+    list_resp = await test_client.get("/v1/admin/roles")
+    assert list_resp.status_code == 200
+    active_codes = [r["code"] for r in list_resp.json()]
+    assert "SR_CHANNEL_PARTNER" not in active_codes
+
+    # 5. SUPER_ADMIN deletion safeguard
+    del_super_admin = await test_client.delete("/v1/admin/roles/SUPER_ADMIN")
+    assert del_super_admin.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_staff_soft_delete_and_role_protection(test_client, db_session: AsyncSession):
+    await seed_departments_and_roles(db_session)
+    await seed_admin_user(db_session)
+
+    # Create staff under TELECALLER role
+    staff_payload = {
+        "name": "Sunita Verma",
+        "username": "sunita",
+        "password": "Sunita@123",
+        "mobile": "9829099999",
+        "department_code": "SALES",
+        "role_code": "TELECALLER",
+    }
+    create_resp = await test_client.post("/v1/admin/staff", json=staff_payload)
+    assert create_resp.status_code == 201
+    emp_id = create_resp.json()["employee_id"]
+
+    # Role deletion should fail because an active employee is assigned
+    del_role_fail = await test_client.delete("/v1/admin/roles/TELECALLER")
+    assert del_role_fail.status_code == 400
+    assert "active staff member" in del_role_fail.json()["detail"]
+
+    # Soft-delete the staff member
+    del_staff = await test_client.delete(f"/v1/admin/staff/{emp_id}")
+    assert del_staff.status_code == 200
+    assert del_staff.json()["status"] == "success"
+
+    # Verify staff is excluded from staff list
+    list_resp = await test_client.get("/v1/admin/staff")
+    staff_ids = [s["employee_id"] for s in list_resp.json()]
+    assert emp_id not in staff_ids
+
+    # Super Admin cannot be deleted
+    del_admin_fail = await test_client.delete("/v1/admin/staff/EMP-0001")
+    assert del_admin_fail.status_code == 400
