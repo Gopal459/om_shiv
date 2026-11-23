@@ -50,6 +50,9 @@ class Lead(Base):
 
     stage: Mapped[str] = mapped_column(String(32), default="NEW", nullable=False, index=True)
     temperature: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)  # HOT, WARM, COLD
+    follow_up_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_contacted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    lost_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     budget_min: Mapped[Optional[float]] = mapped_column(Numeric(14, 2), nullable=True)
     budget_max: Mapped[Optional[float]] = mapped_column(Numeric(14, 2), nullable=True)
     preferred_city: Mapped[Optional[str]] = mapped_column(String(100), default="Alwar", nullable=True)
@@ -109,7 +112,15 @@ class LeadActivity(Base):
     note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     next_action: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     follow_up_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    stage_before: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    stage_after: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    temperature: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
     logged_by: Mapped[Optional[str]] = mapped_column(
+        String(32),
+        ForeignKey("employees.employee_id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    performed_by: Mapped[Optional[str]] = mapped_column(
         String(32),
         ForeignKey("employees.employee_id", ondelete="SET NULL"),
         nullable=True,
@@ -121,3 +132,8 @@ class LeadActivity(Base):
     )
 
     lead: Mapped[Lead] = relationship("Lead", back_populates="activities")
+
+
+# Alias for LeadActivity representing action logs
+LeadActionLog = LeadActivity
+

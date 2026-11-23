@@ -130,6 +130,7 @@ class IntakeService:
                     "full_name": existing_idem.full_name,
                     "mobile": existing_idem.mobile,
                     "stage": existing_idem.stage,
+                    "is_untouched": existing_idem.is_untouched,
                 }
 
         # 3. 24-Hour Deduplication
@@ -167,6 +168,7 @@ class IntakeService:
                 "full_name": existing_lead.full_name,
                 "mobile": existing_lead.mobile,
                 "stage": existing_lead.stage,
+                "is_untouched": existing_lead.is_untouched,
             }
 
         # 4. Fresh Lead Generation
@@ -216,6 +218,7 @@ class IntakeService:
             "full_name": new_lead.full_name,
             "mobile": new_lead.mobile,
             "stage": new_lead.stage,
+            "is_untouched": new_lead.is_untouched,
         }
 
     async def create_website_inquiry(

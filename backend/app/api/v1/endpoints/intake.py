@@ -39,6 +39,7 @@ class LeadIntakeResponse(BaseModel):
     full_name: Optional[str] = None
     mobile: Optional[str] = None
     stage: Optional[str] = None
+    is_untouched: Optional[bool] = None
 
 
 class WebsiteInquiryCreateRequest(BaseModel):
