@@ -32,10 +32,12 @@ The purpose of this project is to build a centralized, single-source-of-truth pl
 
 - **Strict Role & Employee ID Architecture:** Every actor is identified by a system-generated ID (`EMP-XXXX`, `CP-XXXX`). Routing, approval queues, targets, and notifications bind strictly to roles, departments, and IDs—never personal names.
 - **Settings-Driven Engine:** Approximately 90 core business rules (assignment algorithms, SLA windows, VIP thresholds, commission slabs, stage transitions, quiet hours) are configurable via an MD settings table with complete audit logging.
-- **Single Intake Pipeline:** All inbound channels (Website, Meta Lead Ads, Google Ads, WhatsApp Bot, Front Desk, Sales manual entry, Channel Partners, AI Voice) pass through one unified Intake API with standard validation, mobile normalization, and deterministic ID allocation (`OB-YYYY-NNNN`).
+- **Single Intake Pipeline & Scalable Sequence IDs:** All inbound channels (Website, Meta Lead Ads, Google Ads, WhatsApp Bot, Front Desk, Sales manual entry, Channel Partners, AI Voice) pass through one unified Intake API with standard validation, mobile normalization, idempotency locking, and deterministic sequence allocation (`OB-YYYY-NNNNNN` — 6 digits zero-padded, scalable to 1M+ leads/year).
+- **Inventory Sequence Scalability:** Listings are generated with deterministic IDs (`OP-YYYY-NNNNN` — 5 digits zero-padded, scalable to 100K+ listings/year) ensuring zero collision or overflow across years.
+- **Dual-Channel High-Availability Authentication:** WhatsApp OTP primary login (via DoubleTick) backed by automatic SMS OTP fallback (via MSG91/Fast2SMS) if unconfirmed within 30 seconds, eliminating single-vendor staff lockout risk.
 - **Complete Property Taxonomy Integration (Propira Rebuild):** Full native schema and API support for 3 listing types (Sale, Rent, PG), 4 categories (Residential, Commercial, Agriculture, Industry), and 12 sub-categories with specific attribute tables and strict server-side validation.
 - **100% Dynamic Admin-Controlled Property Master Options:** Every dropdown, option list, amenity checkbox, area unit, ownership type, and sub-type in the Property Posting engine is 100% dynamic and configurable by the MD/Admin from the admin panel. Zero hardcoded enum lists or choice arrays in frontend or backend application code.
-- **Deterministic Two-Sided Matching:** Automated matching between verified listings (`OP-YYYY-NNN`) and active buyer requirement cards based on location, budget tolerance ($\pm 15\%$), property type, and transaction intent.
+- **Deterministic Two-Sided Matching:** Automated matching between verified listings (`OP-YYYY-NNNNN`) and active buyer requirement cards based on location, budget tolerance ($\pm 15\%$), property type, and transaction intent.
 - **Multi-Channel Automation:** Two-way WhatsApp Business API integration (via DoubleTick) for automated lead qualification, SLA escalation, site visit reminders, and feedback collection; abstracted AI voice calling for automated pre-qualification.
 - **Channel Partner Ecosystem:** Partner tiers (Associate, Partner, Premium Partner) with lead submission, 90-day lead protection, and transparent commission lifecycle tracking (`Due` $\to$ `Approved` $\to$ `Paid`).
 
@@ -75,6 +77,27 @@ The purpose of this project is to build a centralized, single-source-of-truth pl
 ### 3.2 Decision
 
 **Option A** was selected by the project stakeholder. It provides upfront schema stability while allowing modular, bite-sized TDD execution across delivery milestones.
+
+### 3.3 Handover §14 Open Decisions & Resolution Tracker
+
+To eliminate ambiguity and prevent mid-build surprises, every open question from Developer Handover §14 is explicitly resolved and logged below:
+
+| # | Handover §14 Question | Resolution & Architectural Decision | Mechanism / Setting |
+|---|---|---|---|
+| **Q1** | **Channel Partner Levels & Slabs** | Proposed 3-tier model (Associate, Partner, Premium) adopted as initial master data. | Editable by MD in `system_settings` & `channel_partners`. |
+| **Q2** | **Partner Lead Protection Window** | 90-day protection window adopted. If lead was already open in CRM, internal lead takes precedence (logged as non-credited referral note). | Setting `partner_lead_protection_days` (default: 90). |
+| **Q3** | **Rent Routing Threshold** | Threshold set to ₹25,000/month. Below: Direct tenant number reveal (daily rate limit 5/day to stop scraping). At/Above: Assigned to CP. | Setting `rent_routing_threshold_inr` (default: 25000). |
+| **Q4** | **Rent Leads to Partners Allocation** | High-rent leads allocated via geographic micro-market + round-robin among active verified partners. | Zone-based round-robin query. |
+| **Q5** | **WhatsApp Community Posting** | **Option (a) + (b) Adopted:** CRM generates pre-formatted rich Share Cards with 1-tap clipboard copy for staff/managers to post to groups, plus 1-to-1 opt-in template broadcasts. Unofficial scrapers strictly rejected (zero Meta ban risk). | Handled via DoubleTick templates + Frontend Share Cards. |
+| **Q6** | **Matched-Buyer Auto-Broadcast** | Semi-automated: AI generates match list; advisor or manager approves with 1-tap before dispatching WhatsApp templates to buyers. | Setting `matching_auto_dispatch_requires_approval` (default: true). |
+| **Q7** | **Seller Self-Posting Verification** | Any owner can self-post after mobile OTP; ad lands in `PENDING_VERIFICATION` (not public) until field verification is approved. | Enforced by status state machine. |
+| **Q8** | **Website Price Display Default** | System default is `BAND` (e.g. ₹45L–₹50L). MD can override per-listing to `EXACT` or `ON_REQUEST`. | Setting `default_public_price_mode`. |
+| **Q9** | **Partner Seller Contact Visibility** | Partners **never** see seller phone number or minimum acceptable price, regardless of partner tier. Visits coordinated with listing owner. | Enforced via Pydantic response filtering & SQL projection. |
+| **Q10** | **Commission Lifecycle Boundary** | Commission ledger (`DUE` $\to$ `APPROVED` $\to$ `PAID`) tracked inside CRM via `partner_commissions`. External payouts handled by Accounts. | Modeled in CRM Section 5.5. |
+| **Q11** | **AI Calling Vendor Interface** | Provider-agnostic adapter interface (`VoiceProviderAdapter`) implemented in FastAPI so vendor (Bland.ai, Retell, ElevenLabs) can swap without code rewrites. | Pluggable interface in backend. |
+| **Q12** | **Mobile App Architecture** | React Native (store-published Android + iOS) for staff and partners. | Shared API contract with CRM Web. |
+| **Q13** | **Legacy Data Migration Scope** | Active open leads, verified available listings, and active partners only. Legacy Google Sheets frozen and archived as read-only cold backup. | Clean PostgreSQL schema with strict constraints. |
+| **Q14** | **Phase Milestone Sign-off** | Joint sign-off by Managing Director (MD) and Sales Head before milestone go-live. | Verification gate per phase. |
 
 ---
 
@@ -125,15 +148,19 @@ flowchart TD
 
 - **Backend Service:** Python 3.11+, FastAPI (Async REST API, Pydantic v2 data models, SQLAlchemy 2.0 ORM, Alembic migrations).
 - **Primary Database:** PostgreSQL 15+ (Relational integrity, strict foreign keys, sequence generators for IDs, JSONB for dynamic attributes).
-- **Caching & Task Queue:** Redis 7+ and Celery / ARQ (asynchronous background jobs, SLA escalation timers, WhatsApp webhook processing, AI call queue dispatch).
+- **Caching & Task Queue:** Redis 7+ and Celery / ARQ (asynchronous background jobs, SLA escalation timers, WhatsApp webhook processing, AI call queue dispatch, Redis mutex locks for webhook idempotency).
 - **Internal CRM Web App:** React 18, Vite, TypeScript, TailwindCSS, TanStack Query, Lucide Icons.
 - **Public Portal:** Next.js 14 (App Router, Server Components, Incremental Static Regeneration for property pages).
 - **Mobile Application:** React Native (Expo / bare workflow), cross-platform Android & iOS targeting sales staff and partners.
+- **Authentication & Dual-Channel OTP:**
+  - Primary Channel: Official WhatsApp Business API via DoubleTick REST API.
+  - Secondary / Fallback Channel: Dedicated SMS Gateway (e.g. MSG91 / Fast2SMS / Twilio) triggered automatically if WhatsApp OTP fails or after 30 seconds without delivery confirmation, plus a manual "Resend via SMS" option.
+  - MD Path: Email OTP + Encrypted Backup PIN.
 - **AI Automation & LLM Orchestration:**
-  - Pluggable AI Voice Calling Agent API (e.g. Bland.ai / Retell AI / ElevenLabs Conversational + Webhooks).
-  - LLM Orchestrator (Google Gemini 1.5 Flash / Pro via API or LangChain/LlamaIndex) for conversational extraction, lead summarization, and RAG knowledge feeds.
-  - DoubleTick WhatsApp Business API (Webhooks for 2-way message flow, interactive template messages).
+  - Pluggable AI Voice Calling Agent API (e.g. Bland.ai / Retell AI / ElevenLabs Conversational + Webhooks via `VoiceProviderAdapter`).
+  - LLM Orchestrator (Google Gemini 1.5 Flash / Pro via API with strict PII pre-redaction and Zero Data Retention guarantee) for conversational extraction, lead summarization, and RAG knowledge feeds.
 - **Storage & Infrastructure:** AWS S3 / Cloudflare R2 (presigned media uploads for site visit photos, property brochures, audio call recordings).
+- **Observability & APM:** Sentry for error tracking and crash diagnostics; Prometheus + Grafana for latency, QPS, queue depth, and service health monitoring.
 
 ---
 
@@ -152,12 +179,26 @@ flowchart TD
   - `handled_categories` (text array: `Residential`, `Commercial`, `Agriculture`, `Industry`)
   - `budget_min_cr`, `budget_max_cr` (numeric)
   - `is_active` (boolean), `join_date` (date)
-- `auth_sessions`: `id`, `entity_type` (`EMPLOYEE`, `PARTNER`), `entity_id`, `session_token`, `otp_hash`, `otp_expires_at`, `expires_at`, `created_at`.
+- `auth_sessions`: `id`, `entity_type` (`EMPLOYEE`, `PARTNER`), `entity_id`, `session_token`, `otp_hash`, `otp_channel` (`WHATSAPP`, `SMS_FALLBACK`), `otp_expires_at`, `expires_at`, `created_at`.
+
+#### 5.1.1 RBAC Enforcement & Data Protection at FastAPI Layer
+To prevent unauthorized access and strictly enforce the anti-goal that **seller phone numbers, minimum reserve prices, and internal legal notes are never leaked**, permissions are enforced across three mandatory layers:
+1. **Declarative Route Guards (FastAPI Dependencies):**
+   - Endpoints require explicit scopes: `@router.get("/leads", dependencies=[Depends(require_permission("LEADS_VIEW"))])`.
+2. **Row-Level Query Scoping (Database Layer):**
+   - Every ORM query automatically injects tenant/role filters:
+     - `SALES_EXEC`: Scoped strictly to `assigned_to = current_user.employee_id` OR `listed_by_id = current_user.employee_id`.
+     - `SALES_MANAGER`: Scoped to `assigned_to IN (SELECT employee_id FROM employees WHERE reporting_to = current_user.employee_id)`.
+     - `MD`: Unrestricted across all records (MD-private leads filtered out for all non-MD queries).
+3. **Pydantic Response Projection (Serialization Layer):**
+   - Separate outbound DTO models ensure sensitive data cannot leave the server:
+     - `PropertyPublicOut`: Public schema used by website and general inventory search. Omits `seller_name`, `seller_mobile`, `min_acceptable_price`, and `legal_notes`.
+     - `PropertyOwnerOut`: Accessible solely by the listing's verified owner employee or MD. Includes direct contact details and reserve price.
 
 ### 5.2 System Settings & Audit Ledger
 
 - `system_settings`:
-  - `key` (PK, varchar, e.g. `sla_untouched_hours`, `repeat_enquiry_window_days`)
+  - `key` (PK, varchar, e.g. `sla_untouched_hours`, `repeat_enquiry_window_days`, `rent_routing_threshold_inr`)
   - `value` (JSONB)
   - `data_type` (`INT`, `STRING`, `BOOLEAN`, `JSON`, `DECIMAL`)
   - `category` (`ASSIGNMENT`, `SLA`, `MATCHING`, `WHATSAPP`, `COMMISSION`, `RENT`)
@@ -169,7 +210,8 @@ flowchart TD
 ### 5.3 Inbound Leads & Buyer Lifecycle
 
 - `leads`:
-  - `lead_id` (PK, format `OB-YYYY-NNNN`, sequence backed, immutable)
+  - `lead_id` (PK, format `OB-YYYY-NNNNNN` — 6 digits zero-padded, sequence backed, immutable, scalable to 1M+ leads/year)
+  - `idempotency_key` (varchar(64), unique, nullable; derived from webhook delivery ID or payload hash to prevent duplicate intake)
   - `source` (`WEBSITE`, `META`, `GOOGLE`, `WHATSAPP_BOT`, `FRONT_DESK`, `SALES_SELF`, `MD`, `PARTNER`, `AI_CALL`)
   - `full_name`, `mobile` (varchar `91XXXXXXXXXX`, indexed)
   - `email`, `lead_type` (`BUYER`, `SELLER`, `RENT`)
@@ -246,7 +288,7 @@ To ensure **zero hardcoded options** anywhere in the system, all choices, dropdo
 #### 5.4.2 Core Property & Attribute Schemas
 
 - `properties`:
-  - `listing_id` (PK, format `OP-YYYY-NNN`, sequence backed)
+  - `listing_id` (PK, format `OP-YYYY-NNNNN` — 5 digits zero-padded, sequence backed, immutable, scalable to 100K+ listings/year)
   - `listing_type` (FK to `property_master_options` where group=`LISTING_TYPE`: Rent=1, Sale=2, PG=3)
   - `category_code` (FK to `property_master_options` where group=`CATEGORY`: 1=Residential, 2=Commercial, 3=Agriculture, 4=Industry)
   - `sub_category_code` (FK to `property_master_options` where group=`SUB_CATEGORY`: 1=Flat, 2=House, 4=ResPlot, 5=Shop, 6=Office, 7=CommPlot, 8=AgriLand, 9=Farmhouse, 10=IndPlot, 11=Warehouse, 12=ColdStorage, 13=Factory)
@@ -395,15 +437,18 @@ To ensure full observability of all AI and communication channels:
 
 ## 6. Business Logic & Engine Specifications
 
-### 6.1 Intake & De-duplication Engine
+### 6.1 Intake, Idempotency & De-duplication Engine
 
-1. **Source Token Validation:** Reject and log unauthorized webhook payloads.
+1. **Source Token & Webhook Idempotency Validation:**
+   - Authenticate intake source token; reject and log unauthorized requests in `intake_rejects`.
+   - Calculate `idempotency_key` (derived from Meta `leadgen_id`, Google lead ID, or SHA-256 hash of `source + mobile + timestamp_minute`).
+   - Acquire a 60-second Redis distributed lock (`SETNX`). If the key exists in Redis or `leads.idempotency_key`, immediately return HTTP 200 OK with the existing `lead_id` without executing duplicate workflow tasks.
 2. **Mobile Normalization:** Strip spaces, leading zeros, and prefixes to store standard 10-digit format (`91XXXXXXXXXX`).
 3. **Test Lead Filter:** Numbers present in the `test_numbers` table receive `is_test = true` and are blocked from production reports, SMS/WhatsApp triggers, and AI calling.
 4. **Repeat Enquiry Decision Matrix:**
    - Same mobile within 24 hours: Silently ignore with an intake audit log entry.
    - Active open lead ($< 45$ days): Do not create duplicate lead. Append an activity note to existing lead and create an urgent task for the owner: _"Repeat enquiry received — re-confirm requirements"_.
-   - Closed lead (`Won`/`Lost`) OR last enquiry $> 45$ days: Generate a new lead record (`OB-YYYY-NNNN`) with `linked_previous_lead_id` set to original. Auto-route to the original owner employee if category matches.
+   - Closed lead (`Won`/`Lost`) OR last enquiry $> 45$ days: Generate a new lead record (`OB-YYYY-NNNNNN`) with `linked_previous_lead_id` set to original. Auto-route to the original owner employee if category matches.
 
 ### 6.2 Assignment & Routing Engine (Rules-Governed & AI-Optimized)
 
@@ -589,8 +634,18 @@ flowchart TD
     3. Critical SLA breaches and capacity bottlenecks across sales executives.
     4. Top 5 priority managerial interventions for the day.
 
-### 7.6 AI Quality Feedback Loop & Human-in-the-Loop Governance
+### 7.6 PII Sanitization, Redaction & LLM Privacy Architecture
+To ensure strict privacy compliance and maintain parity with the system anti-goal of **never leaking confidential seller and client contacts**, an automated PII Sanitization & Redaction Gateway sits between the FastAPI backend and all external LLM services (Gemini, Bland.ai, Retell):
+1. **Pre-Inference Data Sanitization Pipeline:**
+   - **Phone Redaction:** Client and seller mobile numbers are substituted with synthetic session tokens (e.g. `98290XXXXX` $\to$ `[CLIENT_PHONE_TOKEN_#A1]`).
+   - **Name Masking:** Full client names are replaced with pseudonymized identifiers (e.g. `[CLIENT_FIRST_NAME]`).
+   - **Property Financial & Legal Stripping:** Minimum acceptable reserve prices, internal legal dispute notes, khasra/registry identifiers, and exact house/street numbers are completely excluded from prompt assembly. Prompts receive only macro-location (zone, colony), property type, super area, and public price band.
+2. **Enterprise Zero Data Retention (ZDR):**
+   - API calls to Google Gemini and voice providers are made under enterprise terms with Zero Data Retention (`store=False`) to ensure client transcripts and parameters are not stored or used for foundational model training.
+3. **Data Residency & Compliance:**
+   - All external LLM requests route through Indian/approved regional data endpoints to adhere to data privacy standards.
 
+### 7.7 AI Quality Feedback Loop & Human-in-the-Loop Governance
 - Every AI-extracted requirement is presented to the human sales representative as a _suggested_ field with a 1-tap _"Confirm"_ or _"Edit"_ action.
 - Telemetry: Staff rate each AI call outcome as `Correct`, `Partially Correct`, or `Incorrect`.
 - Weekly accuracy metrics are tracked on the Tech Admin dashboard to monitor prompt drift, speech recognition accuracy, and conversion efficacy.
@@ -600,22 +655,101 @@ flowchart TD
 ## 8. What is Left to the Builder
 
 The following technical implementation details are left to engineering discretion:
-
 - Specific UI component styling with TailwindCSS (adhering to clean, high-contrast, mobile-friendly design tokens).
-- Exact database connection pool sizing and indexing strategy on composite query filters.
+- Exact database connection pool sizing (recommended: min 10, max 50 with PgBouncer) and indexing strategy on composite query filters.
 - Asynchronous task worker configuration (Celery vs. ARQ with Redis).
 - Specific HTTP client timeouts, retry exponential backoff strategies, and logging formatter configurations.
-- Minor partner lead allocation rules for high rent (e.g., standard round-robin among active verified partners in the designated zone).
 - Selection of specific voice synthesis model voices and audio codecs for the telephony integration.
 
 ---
 
-## 9. Verification & Acceptance Criteria
+## 9. Disaster Recovery, High Availability & Observability Strategy
 
-1. **Schema & Migration:** Clean Alembic migration script executing without errors; foreign key constraints prevent orphaned records.
-2. **ID Sequences:** Independent sequences for `OB-YYYY-NNNN` (leads) and `OP-YYYY-NNN` (properties) guaranteed non-reusable and collision-free under concurrent requests.
-3. **Access Isolation:** Unauthenticated requests or unauthorized roles (e.g. Sales Executive attempting to read seller phone numbers on inventory they do not own) return strict 403 Forbidden responses.
-4. **Validation Proof:** Attempting to post a property with $Carpet Area \ge Super Area$ fails with HTTP 422 Unprocessable Entity.
-5. **Intake De-duplication:** Submitting identical mobile numbers within 24 hours results in exactly one database lead record.
-6. **AI Safety Gate:** Triggering a manual lead stage transition while an AI voice call is queued immediately revokes the call job and emits an audit event.
-7. **Matching Tolerance:** Verified property priced at ₹1.10 Cr correctly matches a buyer requirement card with budget range ₹0.80–₹1.00 Cr under the default $\pm 15\%$ tolerance setting.
+### 9.1 Recovery Objectives & Backups
+- **RPO (Recovery Point Objective):** $\le 1\text{ hour}$ (maximum 1 hour of data loss under total datacenter failure).
+- **RTO (Recovery Time Objective):** $\le 4\text{ hours}$ (system fully restored and operational).
+- **Automated Backup Cadence:**
+  - Daily full logical backup via `pg_dump` scheduled at 02:00 IST, encrypted and streamed to offsite AWS S3 / Cloudflare R2 bucket with 30-day lifecycle retention.
+  - Continuous Write-Ahead Log (WAL) archiving enabling Point-in-Time Recovery (PITR) up to 7 days.
+  - Weekly automated restore drill on the staging environment verifying backup integrity.
+
+### 9.2 Observability, Alerting & Health Probes
+- **Application Performance Monitoring (APM):** Sentry integrated into FastAPI backend, React CRM web, and Next.js frontend for real-time error tracking, exception alerting, and performance bottleneck traces.
+- **Metrics & Dashboards:** Prometheus exporter exposing API response latency, QPS, active DB connections, Redis memory usage, and Celery worker queue depth, visualized via Grafana / BetterStack.
+- **Deep Health Check Endpoint (`/v1/health`):**
+  - Probes PostgreSQL read/write connectivity.
+  - Probes Redis connection and ping latency.
+  - Checks DoubleTick WhatsApp wallet balance and fires priority alert to Tech Admin if balance drops below threshold.
+
+---
+
+## 10. Phased Implementation Roadmap & Agent Scope Reconciliation
+
+To reconcile the advanced AI agents with the phased delivery schedule and prevent timeline slippage:
+
+```mermaid
+flowchart LR
+    subgraph Milestone 1
+        P0[Phase 0: Setup] --> P1[Phase 1: Foundation]
+        P1 --> P2[Phase 2: CRM Core]
+        P2 --> P3[Phase 3: Propira Engine]
+    end
+
+    subgraph Milestone 2
+        P3 --> P4[Phase 4: Public Next.js]
+        P4 --> P5[Phase 5: Partner Portal]
+    end
+
+    subgraph Milestone 3
+        P5 --> P6[Phase 6: WhatsApp Bot]
+        P6 --> P7[Phase 7: AI Voice & Matching]
+        P7 --> P7B[Phase 7B: Smart Router & Copilot]
+    end
+
+    subgraph Milestone 4
+        P7B --> P8[Phase 8: HR & Tasks]
+        P8 --> P9[Phase 9: Cutover & Go-Live]
+    end
+```
+
+- **Phase 0 — Setup & Decisions:** Monorepo, Postgres 15, Redis 7, Alembic, DoubleTick sandbox, SMS OTP gateway sandbox.
+- **Phase 1 — Foundation:** Employee IDs (`EMP-XXXX`), Role-based access, Dual-channel OTP (WhatsApp primary + SMS fallback), ~90 settings editor + audit log, WhatsApp send module.
+- **Phase 2 — CRM Core:** Intake API with idempotency locks, widened `OB-YYYY-NNNNNN` sequence, 24h dedup, **Strict Rules Table Routing** (`lead_routing_mode = STRICT_RULES_TABLE`), Stage Machine (New $\to$ Won/Lost/Nurture), Sales Web App, Manager SLA timers (3h reminder, 24h escalation).
+- **Phase 3 — Propira Property Engine:** Complete Propira taxonomy (Sale, Rent, PG), 100% dynamic master tables (`property_master_groups`, `property_master_options`, `pincode_master`), widened `OP-YYYY-NNNNN` sequence, Quick Listing flow, owner ad requests, 90/30-day auto-expiry worker.
+- **Phase 4 — Public Website (Next.js):** Fast public portal, ISR caching, verified property browsing (safe public projection only), seller/rent self-posting, rent number reveal rate limiting (anti-scraping).
+- **Phase 5 — Channel Partner Portal:** Broker portal (`CP-XXXX`), partner tiers, 90-day lead protection lock, commission ledger (`DUE` $\to$ `APPROVED` $\to$ `PAID`), high-rent partner allocation.
+- **Phase 6 — WhatsApp Automation (Agent 2):** Inbound conversational intake bot, verified listing photo cards, 1-tap clipboard Share Cards for community posting, and event triggers.
+- **Phase 7 — AI Voice Calling & Two-Sided Matching (Agents 1 & 4):** Outbound AI pre-qualification calling within 10:00–19:00 calling window, live inventory RAG feed, safety cancel rule, automated $\pm 15\%$ budget matching, and nurture revival.
+- **Phase 7B — Smart AI Lead Router & Sales Copilot (Agents 3 & 5):**  
+  *Shipped as an advanced capability after Core is proven live:*
+  - **Agent 3:** Opt-in `AI_OPTIMIZED_WITH_RULE_GUARDRAILS` routing engine evaluating rep win rates and capacity caps.
+  - **Agent 5:** 3-line lead history summaries, next-best-action recommender, and daily 08:45 AM MD executive WhatsApp brief.
+- **Phase 8 — Internal HR, Tasks & Content:** 50m geo-fenced attendance, leave approvals with automatic cover rerouting, content pipeline, KRA/KPI monthly scoring.
+- **Phase 9 — Data Migration & Switch-Over:** Cleansing legacy Google Sheets, importing open leads/active listings into PostgreSQL, freezing legacy sheets, DNS cutover, joint MD/Sales Head sign-off.
+
+---
+
+## 11. Comprehensive Testing Matrix & Acceptance Criteria
+
+1. **Schema & Migration Integrity:**
+   - Alembic migrations execute cleanly from scratch; all foreign keys, composite unique constraints, and sequence bindings (`OB-YYYY-NNNNNN`, `OP-YYYY-NNNNN`) are validated.
+2. **Deterministic Sequence Scalability:**
+   - 100 concurrent intake requests generate exactly sequential, unique `OB-YYYY-NNNNNN` IDs without gaps or collisions.
+3. **Dual-Channel Auth Fallback Test:**
+   - Simulating DoubleTick API failure during login triggers immediate automated SMS OTP dispatch within 30 seconds; staff member authenticates successfully.
+4. **RBAC & Data Leakage Prevention:**
+   - Sales Executive role calling `/v1/properties/{id}` on an inventory item they do not own receives `PropertyPublicOut` (seller phone number, minimum acceptable price, and legal notes are completely stripped). Direct SQL inspection confirms no leaks.
+5. **Validation & Business Rule Proofs:**
+   - Property submission with $Carpet Area \ge Super Area$ fails with HTTP 422 Unprocessable Entity.
+   - Pincode not present in `pincode_master` fails validation.
+   - Owner ad request allows only one pending request per ad; second request returns HTTP 409 Conflict.
+6. **Intake Webhook Idempotency & Dedup:**
+   - Re-sending the same webhook payload within 60 seconds returns HTTP 200 with existing `lead_id` and does not create duplicate database rows or background tasks.
+   - Submitting an identical mobile number within 24 hours creates an intake audit entry and ignores duplicate lead creation.
+7. **Concurrency & AI Safety Gate:**
+   - If an AI voice call is queued and a human sales rep logs an activity or moves the stage, a pre-dial check immediately cancels the external call job and emits an audit event.
+8. **Matching Precision:**
+   - Verified property priced at ₹1.10 Cr correctly matches a buyer requirement card with budget range ₹0.80–₹1.00 Cr under the default $\pm 15\%$ tolerance setting.
+9. **Zero Hardcoded Master Data Proof:**
+   - Disabling an amenity or adding a new flooring type in the Admin Panel immediately updates `/v1/public/property-schema` output and reflects on frontend forms without code deployment.
+
