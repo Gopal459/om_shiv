@@ -4,6 +4,7 @@ import logging
 from typing import Dict, Any
 from fastapi import FastAPI, status
 from fastapi.middleware.cors import CORSMiddleware
+from app.api.v1.endpoints import auth
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +23,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(auth.router, prefix="/v1/auth", tags=["auth"])
 
 
 async def check_postgres() -> Dict[str, Any]:
