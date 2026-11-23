@@ -4,7 +4,7 @@ import logging
 from typing import Dict, Any
 from fastapi import FastAPI, status
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.v1.endpoints import auth, settings, intake, leads, property_master, properties, property_verification
+from app.api.v1.endpoints import auth, settings, intake, leads, property_master, properties, property_verification, owner_operations
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +31,7 @@ app.include_router(leads.router, prefix="/v1/leads", tags=["leads"])
 app.include_router(property_master.router, prefix="/v1", tags=["property-master"])
 app.include_router(properties.router, prefix="/v1", tags=["properties"])
 app.include_router(property_verification.router, prefix="/v1", tags=["property-verification"])
+app.include_router(owner_operations.router, prefix="/v1", tags=["owner-operations"])
 
 
 
