@@ -4,7 +4,7 @@ import logging
 from typing import Dict, Any
 from fastapi import FastAPI, status
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.v1.endpoints import auth, settings
+from app.api.v1.endpoints import auth, settings, intake
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +26,7 @@ app.add_middleware(
 
 app.include_router(auth.router, prefix="/v1/auth", tags=["auth"])
 app.include_router(settings.router, prefix="/v1", tags=["settings", "audit"])
+app.include_router(intake.router, prefix="/v1", tags=["intake", "inquiries"])
 
 
 
