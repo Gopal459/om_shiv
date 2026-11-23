@@ -80,6 +80,8 @@ class Employee(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     employee_id: Mapped[str] = mapped_column(String(32), unique=True, index=True, nullable=False)
     name: Mapped[str] = mapped_column(String(150), nullable=False)
+    username: Mapped[Optional[str]] = mapped_column(String(50), unique=True, index=True, nullable=True)
+    password_hash: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     email: Mapped[Optional[str]] = mapped_column(String(255), unique=True, index=True, nullable=True)
     mobile: Mapped[str] = mapped_column(String(15), unique=True, index=True, nullable=False)
     department_id: Mapped[Optional[int]] = mapped_column(
