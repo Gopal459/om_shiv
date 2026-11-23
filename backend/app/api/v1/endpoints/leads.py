@@ -10,7 +10,7 @@ from sqlalchemy import select, and_, or_, desc, asc
 
 from app.core.database import get_db
 from app.core.security import decode_access_token
-from app.models.leads import Lead, LeadActivity, LeadActionLog
+from app.models.leads import Lead, LeadActivity, LeadActionLog, TblLead, LeadSequence
 from app.repositories import lead_repo
 from app.services.pipeline_service import pipeline_service
 
@@ -95,6 +95,301 @@ def get_actor_from_token(
 async def find_lead_by_id_or_lead_id(db: AsyncSession, lead_identifier: str) -> Optional[Lead]:
     """Helper delegating to LeadRepository."""
     return await lead_repo.get_by_id_or_lead_id(db, lead_identifier)
+
+
+class LeadCreateManual(BaseModel):
+    contact_name: str = Field(..., description="Lead contact name")
+    mobile: str = Field(..., description="Mobile number")
+    email: Optional[str] = None
+    address: Optional[str] = None
+    lead_type: Optional[str] = "BUY"
+    lead_source_id: Optional[int] = 1
+    rating: Optional[int] = 3
+    indv_property_address: Optional[str] = None
+    lead_remark: Optional[str] = None
+    deal_final_price: Optional[float] = 0.0
+
+
+class LeadImportBulk(BaseModel):
+    leads: List[Dict[str, Any]]
+
+
+class LeadStagePatch(BaseModel):
+    lead_status: int
+    stage: Optional[int] = None
+    remark: Optional[str] = None
+
+
+def normalize_phone(phone: str) -> str:
+    cleaned = "".join(filter(str.isdigit, str(phone)))
+    if cleaned.startswith("0") and len(cleaned) == 11:
+        cleaned = cleaned[1:]
+    if len(cleaned) == 10:
+        return f"91{cleaned}"
+    if cleaned.startswith("91") and len(cleaned) == 12:
+        return cleaned
+    return cleaned or "919999999999"
+
+
+async def generate_lead_id(db: AsyncSession) -> str:
+    year = datetime.now(timezone.utc).year
+    res = await db.execute(select(LeadSequence).where(LeadSequence.year == year))
+    seq = res.scalar_one_or_none()
+    if not seq:
+        seq = LeadSequence(year=year, last_sequence=1)
+        db.add(seq)
+    else:
+        seq.last_sequence += 1
+    await db.flush()
+    return f"OB-{year}-{seq.last_sequence:06d}"
+
+
+async def find_tbl_lead_by_id_or_unique_id(db: AsyncSession, identifier: str) -> Optional[TblLead]:
+    stmt = select(TblLead).where(TblLead.lead_unique_id == identifier, TblLead.deleted_at.is_(None))
+    res = await db.execute(stmt)
+    lead = res.scalar_one_or_none()
+    if lead:
+        return lead
+    if str(identifier).isdigit():
+        stmt_pk = select(TblLead).where(TblLead.leads_id == int(identifier), TblLead.deleted_at.is_(None))
+        res_pk = await db.execute(stmt_pk)
+        return res_pk.scalar_one_or_none()
+    return None
+
+
+# --- Lead Inflows, Kanban & Stage Endpoints ---
+
+@router.post(
+    "/create",
+    status_code=status.HTTP_201_CREATED,
+    summary="Manual lead creation with 24 sources and property type",
+)
+async def create_manual_lead(
+    payload: LeadCreateManual,
+    db: AsyncSession = Depends(get_db),
+    actor_id: str = Depends(get_actor_from_token),
+) -> Dict[str, Any]:
+    norm_mobile = normalize_phone(payload.mobile)
+    lead_uid = await generate_lead_id(db)
+    lead_type = (payload.lead_type or "BUY").upper()
+
+    tbl_lead = TblLead(
+        lead_unique_id=lead_uid,
+        contact_name=payload.contact_name,
+        mobile=norm_mobile,
+        email=payload.email,
+        address=payload.address,
+        lead_table_name=lead_type,
+        lead_source_id=payload.lead_source_id or 1,
+        rating=payload.rating or 3,
+        indv_property_address=payload.indv_property_address,
+        lead_remark=payload.lead_remark,
+        deal_final_price=payload.deal_final_price or 0.0,
+        lead_status=0,
+        stage=1,
+        lead_open=1,
+        create_by=actor_id,
+    )
+    db.add(tbl_lead)
+
+    # Sync modern Lead entity so standard queries & activities work
+    lead_entity = Lead(
+        lead_id=lead_uid,
+        full_name=payload.contact_name,
+        mobile=norm_mobile,
+        email=payload.email,
+        lead_type=lead_type,
+        source=f"SOURCE_{payload.lead_source_id or 1}",
+        stage="NEW",
+        temperature="HOT" if payload.rating == 1 else "WARM" if payload.rating == 2 else "COLD",
+        preferred_locality=payload.indv_property_address,
+    )
+    db.add(lead_entity)
+    await db.commit()
+    await db.refresh(tbl_lead)
+
+    return {
+        "status": "success",
+        "leads_id": tbl_lead.leads_id,
+        "lead_unique_id": tbl_lead.lead_unique_id,
+        "contact_name": tbl_lead.contact_name,
+        "mobile": tbl_lead.mobile,
+        "lead_type": tbl_lead.lead_table_name,
+        "lead_status": tbl_lead.lead_status,
+        "stage": tbl_lead.stage,
+        "rating": tbl_lead.rating,
+    }
+
+
+@router.post(
+    "/import-bulk",
+    status_code=status.HTTP_201_CREATED,
+    summary="Bulk CSV / Excel lead import",
+)
+async def import_bulk_leads(
+    payload: LeadImportBulk,
+    db: AsyncSession = Depends(get_db),
+    actor_id: str = Depends(get_actor_from_token),
+) -> Dict[str, Any]:
+    imported = []
+    for item in payload.leads:
+        name = item.get("contact_name") or item.get("name") or "Imported Lead"
+        raw_phone = item.get("mobile") or item.get("phone") or "9999999999"
+        norm_phone = normalize_phone(raw_phone)
+        lead_type = (item.get("lead_type") or item.get("type") or "BUY").upper()
+        lead_uid = await generate_lead_id(db)
+
+        tbl = TblLead(
+            lead_unique_id=lead_uid,
+            contact_name=name,
+            mobile=norm_phone,
+            email=item.get("email"),
+            address=item.get("address"),
+            lead_table_name=lead_type,
+            lead_source_id=int(item.get("lead_source_id") or 6),
+            rating=int(item.get("rating") or 3),
+            indv_property_address=item.get("indv_property_address") or item.get("location"),
+            lead_remark=item.get("lead_remark") or item.get("remarks"),
+            lead_status=0,
+            stage=1,
+            lead_open=1,
+            create_by=actor_id,
+        )
+        db.add(tbl)
+
+        lead_ent = Lead(
+            lead_id=lead_uid,
+            full_name=name,
+            mobile=norm_phone,
+            email=item.get("email"),
+            lead_type=lead_type,
+            source="BULK_IMPORT",
+            stage="NEW",
+            temperature="HOT" if tbl.rating == 1 else "WARM" if tbl.rating == 2 else "COLD",
+        )
+        db.add(lead_ent)
+        imported.append(lead_uid)
+
+    await db.commit()
+    return {
+        "status": "success",
+        "imported_count": len(imported),
+        "lead_ids": imported,
+    }
+
+
+@router.get(
+    "/kanban",
+    status_code=status.HTTP_200_OK,
+    summary="Fetch leads grouped into Kanban pipeline columns",
+)
+async def get_kanban_board(
+    type: Optional[str] = Query(None, description="Optional property type filter: buy, rent, pg, all"),
+    db: AsyncSession = Depends(get_db),
+    actor_id: str = Depends(get_actor_from_token),
+) -> Dict[str, List[Dict[str, Any]]]:
+    stmt = select(TblLead).where(TblLead.deleted_at.is_(None))
+    if type and type.lower() != "all":
+        stmt = stmt.where(TblLead.lead_table_name.ilike(f"%{type}%"))
+
+    res = await db.execute(stmt.order_by(TblLead.leads_id.desc()))
+    all_leads = res.scalars().all()
+
+    board: Dict[str, List[Dict[str, Any]]] = {
+        "new": [],
+        "in_progress": [],
+        "site_visit": [],
+        "qualified": [],
+        "converted": [],
+        "disqualified": [],
+    }
+
+    for l in all_leads:
+        card = {
+            "leads_id": l.leads_id,
+            "lead_unique_id": l.lead_unique_id or f"PR{l.leads_id}",
+            "contact_name": l.contact_name,
+            "mobile": l.mobile,
+            "email": l.email,
+            "address": l.address,
+            "lead_type": l.lead_table_name or "BUY",
+            "rating": l.rating,
+            "lead_status": l.lead_status,
+            "stage": l.stage,
+            "property_address": l.indv_property_address or "Alwar, Rajasthan",
+            "deal_final_price": float(l.deal_final_price or 0.0),
+            "lead_remark": l.lead_remark or "N/A",
+            "created_date": l.created_date.isoformat() if l.created_date else None,
+        }
+
+        # Deterministic column grouping:
+        # 1. Disqualified (lead_status == 2)
+        if l.lead_status == 2:
+            board["disqualified"].append(card)
+        # 2. Converted (lead_status == 5)
+        elif l.lead_status == 5:
+            board["converted"].append(card)
+        # 3. Qualified (lead_status == 4)
+        elif l.lead_status == 4:
+            board["qualified"].append(card)
+        # 4. Site Visit / Inspection (stage in [2, 3])
+        elif l.stage in [2, 3]:
+            board["site_visit"].append(card)
+        # 5. In Progress (lead_status == 1)
+        elif l.lead_status == 1:
+            board["in_progress"].append(card)
+        # 6. Default to New (lead_status == 0)
+        else:
+            board["new"].append(card)
+
+    return board
+
+
+@router.patch(
+    "/{id}/stage",
+    status_code=status.HTTP_200_OK,
+    summary="1-click stage and lead_status transition for Kanban moves",
+)
+async def update_lead_stage(
+    id: str,
+    payload: LeadStagePatch,
+    db: AsyncSession = Depends(get_db),
+    actor_id: str = Depends(get_actor_from_token),
+) -> Dict[str, Any]:
+    tbl_lead = await find_tbl_lead_by_id_or_unique_id(db, id)
+    if not tbl_lead:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Lead '{id}' not found in tbl_leads",
+        )
+
+    tbl_lead.lead_status = payload.lead_status
+    if payload.stage is not None:
+        tbl_lead.stage = payload.stage
+    if payload.remark:
+        tbl_lead.lead_remark = payload.remark
+    tbl_lead.last_callstatus_updatetime = datetime.now(timezone.utc)
+
+    # Sync modern Lead entity if exists
+    modern_lead = await find_lead_by_id_or_lead_id(db, tbl_lead.lead_unique_id or str(tbl_lead.leads_id))
+    if modern_lead:
+        stage_map = {0: "NEW", 1: "CONNECTED", 2: "LOST", 3: "SOLVED", 4: "QUALIFIED", 5: "WON"}
+        if payload.stage in [2, 3]:
+            modern_lead.stage = "SITE_VISIT"
+        else:
+            modern_lead.stage = stage_map.get(payload.lead_status, modern_lead.stage)
+
+    await db.commit()
+    await db.refresh(tbl_lead)
+
+    return {
+        "status": "success",
+        "leads_id": tbl_lead.leads_id,
+        "lead_unique_id": tbl_lead.lead_unique_id,
+        "lead_status": tbl_lead.lead_status,
+        "stage": tbl_lead.stage,
+        "lead_remark": tbl_lead.lead_remark,
+    }
 
 
 # --- Sales Rep Queue & Leads Endpoints ---
