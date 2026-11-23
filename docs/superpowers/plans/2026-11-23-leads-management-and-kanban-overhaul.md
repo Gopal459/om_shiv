@@ -1,6 +1,6 @@
 # Enterprise Leads Management, Inflow Pipeline & Kanban Overhaul Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Implement the complete enterprise leads ecosystem including `tbl_leads` 54-field database migration, 6 inbound inflow handlers, dual-mode Kanban & Data Table views, Screenshot-1 sidebar submenus (Buy, Rent, PG, Create, Import), and Screenshot 2 & 3 pixel-perfect Lead Detail view.
 
@@ -68,7 +68,7 @@
 **Interfaces:**
 - Produces: `tbl_leads` table with all 54 columns, soft-delete column `deleted_at`, and `Lead` / `TblLead` entity with bidirectional property aliases.
 
-- [ ] **Step 1: Write the failing test for `tbl_leads` migration**
+- [x] **Step 1: Write the failing test for `tbl_leads` migration**
 
 ```python
 import pytest
@@ -89,16 +89,16 @@ async def test_tbl_leads_table_has_all_54_columns(db_session: AsyncSession):
     assert "deleted_at" in cols
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `.venv\Scripts\pytest backend/tests/test_tbl_leads_schema.py -v`
 Expected: FAIL with "no such table: tbl_leads"
 
-- [ ] **Step 3: Implement `0005_tbl_leads_schema.py` and register in `runner.py`**
+- [x] **Step 3: Implement `0005_tbl_leads_schema.py` and register in `runner.py`**
 
 Create `backend/app/db/migrations/0005_tbl_leads_schema.py` defining the full 54-column table `tbl_leads` with indexes on `mobile`, `lead_status`, `stage`, `deleted_at`, and add `"app.db.migrations.0005_tbl_leads_schema"` to `MIGRATION_STEPS` in `runner.py`.
 
-- [ ] **Step 4: Update `backend/app/models/leads.py` with `tbl_leads` entity and hybrid property shims**
+- [x] **Step 4: Update `backend/app/models/leads.py` with `tbl_leads` entity and hybrid property shims**
 
 Map `Lead` to `tbl_leads` with property aliases:
 - `id` ↔ `leads_id`
@@ -108,12 +108,12 @@ Map `Lead` to `tbl_leads` with property aliases:
 - `created_at` ↔ `created_date`
 - `updated_at` ↔ `modified_date`
 
-- [ ] **Step 5: Run tests to verify migration and all 60 existing tests pass**
+- [x] **Step 5: Run tests to verify migration and all 60 existing tests pass**
 
 Run: `.venv\Scripts\pytest backend/tests -q`
 Expected: 61+ passed (100% green)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/app/db/migrations/ backend/app/models/leads.py backend/tests/test_tbl_leads_schema.py
@@ -136,7 +136,7 @@ git commit -m "feat(db): add 0005_tbl_leads_schema migration and tbl_leads model
   - `GET /v1/leads/kanban` (Grouped leads by status/stage with temperature badges)
   - `PATCH /v1/leads/{id}/stage` (1-click status / stage progression)
 
-- [ ] **Step 1: Write tests for manual create, bulk CSV import, and Kanban grouping**
+- [x] **Step 1: Write tests for manual create, bulk CSV import, and Kanban grouping**
 
 ```python
 import pytest
@@ -164,21 +164,21 @@ async def test_manual_create_and_kanban_grouping(test_client: AsyncClient):
     assert any(l["contact_name"] == "Vikram Rathore" for l in kb_data["new"])
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `.venv\Scripts\pytest backend/tests/test_lead_inflow_and_kanban.py -v`
 Expected: FAIL (404 Not Found)
 
-- [ ] **Step 3: Implement endpoints in `leads.py` and repository methods**
+- [x] **Step 3: Implement endpoints in `leads.py` and repository methods**
 
 Implement `POST /v1/leads/create`, `POST /v1/leads/import-bulk` (handling CSV text or multipart files), `GET /v1/leads/kanban`, and `PATCH /v1/leads/{id}/stage`.
 
-- [ ] **Step 4: Run tests to verify all endpoints pass**
+- [x] **Step 4: Run tests to verify all endpoints pass**
 
 Run: `.venv\Scripts\pytest backend/tests/test_lead_inflow_and_kanban.py -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/app/api/ backend/app/repositories/ backend/tests/test_lead_inflow_and_kanban.py
@@ -202,24 +202,24 @@ git commit -m "feat(api): add lead manual creation, CSV bulk import, and Kanban 
   - `CreateLeadModal` with 24 lead sources, budget, type selector, customer details
   - `ImportLeadModal` with drag-and-drop CSV parser, preview table, and 1-click import
 
-- [ ] **Step 1: Update `AdminLayout.tsx` to exact Screenshot 1 submenus**
+- [x] **Step 1: Update `AdminLayout.tsx` to exact Screenshot 1 submenus**
 
 Configure `LEADS` item with `Buy`, `Rent`, `PG`, `Create Lead`, and `Import Lead`.
 
-- [ ] **Step 2: Create `CreateLeadModal.tsx`**
+- [x] **Step 2: Create `CreateLeadModal.tsx`**
 
 Build modal with property type tabs (`Buy`, `Rent`, `PG`), 24 lead sources dropdown (Newspaper, Facebook, Google, Direct Walk-in, etc.), name, mobile, email, address, budget min/max, and remarks.
 
-- [ ] **Step 3: Create `ImportLeadModal.tsx`**
+- [x] **Step 3: Create `ImportLeadModal.tsx`**
 
 Build bulk import modal supporting CSV/Excel parsing, previewing up to 10 rows, duplicate detection, and batch submission to `/v1/leads/import-bulk`.
 
-- [ ] **Step 4: Verify clean frontend build**
+- [x] **Step 4: Verify clean frontend build**
 
 Run: `cd frontend; bun run build`
 Expected: 0 errors
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/layouts/AdminLayout.tsx frontend/src/components/leads/ frontend/src/App.tsx
@@ -239,24 +239,24 @@ git commit -m "feat(ui): add Screenshot-1 leads sidebar submenus, Create Lead mo
 **Interfaces:**
 - Produces: Dual-mode toggle `[Kanban Board View]` ⇄ `[Table View]` in `/leads` with active property type filters (`All`, `Buy`, `Rent`, `PG`), temperature chips, search, and 1-click status advances.
 
-- [ ] **Step 1: Implement `LeadKanbanBoard.tsx`**
+- [x] **Step 1: Implement `LeadKanbanBoard.tsx`**
 
 Create 6-column pipeline (`New / Fresh`, `In Progress`, `Site Visit Planned`, `Qualified`, `Converted`, `Disqualified`) with card statistics, SLA indicator, quick call/WhatsApp buttons, and drag-and-drop or dropdown status advances.
 
-- [ ] **Step 2: Implement `LeadTableView.tsx`**
+- [x] **Step 2: Implement `LeadTableView.tsx`**
 
 Create responsive data table with customer name, mobile, property type badge, temperature flame, stage, SLA timer, and actions (`View Details`, `Call`, `Disqualify`).
 
-- [ ] **Step 3: Integrate into `MyWork.tsx` with View Switcher & Inflow Modals**
+- [x] **Step 3: Integrate into `MyWork.tsx` with View Switcher & Inflow Modals**
 
 Add top-level view toggle, search bar, property type pills, and connect `Create Lead` & `Import Lead` triggers.
 
-- [ ] **Step 4: Verify clean frontend build**
+- [x] **Step 4: Verify clean frontend build**
 
 Run: `cd frontend; bun run build`
 Expected: 0 errors
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/components/leads/ frontend/src/pages/MyWork.tsx
@@ -278,7 +278,7 @@ git commit -m "feat(ui): implement interactive dual-mode Kanban board and data t
   - Red capsule pill headers (`Contact Details >`, `Property Details >`, `Others >`) with exact styling and fields
   - Quick action modals for logging calls, updating follow-ups, and changing status
 
-- [ ] **Step 1: Implement Top Header & 7 Circular Action Buttons**
+- [x] **Step 1: Implement Top Header & 7 Circular Action Buttons**
 
 Create the circular action button bar with tooltips and active handlers:
 1. Call (Purple `#4f46e5`)
@@ -289,19 +289,19 @@ Create the circular action button bar with tooltips and active handlers:
 6. Share (Cyan `#0284c7`)
 7. History / Log (Green `#16a34a`)
 
-- [ ] **Step 2: Implement 3 Red Capsule Card Sections**
+- [x] **Step 2: Implement 3 Red Capsule Card Sections**
 
 Implement:
 1. `Contact Details >`: Follow Up Remark, Request ID (`PR141`), Customer Name, Mobile, Email, Address, Status, Current Update.
 2. `Property Details >`: Property Id, Looking For, Property Type, Property Address.
 3. `Others >`: Followup Date, Received Date, Last Updated Date & By, Assign Date & Assignee.
 
-- [ ] **Step 3: Verify clean frontend build**
+- [x] **Step 3: Verify clean frontend build**
 
 Run: `cd frontend; bun run build`
 Expected: 0 errors
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/pages/LeadDetail.tsx
@@ -316,17 +316,17 @@ git commit -m "feat(ui): redesign Lead Detail view matching reference Screenshot
 - Test: Run all backend tests and frontend production build
 - Test: Manual verification of Kanban drag/status advance, modals, and detail cards
 
-- [ ] **Step 1: Run all backend pytest tests**
+- [x] **Step 1: Run all backend pytest tests**
 
 Run: `.venv\Scripts\pytest backend/tests -v`
 Expected: All 60+ tests pass with 0 failures
 
-- [ ] **Step 2: Run frontend production build**
+- [x] **Step 2: Run frontend production build**
 
 Run: `cd frontend; bun run build`
 Expected: 0 TypeScript errors, clean bundle output
 
-- [ ] **Step 3: Final branch commit and status check**
+- [x] **Step 3: Final branch commit and status check**
 
 Run: `git status`
 Expected: Working tree clean
