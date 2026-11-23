@@ -402,13 +402,13 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
       </aside>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 min-h-screen">
+      <div className="flex-1 flex flex-col min-w-0 min-h-screen bg-grid-pattern relative">
         {/* Top Navbar Header */}
         <header
-          className={`h-16 px-4 sm:px-6 lg:px-8 border-b flex items-center justify-between sticky top-0 z-40 backdrop-blur-md transition-colors ${
+          className={`h-16 px-4 sm:px-6 lg:px-8 border-b flex items-center justify-between sticky top-0 z-40 backdrop-blur-xl transition-all ${
             isDark
-              ? 'bg-slate-900/90 border-slate-800 shadow-sm'
-              : 'bg-white/95 border-slate-200/80 shadow-xs'
+              ? 'bg-slate-900/90 border-slate-800 shadow-lg shadow-black/20'
+              : 'bg-white/90 border-slate-200/80 shadow-xs'
           }`}
         >
           {/* Left: Mobile Drawer Trigger + Desktop Menu Pill + Active Tab Breadcrumb */}
