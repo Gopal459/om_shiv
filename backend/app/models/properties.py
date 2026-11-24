@@ -138,3 +138,165 @@ class PropPG(Base):
     notice_period_days: Mapped[int] = mapped_column(Integer, default=30, nullable=False)
 
     property: Mapped[Property] = relationship("Property", back_populates="pg_details")
+
+
+class TblProperty(Base):
+    """Legacy 124-column tbl_property model providing 100% database schema parity."""
+    __tablename__ = "tbl_property"
+
+    property_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    assigned_user_id: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    if_update_user: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    update_date_time: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    update_by_username: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    assigned_user_date_time: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    propertyid_no: Mapped[str] = mapped_column(String(264), nullable=False)
+    property_type: Mapped[int] = mapped_column(Integer, default=0, nullable=False)  # 1=>Rent, 2=>Sell, 3=>PG
+    user_id: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    state_id: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    city_id: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    location_lat: Mapped[Optional[str]] = mapped_column(String(264), nullable=True)
+    location_long: Mapped[Optional[str]] = mapped_column(String(264), nullable=True)
+    sublocality_address: Mapped[Optional[str]] = mapped_column(String(264), nullable=True)
+    slug: Mapped[Optional[str]] = mapped_column(String(264), nullable=True)
+    location: Mapped[Optional[str]] = mapped_column(String(264), nullable=True)
+    nearby_area: Mapped[Optional[str]] = mapped_column(String(264), nullable=True)
+    pincode: Mapped[str] = mapped_column(String(264), default="0", nullable=False)
+    looking_type: Mapped[int] = mapped_column(Integer, default=0, nullable=False)  # 1=>Res, 2=>Comm, 3=>Agri, 4=>Ind
+    looking_subcat_type: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    looking_subcat_type_value: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    whichpart_torent: Mapped[int] = mapped_column(Integer, default=0, nullable=False)  # 1=>Complete, 2=>Part
+    floor_torent: Mapped[int] = mapped_column(Integer, default=0, nullable=False)  # -1=>Basement, 0=>Ground
+    street_no: Mapped[Optional[str]] = mapped_column(String(264), nullable=True)
+    property_ownership: Mapped[int] = mapped_column(Integer, default=0, nullable=False)  # 1=>Leasehold, 2=>Freehold
+    noof_bhk: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    possession_status: Mapped[int] = mapped_column(Integer, default=0, nullable=False)  # 1=>Ready, 2=>Under construction
+    constructed_floors: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    area: Mapped[str] = mapped_column(String(264), default="0", nullable=False)
+    area_unit: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    constructed_area: Mapped[Optional[str]] = mapped_column(String(264), nullable=True)
+    constructed_areaunit: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    boundary: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    super_area: Mapped[Optional[str]] = mapped_column(String(264), nullable=True)
+    superarea_unit: Mapped[str] = mapped_column(String(264), default="0", nullable=False)
+    carpet_area: Mapped[str] = mapped_column(String(264), default="0", nullable=False)
+    carpetarea_unit: Mapped[str] = mapped_column(String(264), default="0", nullable=False)
+    noof_floors: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    property_which_floors: Mapped[str] = mapped_column(String(264), default="0", nullable=False)
+    office: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    room: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    kitchen: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    toilet: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    shade: Mapped[Optional[str]] = mapped_column(String(264), nullable=True)
+    machinery_plant: Mapped[Optional[str]] = mapped_column(String(264), nullable=True)
+    garage_parking: Mapped[str] = mapped_column(String(264), default="0", nullable=False)
+    baathroom: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    balcony: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    construction_age: Mapped[str] = mapped_column(String(264), default="0", nullable=False)
+    transaction_type: Mapped[int] = mapped_column(Integer, default=0, nullable=False)  # 1=>Resale, 2=>New
+    want_tosell: Mapped[int] = mapped_column(Integer, default=0, nullable=False)  # 1=>Part, 2=>Complete
+    project_name: Mapped[Optional[str]] = mapped_column(String(264), nullable=True)
+    priceper_unitvalue: Mapped[float] = mapped_column(Numeric(18, 2), default=0.00, nullable=False)
+    priceperunit_type: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    expected_price: Mapped[float] = mapped_column(Numeric(18, 2), default=0.00, nullable=False)
+    price_negociable: Mapped[int] = mapped_column(Integer, default=0, nullable=False)  # 1=>Yes, 2=>No
+    extra_charge_apply: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    width_facing_road: Mapped[str] = mapped_column(String(264), default="0", nullable=False)
+    facing: Mapped[int] = mapped_column(Integer, default=0, nullable=False)  # 1=East, 2=West, 3=North, etc.
+    flooring: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    rentalallow_forid: Mapped[str] = mapped_column(String(255), default="0", nullable=False)
+    corner: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    clu: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    clu_type: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    feature_furnished: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    furnished_type: Mapped[str] = mapped_column(String(264), default="0", nullable=False)
+    featurepowerbackup: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    feature_watersupply: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    feature_lift: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    feature_park: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    feature_ownparking: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    feature_visitparking: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    feature_intercomfac: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    feature_clubhosue: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    feature_swimming: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    feature_fitness: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    feature_gatedcomm: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    feature_security: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    feature_electricityconnection: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    nearby_atm: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    nearby_childchehe: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    nearby_shoppingmall: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    nearby_hospital: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    nearby_school: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    nearby_multiplex: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    nearby_departmental: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    expiarydate: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_date: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=True,
+    )
+    modified_date: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=True,
+    )
+    verified_status: Mapped[int] = mapped_column(Integer, default=0, nullable=False)  # 0=>unverified, 1=>verified
+    is_active: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    source_type: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    source_owner_name: Mapped[Optional[str]] = mapped_column(String(264), nullable=True)
+    source_owner_email: Mapped[Optional[str]] = mapped_column(String(264), nullable=True)
+    source_owner_mobile: Mapped[Optional[str]] = mapped_column(String(264), nullable=True)
+    franchise_id: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    franchiseemember_id: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    verification_description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    document_submit: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    document_approve_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    is_exclusive: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    sold_status: Mapped[int] = mapped_column(Integer, default=0, nullable=False)  # 0=>Available, 1=>Sold, 2=>Expired
+    sold_request_sent: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    delete_request_sent: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    recyclebin_status: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    recyclebin_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    live_request_sent: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    total_view: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    images: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    images_order: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    video: Mapped[Optional[str]] = mapped_column(String(264), nullable=True)
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class TblPayingGuest(Base):
+    """Paying guest properties extension table tbl_payingguest."""
+    __tablename__ = "tbl_payingguest"
+
+    pg_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    property_id: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    pg_name: Mapped[Optional[str]] = mapped_column(String(264), nullable=True)
+    available_category: Mapped[int] = mapped_column(Integer, default=1, nullable=False)  # 1=>Pros, 2=>Students, 3=>Both
+    gender: Mapped[int] = mapped_column(Integer, default=1, nullable=False)  # 1=>Boys, 2=>Girls, 3=>Both
+    room_type: Mapped[int] = mapped_column(Integer, default=1, nullable=False)  # 1=>Private, 2=>Sharing, 3=>Both
+    food_option: Mapped[int] = mapped_column(Integer, default=2, nullable=False)  # 1=>With Food, 2=>Without
+    food_type: Mapped[int] = mapped_column(Integer, default=1, nullable=False)  # 1=>Veg, 2=>Non-Veg, 3=>Both
+    meal_type: Mapped[Optional[str]] = mapped_column(String(264), nullable=True)
+    notice_period: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    electrical_charges: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    smoking: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    alcohol: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    attached_bathroom: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    attached_balcony: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    common_area: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    amenities: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=True,
+    )
+    updated_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=True,
+    )

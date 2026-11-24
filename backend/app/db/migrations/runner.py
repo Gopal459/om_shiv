@@ -13,6 +13,7 @@ MIGRATION_STEPS = [
     "app.db.migrations.0003_seed_identity_and_roles",
     "app.db.migrations.0004_seed_property_masters",
     "app.db.migrations.0005_tbl_leads_schema",
+    "app.db.migrations.0006_tbl_property_schema",
 ]
 
 
