@@ -373,86 +373,122 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
     fetchProperty();
   }, [propertyId]);
 
-  // 2. REAL FILE UPLOAD LOGIC WITH STATUTORY VALIDATION
-  const processFiles = async (files: FileList | File[]) => {
+  // 2. REAL FILE UPLOAD LOGIC WITH STATUTORY VALIDATION (MULTI-FILE BATCH SUPPORT)
+  const processFiles = async (selectedFiles: FileList | File[]) => {
+    // 1. Snapshot immediately into detached JavaScript Array so DOM FileList mutations never truncate files
+    const files = Array.from(selectedFiles);
+    if (!files || files.length === 0) return;
+
     setUploadError('');
     setUploadSuccess('');
     setError('');
 
-    if (images.length >= 10) {
+    const currentCount = images.length;
+    if (currentCount >= 10) {
       setUploadError('Maximum 10 photos allowed for listing.');
       return;
     }
 
+    const availableSlots = 10 - currentCount;
+    const filesToUpload = files.slice(0, availableSlots);
+    if (files.length > availableSlots) {
+      setUploadError(`Only ${availableSlots} slots remaining. Selected ${files.length} photos; only the first ${availableSlots} will be uploaded.`);
+    }
+
     const allowedMime = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
     const allowedExt = ['png', 'jpg', 'jpeg', 'webp'];
-    let uploadedCount = 0;
 
-    for (let i = 0; i < files.length; i++) {
-      if (images.length + uploadedCount >= 10) {
-        setUploadError('Maximum limit of 10 photos reached.');
-        break;
-      }
-      const file = files[i];
+    const validFiles: File[] = [];
+    const validationErrors: string[] = [];
+
+    for (const file of filesToUpload) {
       const ext = file.name.split('.').pop()?.toLowerCase() || '';
-
-      // Format validation: check both extension and MIME type
       const isExtValid = allowedExt.includes(ext);
       const isMimeValid = file.type ? (allowedMime.includes(file.type.toLowerCase()) || file.type.startsWith('image/')) : true;
 
       if (!isExtValid && !isMimeValid) {
-        setUploadError(`File "${file.name}" has invalid format. Accepted formats: PNG, JPG, JPEG, WEBP.`);
+        validationErrors.push(`"${file.name}" invalid format`);
         continue;
       }
-
-      // Minimum Size check: 10KB
       if (file.size < 10 * 1024) {
-        setUploadError(`File "${file.name}" is too small (${(file.size / 1024).toFixed(1)} KB). Minimum size required is 10 KB.`);
+        validationErrors.push(`"${file.name}" too small (${(file.size / 1024).toFixed(1)}KB < 10KB)`);
         continue;
       }
-
-      // Maximum Size check: 2MB
       if (file.size > 2 * 1024 * 1024) {
-        setUploadError(`File "${file.name}" exceeds 2MB limit (${(file.size / (1024 * 1024)).toFixed(1)} MB). Maximum size is 2 MB.`);
+        validationErrors.push(`"${file.name}" exceeds 2MB (${(file.size / (1024 * 1024)).toFixed(1)}MB)`);
         continue;
       }
+      validFiles.push(file);
+    }
 
-      setUploadingImage(true);
-      try {
+    if (validationErrors.length > 0) {
+      setUploadError(`Skipped: ${validationErrors.join(', ')}`);
+    }
+
+    if (validFiles.length === 0) return;
+
+    setUploadingImage(true);
+    const token = localStorage.getItem('access_token');
+    const newUploadedUrls: string[] = [];
+    const uploadErrors: string[] = [];
+
+    try {
+      // Upload all valid files concurrently via Promise.all
+      const uploadPromises = validFiles.map(async (file) => {
         const formData = new FormData();
         formData.append('file', file);
-        const token = localStorage.getItem('access_token');
+        try {
+          const res = await fetch('/v1/properties/upload-image', {
+            method: 'POST',
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+            body: formData,
+          });
 
-        const res = await fetch('/v1/properties/upload-image', {
-          method: 'POST',
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-          body: formData,
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          setImages((prev) => [...prev, data.url]);
-          uploadedCount++;
-          setUploadSuccess(`Photo "${file.name}" uploaded successfully!`);
-        } else {
-          const errData = await res.json().catch(() => ({}));
-          const errMsg = errData.detail || `Upload failed for ${file.name}.`;
-          setUploadError(errMsg);
+          if (res.ok) {
+            const data = await res.json();
+            return { success: true, url: data.url, name: file.name };
+          } else {
+            const errData = await res.json().catch(() => ({}));
+            return { success: false, error: errData.detail || `Upload failed for ${file.name}` };
+          }
+        } catch (err: any) {
+          return { success: false, error: err.message || `Network error on ${file.name}` };
         }
-      } catch (err: any) {
-        setUploadError(err.message || `Network error uploading ${file.name}.`);
-      } finally {
-        setUploadingImage(false);
+      });
+
+      const results = await Promise.all(uploadPromises);
+
+      results.forEach((r) => {
+        if (r.success && r.url) {
+          newUploadedUrls.push(r.url);
+        } else if (r.error) {
+          uploadErrors.push(r.error);
+        }
+      });
+
+      if (newUploadedUrls.length > 0) {
+        setImages((prev) => [...prev, ...newUploadedUrls]);
+        setUploadSuccess(
+          newUploadedUrls.length === 1
+            ? '1 photo uploaded successfully!'
+            : `Successfully uploaded ${newUploadedUrls.length} photos!`
+        );
       }
+
+      if (uploadErrors.length > 0) {
+        setUploadError((prev) => (prev ? `${prev} | ${uploadErrors.join(', ')}` : uploadErrors.join(', ')));
+      }
+    } finally {
+      setUploadingImage(false);
     }
   };
 
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      processFiles(e.target.files);
+      const selected = Array.from(e.target.files);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      processFiles(selected);
     }
-    // reset input value so re-selecting same file triggers event
-    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -472,7 +508,8 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
     e.stopPropagation();
     setIsDragging(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      processFiles(e.dataTransfer.files);
+      const dropped = Array.from(e.dataTransfer.files);
+      processFiles(dropped);
     }
   };
 
