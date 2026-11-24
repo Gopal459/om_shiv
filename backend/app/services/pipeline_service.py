@@ -123,7 +123,8 @@ class PipelineService:
             else:
                 norm_f_date = follow_up_date.astimezone(timezone.utc)
 
-            if norm_f_date <= now:
+            # Clock skew tolerance: allow up to 2 minutes in past so current-minute selections are accepted
+            if norm_f_date < (now - timedelta(minutes=2)):
                 raise HTTPException(
                     status_code=HTTP_422,
                     detail="follow_up_date must be a future datetime",
@@ -188,11 +189,26 @@ class PipelineService:
         current_stage = lead.stage
         target_stage = stage or current_stage
 
+        # Ensure lead.follow_up_date is timezone-aware before comparison
+        existing_f_date = None
+        if lead.follow_up_date:
+            existing_f_date = (
+                lead.follow_up_date.replace(tzinfo=timezone.utc)
+                if lead.follow_up_date.tzinfo is None
+                else lead.follow_up_date.astimezone(timezone.utc)
+            )
+
+        effective_follow_up_date = follow_up_date or (
+            existing_f_date
+            if (existing_f_date and existing_f_date > now)
+            else None
+        )
+
         validated_stage, valid_temp, valid_f_date = self.validate_stage_transition(
             current_stage=current_stage,
             target_stage=target_stage,
             temperature=temperature or lead.temperature,
-            follow_up_date=follow_up_date,
+            follow_up_date=effective_follow_up_date,
             lost_reason=lost_reason or lead.lost_reason,
             now=now,
         )

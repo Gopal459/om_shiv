@@ -169,6 +169,13 @@ class LeadStagePatch(BaseModel):
     remark: Optional[str] = None
 
 
+class LeadAssignPatch(BaseModel):
+    assigned_to: Optional[str] = None
+    assign_franch_id: Optional[int] = 0
+    assign_franchstaff_id: Optional[int] = 0
+    remark: Optional[str] = None
+
+
 def normalize_phone(phone: str) -> str:
     cleaned = "".join(filter(str.isdigit, str(phone)))
     if cleaned.startswith("0") and len(cleaned) == 11:
@@ -438,6 +445,60 @@ async def update_lead_stage(
         "lead_status": tbl_lead.lead_status,
         "stage": tbl_lead.stage,
         "lead_remark": tbl_lead.lead_remark,
+    }
+
+
+@router.patch(
+    "/{id}/assign",
+    status_code=status.HTTP_200_OK,
+    summary="Reassign lead to a sales rep or franchisee desk",
+)
+async def reassign_lead(
+    id: str,
+    payload: LeadAssignPatch,
+    db: AsyncSession = Depends(get_db),
+    actor_id: str = Depends(get_actor_from_token),
+) -> Dict[str, Any]:
+    tbl_lead = await find_tbl_lead_by_id_or_unique_id(db, id)
+    modern_lead = await find_lead_by_id_or_lead_id(db, id)
+
+    if not tbl_lead and not modern_lead:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Lead '{id}' not found",
+        )
+
+    now = datetime.now(timezone.utc)
+    if tbl_lead:
+        if payload.assign_franch_id is not None:
+            tbl_lead.assign_franch_id = payload.assign_franch_id
+            tbl_lead.assignfranchisee_date = now
+        if payload.assign_franchstaff_id is not None:
+            tbl_lead.assign_franchstaff_id = payload.assign_franchstaff_id
+            tbl_lead.assignfranchiseestaff_date = now
+        if payload.remark:
+            tbl_lead.lead_remark = payload.remark
+
+    if modern_lead:
+        modern_lead.assigned_to = payload.assigned_to
+        modern_lead.updated_at = now
+        transfer_act = LeadActivity(
+            lead_id=modern_lead.lead_id,
+            action_type="TRANSFER",
+            outcome="Reassigned",
+            note=payload.remark or f"Reassigned to {payload.assigned_to or 'Om Shiv Central Desk'}",
+            logged_by=actor_id,
+            performed_by=actor_id,
+            created_at=now,
+        )
+        db.add(transfer_act)
+
+    await db.commit()
+    return {
+        "status": "success",
+        "assigned_to": payload.assigned_to,
+        "assign_franch_id": payload.assign_franch_id,
+        "assign_franchstaff_id": payload.assign_franchstaff_id,
     }
 
 

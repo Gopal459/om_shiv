@@ -30,6 +30,7 @@ import {
   UserCheck,
   FileText,
   Check,
+  PhoneCall,
 } from 'lucide-react';
 
 interface LeadDetailProps {
@@ -54,6 +55,7 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [copiedId, setCopiedId] = useState(false);
+  const [copiedMessage, setCopiedMessage] = useState(false);
 
   // Quick Action Modal states
   const [activeModal, setActiveModal] = useState<
@@ -69,9 +71,68 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  // Reassignment state
+  const [selectedAssignee, setSelectedAssignee] = useState('');
+  const [assignRemark, setAssignRemark] = useState('');
+
   // Inline quick note state
   const [inlineNote, setInlineNote] = useState('');
   const [inlineActionType, setInlineActionType] = useState('NOTE');
+
+  // Helper to generate a sensible future follow-up default (Tomorrow 10:00 AM)
+  const getDefaultFollowUpDate = () => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    d.setHours(10, 0, 0, 0);
+    // Format to YYYY-MM-DDTHH:mm
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
+  const setPresetDate = (type: '2hours' | 'tomorrow' | '2days' | 'nextweek') => {
+    const d = new Date();
+    if (type === '2hours') {
+      d.setHours(d.getHours() + 2);
+    } else if (type === 'tomorrow') {
+      d.setDate(d.getDate() + 1);
+      d.setHours(10, 0, 0, 0);
+    } else if (type === '2days') {
+      d.setDate(d.getDate() + 2);
+      d.setHours(10, 0, 0, 0);
+    } else if (type === 'nextweek') {
+      d.setDate(d.getDate() + 7);
+      d.setHours(10, 0, 0, 0);
+    }
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    setFollowUpDate(`${year}-${month}-${day}T${hours}:${minutes}`);
+    setError('');
+  };
+
+  const openActionModal = (type: 'CALL' | 'FOLLOWUP' | 'STATUS' | 'ASSIGN' | 'PROPERTY' | 'SHARE' | 'HISTORY') => {
+    setError('');
+    setSuccess('');
+    setActiveModal(type);
+
+    if (type === 'CALL') {
+      setActionType('CALL');
+      setOutcome('Connected');
+      if (!followUpDate) setFollowUpDate(getDefaultFollowUpDate());
+    } else if (type === 'FOLLOWUP') {
+      setActionType('FOLLOW_UP');
+      if (!followUpDate) setFollowUpDate(getDefaultFollowUpDate());
+    } else if (type === 'ASSIGN') {
+      setSelectedAssignee(lead?.assigned_to || '');
+      setAssignRemark('');
+    }
+  };
 
   const fetchLead = async (isSilent = false) => {
     if (!isSilent) setLoading(true);
@@ -86,6 +147,7 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
         setLead(data);
         setSelectedStage(data.stage || 'NEW');
         if (data.temperature) setTemperature(data.temperature);
+        if (data.assigned_to) setSelectedAssignee(data.assigned_to);
       } else {
         setError('Lead profile not found in database');
       }
@@ -129,6 +191,17 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
     if (e) e.preventDefault();
     setError('');
     setSuccess('');
+
+    // Client-side validation: ensure follow-up date is in the future
+    if (followUpDate && !isInline) {
+      const selectedTime = new Date(followUpDate).getTime();
+      const minAllowed = Date.now() - 2 * 60 * 1000; // 2 min grace window
+      if (selectedTime < minAllowed) {
+        setError('Please select a future date & time for the follow-up (e.g. Tomorrow at 10:00 AM)');
+        return;
+      }
+    }
+
     setSubmitting(true);
 
     try {
@@ -138,14 +211,12 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
             action_type: inlineActionType,
             outcome: 'Note Added',
             note: inlineNote,
-            stage: selectedStage,
             temperature,
           }
         : {
             action_type: actionType,
             outcome,
-            note,
-            stage: selectedStage,
+            note: note || `Logged ${actionType} interaction`,
             temperature,
             follow_up_date: followUpDate ? new Date(followUpDate).toISOString() : null,
           };
@@ -206,6 +277,39 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
       fetchLead(true);
     } catch (err: any) {
       setError(err.message || 'Error updating stage');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleAssignSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+    setSubmitting(true);
+    try {
+      const token = localStorage.getItem('access_token');
+      const res = await fetch(`/v1/leads/${leadId}/assign`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          assigned_to: selectedAssignee,
+          remark: assignRemark || `Reassigned lead to ${selectedAssignee || 'Om Shiv Central Desk'}`,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.detail || 'Failed to reassign lead');
+      }
+      setSuccess(`Lead reassigned to ${selectedAssignee || 'Om Shiv Central Desk'} successfully!`);
+      setActiveModal(null);
+      setAssignRemark('');
+      fetchLead(true);
+    } catch (err: any) {
+      setError(err.message || 'Error reassigning lead');
     } finally {
       setSubmitting(false);
     }
@@ -292,7 +396,7 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
             onClick={() => fetchLead(true)}
             disabled={refreshing}
             title="Refresh from DB"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white text-xs font-semibold shadow-xs transition-all"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white text-xs font-semibold shadow-xs transition-all cursor-pointer"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin text-emerald-500' : ''}`} />
             <span>{refreshing ? 'Syncing...' : 'Live Sync'}</span>
@@ -312,7 +416,7 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
             <CheckCircle2 className="w-4 h-4 text-emerald-600" />
             <span>{success}</span>
           </div>
-          <button onClick={() => setSuccess('')} className="hover:opacity-75">
+          <button onClick={() => setSuccess('')} className="hover:opacity-75 cursor-pointer">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -324,7 +428,7 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
             <AlertCircle className="w-4 h-4 text-rose-600" />
             <span>{error}</span>
           </div>
-          <button onClick={() => setError('')} className="hover:opacity-75">
+          <button onClick={() => setError('')} className="hover:opacity-75 cursor-pointer">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -463,11 +567,8 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
             {/* 1. Call */}
             <button
               type="button"
-              onClick={() => {
-                setActionType('CALL');
-                setActiveModal('CALL');
-              }}
-              className="group flex items-center justify-center gap-2 px-3 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md shadow-indigo-950/40 transition-all hover:scale-[1.02] active:scale-[0.98]"
+              onClick={() => openActionModal('CALL')}
+              className="group flex items-center justify-center gap-2 px-3 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md shadow-indigo-950/40 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
             >
               <Phone className="w-4 h-4 transition-transform group-hover:rotate-12" />
               <span>Call / Log</span>
@@ -476,8 +577,8 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
             {/* 2. WhatsApp Direct */}
             <button
               type="button"
-              onClick={() => setActiveModal('SHARE')}
-              className="group flex items-center justify-center gap-2 px-3 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-950/40 transition-all hover:scale-[1.02] active:scale-[0.98]"
+              onClick={() => openActionModal('SHARE')}
+              className="group flex items-center justify-center gap-2 px-3 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-950/40 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
             >
               <MessageSquare className="w-4 h-4 transition-transform group-hover:scale-110" />
               <span>WhatsApp</span>
@@ -486,11 +587,8 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
             {/* 3. Follow-up */}
             <button
               type="button"
-              onClick={() => {
-                setActionType('FOLLOW_UP');
-                setActiveModal('FOLLOWUP');
-              }}
-              className="group flex items-center justify-center gap-2 px-3 py-2.5 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-md shadow-rose-950/40 transition-all hover:scale-[1.02] active:scale-[0.98]"
+              onClick={() => openActionModal('FOLLOWUP')}
+              className="group flex items-center justify-center gap-2 px-3 py-2.5 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-md shadow-rose-950/40 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
             >
               <Clock className="w-4 h-4 transition-transform group-hover:scale-110" />
               <span>Follow-up</span>
@@ -499,8 +597,8 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
             {/* 4. Stage Switcher */}
             <button
               type="button"
-              onClick={() => setActiveModal('STATUS')}
-              className="group flex items-center justify-center gap-2 px-3 py-2.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md shadow-amber-950/40 transition-all hover:scale-[1.02] active:scale-[0.98]"
+              onClick={() => openActionModal('STATUS')}
+              className="group flex items-center justify-center gap-2 px-3 py-2.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md shadow-amber-950/40 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
             >
               <Sliders className="w-4 h-4 transition-transform group-hover:rotate-45" />
               <span>Set Stage</span>
@@ -509,8 +607,8 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
             {/* 5. Reassign */}
             <button
               type="button"
-              onClick={() => setActiveModal('ASSIGN')}
-              className="group flex items-center justify-center gap-2 px-3 py-2.5 rounded-2xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-md shadow-purple-950/40 transition-all hover:scale-[1.02] active:scale-[0.98]"
+              onClick={() => openActionModal('ASSIGN')}
+              className="group flex items-center justify-center gap-2 px-3 py-2.5 rounded-2xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-md shadow-purple-950/40 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
             >
               <Shuffle className="w-4 h-4 transition-transform group-hover:scale-110" />
               <span>Reassign</span>
@@ -519,8 +617,8 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
             {/* 6. Property */}
             <button
               type="button"
-              onClick={() => setActiveModal('PROPERTY')}
-              className="group flex items-center justify-center gap-2 px-3 py-2.5 rounded-2xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs shadow-md shadow-sky-950/40 transition-all hover:scale-[1.02] active:scale-[0.98]"
+              onClick={() => openActionModal('PROPERTY')}
+              className="group flex items-center justify-center gap-2 px-3 py-2.5 rounded-2xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs shadow-md shadow-sky-950/40 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
             >
               <Home className="w-4 h-4 transition-transform group-hover:scale-110" />
               <span>Property</span>
@@ -529,8 +627,8 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
             {/* 7. History */}
             <button
               type="button"
-              onClick={() => setActiveModal('HISTORY')}
-              className="group flex items-center justify-center gap-2 px-3 py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs border border-white/10 shadow-md transition-all hover:scale-[1.02] active:scale-[0.98]"
+              onClick={() => openActionModal('HISTORY')}
+              className="group flex items-center justify-center gap-2 px-3 py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs border border-white/10 shadow-md transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
             >
               <History className="w-4 h-4 transition-transform group-hover:-rotate-45" />
               <span>History ({lead.activities?.length || 0})</span>
@@ -638,8 +736,8 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
 
           <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
             <button
-              onClick={() => setActiveModal('CALL')}
-              className="w-full py-2 rounded-xl bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold transition-colors flex items-center justify-center gap-1.5"
+              onClick={() => openActionModal('CALL')}
+              className="w-full py-2 rounded-xl bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <Phone className="w-3.5 h-3.5 text-indigo-500" />
               <span>Initiate Call Log</span>
@@ -738,8 +836,8 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
 
           <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
             <button
-              onClick={() => setActiveModal('PROPERTY')}
-              className="w-full py-2 rounded-xl bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold transition-colors flex items-center justify-center gap-1.5"
+              onClick={() => openActionModal('PROPERTY')}
+              className="w-full py-2 rounded-xl bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <Home className="w-3.5 h-3.5 text-sky-500" />
               <span>View Property Dossier</span>
@@ -819,8 +917,8 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
 
           <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
             <button
-              onClick={() => setActiveModal('FOLLOWUP')}
-              className="w-full py-2 rounded-xl bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold transition-colors flex items-center justify-center gap-1.5"
+              onClick={() => openActionModal('FOLLOWUP')}
+              className="w-full py-2 rounded-xl bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <Calendar className="w-3.5 h-3.5 text-rose-500" />
               <span>Reschedule Follow-up</span>
@@ -843,8 +941,8 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
           </div>
 
           <button
-            onClick={() => setActiveModal('CALL')}
-            className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-xs transition-colors"
+            onClick={() => openActionModal('CALL')}
+            className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
           >
             <Phone className="w-3.5 h-3.5" />
             <span>Log Call Event</span>
@@ -958,7 +1056,7 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
               </h3>
               <button
                 onClick={() => setActiveModal(null)}
-                className="p-1 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                className="p-1 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -977,7 +1075,7 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
                       type="button"
                       onClick={() => handleStagePatch(st.value)}
                       disabled={submitting}
-                      className={`w-full p-3 rounded-2xl border text-left font-bold transition-all flex items-center justify-between ${
+                      className={`w-full p-3 rounded-2xl border text-left font-bold transition-all flex items-center justify-between cursor-pointer ${
                         selectedStage === st.value
                           ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300'
                           : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 text-slate-700 dark:text-slate-300'
@@ -994,22 +1092,42 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
                 <p className="text-slate-600 dark:text-slate-300">
                   Send property recommendation and inquiry confirmation directly to customer mobile on WhatsApp:
                 </p>
-                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 font-mono text-xs text-slate-700 dark:text-slate-300">
-                  Hello {customerName}, this is Om Shiv Properties regarding your inquiry for{' '}
-                  {propertyAddress || `${leadType} Property`}. We have selected verified properties matching your budget ({formattedDealPrice}).
+                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 font-mono text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
+                  {`Hello ${customerName}, this is Om Shiv Properties regarding your inquiry for ${
+                    propertyAddress || `${leadType} Property`
+                  }. We have selected verified properties matching your budget (${formattedDealPrice}).`}
                 </div>
                 {phone ? (
-                  <a
-                    href={`https://wa.me/91${phone}?text=${encodeURIComponent(
-                      `Hello ${customerName}, this is Om Shiv Properties regarding your inquiry for ${propertyAddress || `${leadType} Property`}. We have selected verified properties matching your budget (${formattedDealPrice}).`
-                    )}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-emerald-950/30 transition-all"
-                  >
-                    <MessageSquare className="w-4 h-4" />
-                    <span>Launch WhatsApp Web / App</span>
-                  </a>
+                  <div className="space-y-2">
+                    <a
+                      href={`https://wa.me/91${phone}?text=${encodeURIComponent(
+                        `Hello ${customerName}, this is Om Shiv Properties regarding your inquiry for ${
+                          propertyAddress || `${leadType} Property`
+                        }. We have selected verified properties matching your budget (${formattedDealPrice}).`
+                      )}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-emerald-950/30 transition-all cursor-pointer"
+                    >
+                      <MessageSquare className="w-4 h-4" />
+                      <span>Launch WhatsApp Web / App</span>
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const msg = `Hello ${customerName}, this is Om Shiv Properties regarding your inquiry for ${
+                          propertyAddress || `${leadType} Property`
+                        }. We have selected verified properties matching your budget (${formattedDealPrice}).`;
+                        navigator.clipboard.writeText(msg);
+                        setCopiedMessage(true);
+                        setTimeout(() => setCopiedMessage(false), 2000);
+                      }}
+                      className="w-full py-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      {copiedMessage ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
+                      <span>{copiedMessage ? 'Message Copied!' : 'Copy Message Text'}</span>
+                    </button>
+                  </div>
                 ) : (
                   <p className="text-rose-500 font-bold">No valid mobile number available for WhatsApp outreach.</p>
                 )}
@@ -1022,7 +1140,7 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
                     {propertyCode || 'Unassigned / Direct Inbound Inquiry'}
                   </p>
                   <p className="text-slate-600 dark:text-slate-300 font-medium">
-                    {propertyAddress || 'Customer has not linked a specific property code; general requirement.'}
+                    {propertyAddress || 'Customer has not linked a specific property code; general requirement in Alwar.'}
                   </p>
                   <div className="pt-2 flex items-center gap-3">
                     <span className="font-bold text-emerald-600 dark:text-emerald-400">{formattedDealPrice}</span>
@@ -1035,14 +1153,14 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
                   <button
                     type="button"
                     onClick={() => setActiveModal(null)}
-                    className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold"
+                    className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold cursor-pointer"
                   >
                     Close
                   </button>
                 </div>
               </div>
             ) : activeModal === 'ASSIGN' ? (
-              <div className="space-y-4 text-xs">
+              <form onSubmit={handleAssignSubmit} className="space-y-4 text-xs">
                 <p className="text-slate-600 dark:text-slate-300">
                   Reassign lead to dedicated franchisee or sales telecaller desk:
                 </p>
@@ -1051,35 +1169,49 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
                     Select Sales Rep / Franchisee
                   </label>
                   <select
-                    defaultValue={lead.assigned_to || ''}
-                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                    value={selectedAssignee}
+                    onChange={(e) => setSelectedAssignee(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                   >
                     <option value="">Om Shiv Central Desk (Unassigned)</option>
-                    <option value="EMP-001">Super Admin (Executive)</option>
+                    <option value="EMP-001">Super Admin (Executive Desk)</option>
                     <option value="EMP-002">Rahul Sharma (Senior Sales Telecaller)</option>
+                    <option value="EMP-003">Pooja Verma (Verification Officer)</option>
                     <option value="FRANCH-001">Alwar Franchisee Desk</option>
+                    <option value="FRANCH-002">Jaipur Franchisee Desk</option>
                   </select>
                 </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Transfer Note / Reason (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={assignRemark}
+                    onChange={(e) => setAssignRemark(e.target.value)}
+                    placeholder="Enter reason for assignment / instructions..."
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                  />
+                </div>
+
                 <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
                   <button
                     type="button"
                     onClick={() => setActiveModal(null)}
-                    className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300"
+                    className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
-                    type="button"
-                    onClick={() => {
-                      setSuccess('Lead assigned successfully!');
-                      setActiveModal(null);
-                    }}
-                    className="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold"
+                    type="submit"
+                    disabled={submitting}
+                    className="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold cursor-pointer transition-colors"
                   >
-                    Confirm Reassignment
+                    {submitting ? 'Reassigning...' : 'Confirm Reassignment'}
                   </button>
                 </div>
-              </div>
+              </form>
             ) : activeModal === 'HISTORY' ? (
               <div className="space-y-3 max-h-96 overflow-y-auto custom-scrollbar text-xs">
                 {lead.activities && lead.activities.length > 0 ? (
@@ -1107,32 +1239,95 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
               /* CALL & FOLLOWUP FORM */
               <form onSubmit={(e) => handleLogAction(e, false)} className="space-y-4 text-xs">
                 {activeModal === 'CALL' && (
-                  <div>
-                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      Call Discussion Outcome
-                    </label>
-                    <select
-                      value={outcome}
-                      onChange={(e) => setOutcome(e.target.value)}
-                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-                    >
-                      <option value="Connected">Connected & Spoke with Customer</option>
-                      <option value="Site Visit Planned">Site Visit Planned</option>
-                      <option value="Ringing">Ringing / Unanswered</option>
-                      <option value="Call Back Later">Call Back Later / Busy</option>
-                      <option value="Not Interested">Not Interested / Disqualified</option>
-                    </select>
-                  </div>
+                  <>
+                    {/* 1-Click Dial Banner */}
+                    {phone && (
+                      <div className="p-3 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800/80 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <PhoneCall className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                          <div>
+                            <span className="text-[10px] font-bold text-slate-500 uppercase">Customer Number</span>
+                            <p className="font-mono font-bold text-indigo-900 dark:text-indigo-200 text-xs">{displayPhone}</p>
+                          </div>
+                        </div>
+                        <a
+                          href={`tel:${phone}`}
+                          className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs transition-colors"
+                        >
+                          Dial Now
+                        </a>
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                        Call Discussion Outcome
+                      </label>
+                      <select
+                        value={outcome}
+                        onChange={(e) => setOutcome(e.target.value)}
+                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                      >
+                        <option value="Connected">Connected & Spoke with Customer</option>
+                        <option value="Site Visit Planned">Site Visit Planned</option>
+                        <option value="Ringing">Ringing / Unanswered</option>
+                        <option value="Call Back Later">Call Back Later / Busy</option>
+                        <option value="Not Interested">Not Interested / Disqualified</option>
+                      </select>
+                    </div>
+                  </>
                 )}
 
+                {/* Follow-up Date Time with Quick Preset Chips */}
                 <div>
-                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    Scheduled Follow-up Date & Time
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block font-bold text-slate-700 dark:text-slate-300">
+                      Scheduled Follow-up Date & Time
+                    </label>
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">Future Datetime</span>
+                  </div>
+
+                  {/* 1-Click Preset Buttons */}
+                  <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                    <span className="text-[10px] font-bold text-slate-400">Presets:</span>
+                    <button
+                      type="button"
+                      onClick={() => setPresetDate('2hours')}
+                      className="px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-[10px] font-bold text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
+                    >
+                      +2 Hours
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPresetDate('tomorrow')}
+                      className="px-2 py-0.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 text-[10px] font-bold text-emerald-700 dark:text-emerald-300 transition-colors cursor-pointer"
+                    >
+                      Tomorrow 10 AM
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPresetDate('2days')}
+                      className="px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-[10px] font-bold text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
+                    >
+                      In 2 Days
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPresetDate('nextweek')}
+                      className="px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-[10px] font-bold text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
+                    >
+                      Next Week
+                    </button>
+                  </div>
+
                   <input
                     type="datetime-local"
                     value={followUpDate}
-                    onChange={(e) => setFollowUpDate(e.target.value)}
+                    min={new Date(Date.now() - 60000).toISOString().slice(0, 16)}
+                    onChange={(e) => {
+                      setFollowUpDate(e.target.value);
+                      setError('');
+                    }}
                     className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                   />
                 </div>
@@ -1145,10 +1340,10 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
                     <button
                       type="button"
                       onClick={() => setTemperature('HOT')}
-                      className={`py-2 rounded-xl border font-bold text-xs flex items-center justify-center gap-1.5 ${
+                      className={`py-2 rounded-xl border font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all ${
                         temperature === 'HOT'
-                          ? 'bg-rose-500 text-white border-rose-500'
-                          : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
+                          ? 'bg-rose-500 text-white border-rose-500 shadow-sm'
+                          : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50'
                       }`}
                     >
                       <Flame className="w-3.5 h-3.5" />
@@ -1157,10 +1352,10 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
                     <button
                       type="button"
                       onClick={() => setTemperature('WARM')}
-                      className={`py-2 rounded-xl border font-bold text-xs flex items-center justify-center gap-1.5 ${
+                      className={`py-2 rounded-xl border font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all ${
                         temperature === 'WARM'
-                          ? 'bg-amber-500 text-slate-950 border-amber-500'
-                          : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
+                          ? 'bg-amber-500 text-slate-950 border-amber-500 shadow-sm'
+                          : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50'
                       }`}
                     >
                       <Sun className="w-3.5 h-3.5" />
@@ -1169,10 +1364,10 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
                     <button
                       type="button"
                       onClick={() => setTemperature('COLD')}
-                      className={`py-2 rounded-xl border font-bold text-xs flex items-center justify-center gap-1.5 ${
+                      className={`py-2 rounded-xl border font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all ${
                         temperature === 'COLD'
-                          ? 'bg-sky-500 text-white border-sky-500'
-                          : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
+                          ? 'bg-sky-500 text-white border-sky-500 shadow-sm'
+                          : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50'
                       }`}
                     >
                       <Snowflake className="w-3.5 h-3.5" />
@@ -1198,14 +1393,14 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
                   <button
                     type="button"
                     onClick={() => setActiveModal(null)}
-                    className="px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300"
+                    className="px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition-colors shadow-xs"
+                    className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition-colors shadow-xs cursor-pointer"
                   >
                     {submitting ? 'Saving...' : 'Save & Record Action'}
                   </button>
