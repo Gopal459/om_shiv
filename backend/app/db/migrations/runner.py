@@ -15,6 +15,7 @@ MIGRATION_STEPS = [
     "app.db.migrations.0005_tbl_leads_schema",
     "app.db.migrations.0006_tbl_property_schema",
     "app.db.migrations.0007_tbl_property_amenities_column",
+    "app.db.migrations.0008_tbl_blog_schema",
 ]
 
 
