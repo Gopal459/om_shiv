@@ -13,6 +13,7 @@ import SettingsEditor from './pages/SettingsEditor';
 import ModuleHub from './pages/ModuleHub';
 import PropertyHub from './pages/PropertyHub';
 import PropertyForm from './pages/PropertyForm';
+import BlogManager from './pages/BlogManager';
 import { ThemeProvider } from './context/ThemeContext';
 
 const LeadDetailPage: React.FC = () => {
@@ -170,26 +171,7 @@ const AppContent: React.FC = () => {
             />
           }
         />
-        <Route
-          path="/blogs"
-          element={
-            <ModuleHub
-              title="Blog & Real Estate Market Insights"
-              subtitle="Publish market reports, property investment guides, and Jaipur locality development news."
-              badge="Editorial & Media"
-              stats={[
-                { label: 'Published Articles', value: 24, change: 'SEO Indexed' },
-                { label: 'Market Insights', value: 8, change: 'Quarterly reports' },
-                { label: 'Total Views', value: '18.4K', change: '+22% organic traffic' },
-                { label: 'Drafts in Review', value: 3, change: 'Awaiting publish' },
-              ]}
-              shortcuts={[
-                { label: 'Review Recent Leads Inbound', desc: 'Track leads originating from blog insights', path: '/leads' },
-                { label: 'System Settings & Audit Log', desc: 'View editorial audit trails and timestamps', path: '/settings' },
-              ]}
-            />
-          }
-        />
+        <Route path="/blogs" element={<BlogManager />} />
         <Route
           path="/users"
           element={
