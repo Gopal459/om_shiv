@@ -152,16 +152,16 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
         { label: 'Request Live Property', path: '/properties?tab=request_live' },
       ],
     },
-    {
-      id: 'HOMEPAGE',
-      path: '/homepage',
-      label: 'Homepage',
-      icon: Home,
-      subItems: [
-        { label: 'Hero Banners', path: '/homepage?tab=banners' },
-        { label: 'Featured Projects', path: '/homepage?tab=featured' },
-      ],
-    },
+    // {
+    //   id: 'HOMEPAGE',
+    //   path: '/homepage',
+    //   label: 'Homepage',
+    //   icon: Home,
+    //   subItems: [
+    //     { label: 'Hero Banners', path: '/homepage?tab=banners' },
+    //     { label: 'Featured Projects', path: '/homepage?tab=featured' },
+    //   ],
+    // },
     {
       id: 'STAFF',
       path: '/staff',
@@ -186,25 +186,25 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
       ],
     },
     {
-      id: 'PROPIRA_USERS',
+      id: 'USERS',
       path: '/users',
-      label: 'Propira Users',
+      label: 'Users',
       icon: UserCheck,
       subItems: [
         { label: 'Registered Buyers', path: '/users?type=buyers' },
         { label: 'Property Owners & Sellers', path: '/users?type=owners' },
       ],
     },
-    {
-      id: 'PAGES',
-      path: '/pages',
-      label: 'Pages',
-      icon: Layers,
-      subItems: [
-        { label: 'CMS Static Pages', path: '/pages' },
-        { label: 'Legal & Policies', path: '/pages?type=legal' },
-      ],
-    },
+    // {
+    //   id: 'PAGES',
+    //   path: '/pages',
+    //   label: 'Pages',
+    //   icon: Layers,
+    //   subItems: [
+    //     { label: 'CMS Static Pages', path: '/pages' },
+    //     { label: 'Legal & Policies', path: '/pages?type=legal' },
+    //   ],
+    // },
     {
       id: 'FRANCHISE',
       path: '/franchise',
@@ -221,7 +221,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
       label: 'Settings & Schema',
       icon: Settings,
       subItems: [
-        { label: '92 System Settings & SLAs', path: '/settings' },
+        { label: 'System Settings', path: '/settings' },
         { label: 'Dynamic Property Masters', path: '/masters' },
       ],
     },
@@ -566,16 +566,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
           {/* Right: Live Backend Indicator & Light/Dark Theme Switcher */}
           <div className="flex items-center gap-3">
             {/* Live Backend Active Pill */}
-            <div
-              className={`hidden md:flex items-center gap-2 text-[11px] font-semibold px-3 py-1.5 rounded-full border shadow-2xs ${
-                isDark
-                  ? 'bg-slate-900/90 border-slate-800 text-slate-300'
-                  : 'bg-emerald-50/80 border-emerald-200 text-emerald-800'
-              }`}
-            >
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span>FastAPI Backend Active (Port 8000)</span>
-            </div>
+            
 
             {/* LIGHT / DARK MODE TOGGLE BUTTON */}
             <button
