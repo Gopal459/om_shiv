@@ -538,8 +538,8 @@ async def get_my_work_queue(
     other: List[Lead] = []
 
     for l in leads:
-        # Sort activities descending
-        l.activities.sort(key=lambda a: a.created_at, reverse=True)
+        # Sort activities descending by created_at and id
+        l.activities.sort(key=lambda a: (a.created_at, a.id or 0), reverse=True)
 
         if l.follow_up_date and l.follow_up_date < now:
             overdue.append(l)
@@ -604,7 +604,7 @@ async def get_my_leads(
     res = await db.execute(stmt)
     leads = res.scalars().all()
     for l in leads:
-        l.activities.sort(key=lambda a: a.created_at, reverse=True)
+        l.activities.sort(key=lambda a: (a.created_at, a.id or 0), reverse=True)
     return leads
 
 
@@ -721,7 +721,7 @@ async def get_lead_detail(
         )
 
     if lead:
-        lead.activities.sort(key=lambda a: a.created_at, reverse=True)
+        lead.activities.sort(key=lambda a: (a.created_at, a.id or 0), reverse=True)
 
     return build_lead_detail_dict(lead, tbl_lead)
 
@@ -782,7 +782,7 @@ async def log_sales_action(
     fresh_lead = await find_lead_by_id_or_lead_id(db, lead.lead_id)
     target_lead = fresh_lead or updated_lead
     if target_lead:
-        target_lead.activities.sort(key=lambda a: a.created_at, reverse=True)
+        target_lead.activities.sort(key=lambda a: (a.created_at, a.id or 0), reverse=True)
     return build_lead_detail_dict(target_lead, tbl_lead)
 
 
