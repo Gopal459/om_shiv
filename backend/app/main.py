@@ -23,6 +23,7 @@ from app.api.v1.endpoints import (
     properties,
     property_verification,
     owner_operations,
+    blogs,
 )
 
 logger = logging.getLogger(__name__)
@@ -64,6 +65,7 @@ app.add_middleware(
 
 # Mount Static Files & Media Uploads
 os.makedirs("uploads/properties", exist_ok=True)
+os.makedirs("uploads/blogs", exist_ok=True)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # Mount API Routers
@@ -77,6 +79,7 @@ app.include_router(property_master.router, prefix="/v1", tags=["property-master"
 app.include_router(properties.router, prefix="/v1", tags=["properties"])
 app.include_router(property_verification.router, prefix="/v1", tags=["property-verification"])
 app.include_router(owner_operations.router, prefix="/v1", tags=["owner-operations"])
+app.include_router(blogs.router, prefix="/v1/blogs", tags=["blogs"])
 
 
 @app.get("/", status_code=status.HTTP_200_OK, tags=["root"])
