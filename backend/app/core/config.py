@@ -32,5 +32,10 @@ class Settings(BaseSettings):
     FAST2SMS_API_KEY: str = os.environ.get("FAST2SMS_API_KEY", "")
     MSG91_AUTH_KEY: str = os.environ.get("MSG91_AUTH_KEY", "")
 
+    # AI / LLM Blog Generation
+    OPENAI_API_KEY: str = os.environ.get("OPENAI_API_KEY", "")
+    OPENAI_MODEL: str = os.environ.get("OPENAI_MODEL", "gpt-4o")
+    OPENAI_BASE_URL: str = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1")
+
 
 settings = Settings()

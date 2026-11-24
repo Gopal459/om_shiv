@@ -27,6 +27,15 @@ import {
   Check,
   RefreshCw,
   Sparkles,
+  Bot,
+  Wand2,
+  Cpu,
+  Key,
+  ChevronDown,
+  ChevronUp,
+  Copy,
+  Sliders,
+  FileText,
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import RichTextEditor from '../components/RichTextEditor';
@@ -173,6 +182,30 @@ export const BlogManager: React.FC = () => {
     setToastMessage({ text, type });
     setTimeout(() => setToastMessage(null), 4000);
   };
+
+  // AI Agent Modal State
+  const [showAIModal, setShowAIModal] = useState(false);
+  const [aiTopic, setAiTopic] = useState('');
+  const [aiTone, setAiTone] = useState('Professional');
+  const [aiAudience, setAiAudience] = useState('Property Investors & Homebuyers');
+  const [aiModel, setAiModel] = useState('');
+  const [aiApiKey, setAiApiKey] = useState('');
+  const [showAdvancedAISettings, setShowAdvancedAISettings] = useState(false);
+  const [isGeneratingAI, setIsGeneratingAI] = useState(false);
+  const [isQuickSavingDraft, setIsQuickSavingDraft] = useState(false);
+  const [aiResult, setAiResult] = useState<{
+    blog_title: string;
+    slug: string;
+    short_description: string;
+    description: string;
+    meta_title: string;
+    meta_keyword: string;
+    meta_description: string;
+    suggested_tags?: string[];
+    suggested_category?: string;
+    model_used?: string;
+    tokens_used?: number;
+  } | null>(null);
 
   // 1. Fetch Masters
   const fetchMasters = useCallback(async () => {
@@ -570,6 +603,139 @@ export const BlogManager: React.FC = () => {
     }
   };
 
+  // AI Blog Generator Handlers
+  const handleAIGenerate = async () => {
+    if (!aiTopic.trim()) {
+      showToast('Please enter an article topic or key theme for the AI Agent.', 'error');
+      return;
+    }
+    setIsGeneratingAI(true);
+    try {
+      const res = await fetch('/v1/blogs/ai-generate', {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({
+          topic: aiTopic.trim(),
+          tone: aiTone,
+          target_audience: aiAudience,
+          model: aiModel.trim() || undefined,
+          api_key: aiApiKey.trim() || undefined,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || 'Failed to generate AI blog article');
+      }
+      const data = await res.json();
+      setAiResult(data);
+      showToast('AI Blog Article drafted successfully!', 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Error running AI blog generation', 'error');
+    } finally {
+      setIsGeneratingAI(false);
+    }
+  };
+
+  const handleApplyAIResultToEditor = () => {
+    if (!aiResult) return;
+    setTitleEn(aiResult.blog_title);
+    setSlug(aiResult.slug);
+    setAutoSlug(false);
+    setShortDesc(aiResult.short_description);
+    setBodyEn(aiResult.description);
+    setMetaTitle(aiResult.meta_title);
+    setMetaKeyword(aiResult.meta_keyword);
+    setMetaDescription(aiResult.meta_description);
+
+    // Preselect suggested category if matched or default to first category
+    let catsToSet = [...selectedCatIds];
+    if (aiResult.suggested_category) {
+      const foundCat = categories.find((c) =>
+        c.name.toLowerCase().includes(aiResult.suggested_category!.toLowerCase()) ||
+        aiResult.suggested_category!.toLowerCase().includes(c.name.toLowerCase())
+      );
+      if (foundCat && !catsToSet.includes(foundCat.blog_category_id)) {
+        catsToSet.push(foundCat.blog_category_id);
+      }
+    }
+    if (catsToSet.length === 0 && categories.length > 0) {
+      catsToSet = [categories[0].blog_category_id];
+    }
+    setSelectedCatIds(catsToSet);
+
+    // Preselect suggested tags if matched or default to first tag
+    let tagsToSet = [...selectedTagIds];
+    if (aiResult.suggested_tags && aiResult.suggested_tags.length > 0) {
+      aiResult.suggested_tags.forEach((st) => {
+        const found = tags.find((t) => t.name.toLowerCase() === st.toLowerCase());
+        if (found && !tagsToSet.includes(found.blog_tag_id)) {
+          tagsToSet.push(found.blog_tag_id);
+        }
+      });
+    }
+    if (tagsToSet.length === 0 && tags.length > 0) {
+      tagsToSet = [tags[0].blog_tag_id];
+    }
+    setSelectedTagIds(tagsToSet);
+
+    if (authorId === 0 && authors.length > 0) {
+      setAuthorId(authors[0].author_id);
+    }
+
+    setShowAIModal(false);
+    setActiveTab('editor');
+    showToast('Loaded AI article into editor! You can review, refine, and publish.', 'success');
+  };
+
+  const handleQuickSaveAIDraft = async () => {
+    if (!aiResult) return;
+    setIsQuickSavingDraft(true);
+    try {
+      const catId = categories[0]?.blog_category_id || 1;
+      const tagId = tags[0]?.blog_tag_id || 1;
+      const authId = authorId || (authors[0]?.author_id ?? 1);
+
+      const payload = {
+        blog_title: aiResult.blog_title,
+        blog_title_hindi: null,
+        slug: aiResult.slug,
+        author_name: authId,
+        category_ids: [catId],
+        tag_ids: [tagId],
+        short_description: aiResult.short_description,
+        description: aiResult.description,
+        description_hindi: null,
+        image: '',
+        meta_title: aiResult.meta_title,
+        meta_keyword: aiResult.meta_keyword,
+        meta_description: aiResult.meta_description,
+        status: 0, // Draft
+        feature: 0,
+        homepage_status: 0,
+      };
+
+      const res = await fetch('/v1/blogs', {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        showToast('Article saved directly as Draft in database!', 'success');
+        setShowAIModal(false);
+        setActiveTab('articles');
+        fetchArticles();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        showToast(err.detail || 'Failed to save AI draft', 'error');
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Error saving draft', 'error');
+    } finally {
+      setIsQuickSavingDraft(false);
+    }
+  };
+
   return (
     <div className={`min-h-screen p-6 transition-colors duration-200 ${isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'}`}>
       {/* Toast Alert */}
@@ -609,6 +775,16 @@ export const BlogManager: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => {
+                setAiResult(null);
+                setShowAIModal(true);
+              }}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 text-white font-medium text-sm shadow-md hover:shadow-indigo-500/25 hover:from-violet-700 hover:to-indigo-700 transition"
+            >
+              <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
+              AI Blog Agent
+            </button>
             <button
               onClick={() => {
                 handleResetEditor();
@@ -958,6 +1134,18 @@ export const BlogManager: React.FC = () => {
               {editingBlogId ? `Edit Blog Article #${editingBlogId}` : 'Create New Dynamic Bilingual Article'}
             </h2>
             <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setAiResult(null);
+                  if (titleEn.trim()) setAiTopic(titleEn.trim());
+                  setShowAIModal(true);
+                }}
+                className="flex items-center gap-2 px-4 py-2 text-sm rounded-lg bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 font-medium hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition border border-indigo-200 dark:border-indigo-800"
+              >
+                <Sparkles className="w-4 h-4 text-indigo-500 animate-pulse" />
+                Auto-fill with AI Agent
+              </button>
               <button
                 onClick={handleResetEditor}
                 className="px-4 py-2 text-sm rounded-lg border hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition"
@@ -1698,6 +1886,249 @@ export const BlogManager: React.FC = () => {
                 Save Author
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI Blog Agent Modal */}
+      {showAIModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
+          <div
+            className={`w-full max-w-2xl my-8 p-6 rounded-2xl border shadow-2xl space-y-5 transition-all max-h-[90vh] overflow-y-auto ${
+              isDark ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'
+            }`}
+          >
+            {/* Modal Header */}
+            <div className="flex items-start justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-600 text-white shadow-md">
+                  <Bot className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-bold">Propira AI Blog Generator</h3>
+                    <span className="px-2 py-0.5 text-[11px] font-semibold rounded-full bg-violet-100 text-violet-700 dark:bg-violet-950/70 dark:text-violet-300 flex items-center gap-1">
+                      <Sparkles className="w-3 h-3 text-violet-500" />
+                      OpenAI GPT Agent
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Enter only the article topic or prompt. The AI Agent will draft the complete article, headings, slug & SEO meta tags.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowAIModal(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Prompt Input Form */}
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5 flex items-center justify-between">
+                  <span>Article Topic or Primary Theme *</span>
+                  <span className="text-[11px] font-normal normal-case text-slate-400">Required</span>
+                </label>
+                <textarea
+                  rows={3}
+                  value={aiTopic}
+                  onChange={(e) => setAiTopic(e.target.value)}
+                  placeholder="e.g. Why Alwar Delhi-Mumbai Expressway Corridor is booming for commercial plots in 2026..."
+                  className={`w-full p-3 text-sm rounded-xl border outline-none font-medium focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500 ${
+                    isDark ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-500' : 'bg-slate-50 border-slate-200 text-slate-800 placeholder-slate-400'
+                  }`}
+                />
+              </div>
+
+              {/* Tone & Audience Selection */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+                    Editorial Tone
+                  </label>
+                  <select
+                    value={aiTone}
+                    onChange={(e) => setAiTone(e.target.value)}
+                    className={`w-full px-3 py-2 text-sm rounded-xl border outline-none ${
+                      isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-800'
+                    }`}
+                  >
+                    <option value="Professional">Professional & Authoritative</option>
+                    <option value="Informative & Analytical">Informative & Analytical (Data-Backed)</option>
+                    <option value="Persuasive & Sales-Oriented">Persuasive & Sales-Oriented (High Conversion)</option>
+                    <option value="Conversational & Engaging">Conversational & Engaging Guide</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+                    Target Audience
+                  </label>
+                  <select
+                    value={aiAudience}
+                    onChange={(e) => setAiAudience(e.target.value)}
+                    className={`w-full px-3 py-2 text-sm rounded-xl border outline-none ${
+                      isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-800'
+                    }`}
+                  >
+                    <option value="Property Investors & Homebuyers">Property Investors & Homebuyers</option>
+                    <option value="First-Time Plot Buyers">First-Time Residential Plot Buyers</option>
+                    <option value="Commercial & Warehouse Developers">Commercial & Warehouse Developers</option>
+                    <option value="NRI Investors">NRI (Non-Resident Indian) Investors</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Advanced OpenAI LLM Configuration (Collapsible) */}
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowAdvancedAISettings(!showAdvancedAISettings)}
+                  className="flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                >
+                  <Sliders className="w-3.5 h-3.5" />
+                  <span>Advanced Model & API Key Settings</span>
+                  {showAdvancedAISettings ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                </button>
+
+                {showAdvancedAISettings && (
+                  <div className={`mt-3 p-4 rounded-xl border space-y-3 ${isDark ? 'bg-slate-800/40 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-400 mb-1 flex items-center gap-1">
+                          <Cpu className="w-3 h-3 text-indigo-400" />
+                          Model Name (default: backend .env)
+                        </label>
+                        <input
+                          type="text"
+                          value={aiModel}
+                          onChange={(e) => setAiModel(e.target.value)}
+                          placeholder="e.g. gpt-4o, gpt-4o-mini, gpt-6"
+                          className={`w-full px-3 py-1.5 text-xs rounded-lg border outline-none ${
+                            isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-800'
+                          }`}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-400 mb-1 flex items-center gap-1">
+                          <Key className="w-3 h-3 text-amber-400" />
+                          Custom OpenAI API Key (optional)
+                        </label>
+                        <input
+                          type="password"
+                          value={aiApiKey}
+                          onChange={(e) => setAiApiKey(e.target.value)}
+                          placeholder="sk-... (leave blank to use backend .env)"
+                          className={`w-full px-3 py-1.5 text-xs rounded-lg border outline-none ${
+                            isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-800'
+                          }`}
+                        />
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-slate-400">
+                      Leave blank to use <code className="text-violet-500 font-mono">OPENAI_API_KEY</code> and <code className="text-violet-500 font-mono">OPENAI_MODEL</code> configured in server environment.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAIModal(false)}
+                  className="px-4 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAIGenerate}
+                  disabled={isGeneratingAI || !aiTopic.trim()}
+                  className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white text-xs font-bold rounded-xl shadow-lg shadow-violet-500/25 transition disabled:opacity-50"
+                >
+                  {isGeneratingAI ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>AI Agent is drafting article...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Wand2 className="w-4 h-4 text-amber-300" />
+                      <span>Generate Article with AI</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Generated AI Result Preview */}
+            {aiResult && (
+              <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
+                    <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">Article Generated Successfully</span>
+                    {aiResult.model_used && (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-100 dark:bg-slate-800 text-slate-500">
+                        {aiResult.model_used}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Article Card Preview */}
+                <div className={`p-4 rounded-xl border space-y-2.5 ${isDark ? 'bg-slate-800/60 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Title</span>
+                    <h4 className="text-base font-bold text-slate-900 dark:text-white">{aiResult.blog_title}</h4>
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">URL Slug</span>
+                    <div className="text-xs font-mono text-indigo-500">/blogs/{aiResult.slug}</div>
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Summary</span>
+                    <p className="text-xs text-slate-600 dark:text-slate-300">{aiResult.short_description}</p>
+                  </div>
+                  {aiResult.suggested_tags && aiResult.suggested_tags.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mr-1">Tags:</span>
+                      {aiResult.suggested_tags.map((tg, idx) => (
+                        <span key={idx} className="px-2 py-0.5 rounded text-[10px] font-medium bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400">
+                          #{tg}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* 1-Click Action Buttons */}
+                <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={handleQuickSaveAIDraft}
+                    disabled={isQuickSavingDraft}
+                    className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold transition"
+                  >
+                    {isQuickSavingDraft ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
+                    <span>Direct Save as Draft</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleApplyAIResultToEditor}
+                    className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold shadow-md shadow-emerald-500/20 transition"
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>Load into Rich Text Editor</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

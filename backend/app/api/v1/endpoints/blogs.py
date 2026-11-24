@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.services.blog_service import BlogService
+from app.services.ai_blog_service import AIBlogGeneratorService
 from app.schemas.blog_schemas import (
     BlogCreate,
     BlogUpdate,
@@ -23,6 +24,8 @@ from app.schemas.blog_schemas import (
     BlogAuthorResponse,
     BlogCommentCreate,
     BlogCommentResponse,
+    AIBlogGenerateRequest,
+    AIBlogGenerateResponse,
 )
 
 router = APIRouter()
@@ -64,6 +67,15 @@ def _format_blog_response(blog: Any, categories_map: Dict[int, str] = {}, tags_m
         "created_date": blog.created_date,
         "modified_date": blog.modified_date,
     }
+
+
+# ==================== AI Blog Generator Agent ====================
+@router.post("/ai-generate", response_model=AIBlogGenerateResponse, status_code=status.HTTP_200_OK)
+async def generate_blog_with_ai(
+    req: AIBlogGenerateRequest,
+) -> AIBlogGenerateResponse:
+    """Uses OpenAI LLM to automatically generate a complete real estate blog article with rich HTML content and SEO metadata."""
+    return await AIBlogGeneratorService.generate_blog(req)
 
 
 # ==================== Media Uploads ====================

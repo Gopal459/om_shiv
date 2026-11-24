@@ -206,3 +206,27 @@ class BlogCommentResponse(BaseModel):
     replies: List["BlogCommentResponse"] = []
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# --- AI Blog Generation Schemas ---
+class AIBlogGenerateRequest(BaseModel):
+    topic: str = Field(..., min_length=3, description="Core topic or keyword for article generation")
+    tone: Optional[str] = Field(default="Professional Real Estate Analysis", description="Editorial tone")
+    target_audience: Optional[str] = Field(default="Property Buyers, Investors & NRI Clients", description="Target readership")
+    custom_instructions: Optional[str] = Field(default=None, description="Optional extra directives")
+    model: Optional[str] = Field(default=None, description="OpenAI model override (defaults to env OPENAI_MODEL)")
+    api_key: Optional[str] = Field(default=None, description="Optional OpenAI API key override")
+
+
+class AIBlogGenerateResponse(BaseModel):
+    blog_title: str
+    slug: str
+    short_description: str
+    description: str
+    meta_title: str
+    meta_keyword: str
+    meta_description: str
+    suggested_tags: List[str] = []
+    suggested_category: str = "Market Insights & Trends"
+    model_used: str = "gpt-4o"
+    tokens_used: Optional[int] = 0

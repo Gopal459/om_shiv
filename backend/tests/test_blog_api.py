@@ -145,3 +145,21 @@ async def test_blog_api_complete_suite(auth_client_md: AsyncClient):
     assert threads[0]["name"] == "Anil Goyal"
     assert len(threads[0]["replies"]) >= 1
     assert threads[0]["replies"][0]["name"] == "Propira Team"
+
+    # 14. Test AI Blog Generation Endpoint
+    ai_gen_res = await client.post(
+        "/v1/blogs/ai-generate",
+        json={
+            "topic": "Impact of Delhi-Mumbai Expressway on Alwar plots",
+            "tone": "Professional Real Estate Analysis",
+            "target_audience": "Investors and NRIs",
+        },
+    )
+    assert ai_gen_res.status_code == 200
+    ai_data = ai_gen_res.json()
+    assert "blog_title" in ai_data
+    assert "slug" in ai_data
+    assert "description" in ai_data
+    assert "<h2>" in ai_data["description"]
+    assert "meta_title" in ai_data
+    assert len(ai_data["suggested_tags"]) >= 1
