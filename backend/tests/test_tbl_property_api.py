@@ -144,3 +144,39 @@ async def test_properties_hub_and_status_update(auth_client_md: AsyncClient):
     live_hub = await auth_client_md.get("/v1/properties/hub?tab=verify_live")
     assert live_hub.status_code == 200
     assert any(p["property_id"] == prop_id for p in live_hub.json()["items"])
+
+
+@pytest.mark.asyncio
+async def test_upload_property_image_success(auth_client_md: AsyncClient):
+    """Test uploading a valid property photo (15KB JPEG)."""
+    # Create fake image payload: 15KB JPEG
+    fake_img = b"\xff\xd8\xff" + b"A" * 15000 + b"\xff\xd9"
+    files = {"file": ("test_living_room.jpg", fake_img, "image/jpeg")}
+    
+    resp = await auth_client_md.post("/v1/properties/upload-image", files=files)
+    assert resp.status_code == 201
+    data = resp.json()
+    assert "url" in data
+    assert data["url"].startswith("/uploads/properties/")
+    assert data["size"] > 10000
+
+
+@pytest.mark.asyncio
+async def test_upload_property_image_rejects_under_10kb(auth_client_md: AsyncClient):
+    """Test image smaller than 10KB is rejected with 400."""
+    tiny_img = b"\xff\xd8\xff" + b"A" * 500  # ~500 bytes
+    files = {"file": ("tiny.jpg", tiny_img, "image/jpeg")}
+    resp = await auth_client_md.post("/v1/properties/upload-image", files=files)
+    assert resp.status_code == 400
+    assert "Minimum image size" in resp.text
+
+
+@pytest.mark.asyncio
+async def test_upload_property_image_rejects_invalid_format(auth_client_md: AsyncClient):
+    """Test non-image file is rejected with 400."""
+    fake_doc = b"Hello world text document" * 1000
+    files = {"file": ("document.txt", fake_doc, "text/plain")}
+    resp = await auth_client_md.post("/v1/properties/upload-image", files=files)
+    assert resp.status_code == 400
+    assert "Invalid image format" in resp.text
+

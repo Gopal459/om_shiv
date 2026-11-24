@@ -5,6 +5,7 @@ from typing import Dict, Any
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
 from app.core.config import settings
@@ -60,6 +61,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount Static Files & Media Uploads
+os.makedirs("uploads/properties", exist_ok=True)
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # Mount API Routers
 app.include_router(auth.router, prefix="/v1/auth", tags=["auth"])

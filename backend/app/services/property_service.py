@@ -242,6 +242,7 @@ async def create_tbl_property(
         nearby_departmental=payload.nearby_departmental,
         project_name=payload.project_name,
         description=payload.description,
+        amenities=payload.amenities,
         images=payload.images,
         images_order=payload.images_order,
         video=payload.video,

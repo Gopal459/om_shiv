@@ -54,3 +54,8 @@ build/
 *.swp
 *.swo
 
+# Uploads
+uploads/*
+!uploads/.gitkeep
+
+

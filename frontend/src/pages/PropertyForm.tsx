@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   ArrowLeft,
   Upload,
@@ -36,7 +36,10 @@ import {
   Phone,
   Mail,
   User,
-  CheckCheck,
+  Star,
+  ImagePlus,
+  RefreshCw,
+  Sliders,
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 
@@ -46,6 +49,31 @@ interface PropertyFormProps {
   onBack: () => void;
   onSuccess: (savedProperty: any) => void;
 }
+
+interface DynamicMasterOption {
+  id?: number;
+  code: string;
+  label: string;
+  display_order?: number;
+  applicable_categories?: number[];
+}
+
+// Default fallback amenities with icons
+const DEFAULT_AMENITIES = [
+  { code: 'WATER_SUPPLY', label: 'Water Supply', icon: Droplets, col: 'feature_watersupply' },
+  { code: 'ELECTRICITY', label: 'Electricity Con.', icon: Zap, col: 'feature_electricityconnection' },
+  { code: 'POWER_BACKUP', label: '100% Power Backup', icon: BatteryCharging, col: 'featurepowerbackup' },
+  { code: 'LIFT', label: 'Elevator / Lift', icon: Layers, col: 'feature_lift' },
+  { code: 'PARK', label: 'Park / Green Zone', icon: Trees, col: 'feature_park' },
+  { code: 'OWN_PARKING', label: 'Covered Car Parking', icon: Car, col: 'feature_ownparking' },
+  { code: 'VISITOR_PARKING', label: 'Visitor Parking', icon: Car, col: 'feature_visitparking' },
+  { code: 'INTERCOM', label: 'Intercom Facility', icon: PhoneCall, col: 'feature_intercomfac' },
+  { code: 'CLUB_HOUSE', label: 'Club House / Hall', icon: Building, col: 'feature_clubhosue' },
+  { code: 'SWIMMING_POOL', label: 'Swimming Pool', icon: Waves, col: 'feature_swimming' },
+  { code: 'GYM', label: 'Fitness Gym Center', icon: Dumbbell, col: 'feature_fitness' },
+  { code: 'SECURITY', label: '24x7 Security & CCTV', icon: ShieldCheck, col: 'feature_security' },
+  { code: 'GATED_COMMUNITY', label: 'Gated Township', icon: ShieldCheck, col: 'feature_gatedcomm' },
+];
 
 // Convert numbers to Indian Rupees in words (Lakhs, Crores)
 function numberToIndianWords(num: number): string {
@@ -93,6 +121,7 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
   onSuccess,
 }) => {
   const { isDark } = useTheme();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Active section for navigation
   const [activeSection, setActiveSection] = useState<'user' | 'location' | 'specs' | 'price' | 'features' | 'media'>('user');
@@ -167,39 +196,60 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
   const [priceNegotiable, setPriceNegotiable] = useState(true);
   const [extraCharge, setExtraCharge] = useState(false);
 
-  // Features
+  // Features & DYNAMIC AMENITIES
   const [roadWidth, setRoadWidth] = useState('40');
   const [facing, setFacing] = useState(1); // 1=East, 2=West, 3=North, 4=South, etc.
   const [isCorner, setIsCorner] = useState(false);
-  const [features, setFeatures] = useState({
-    waterSupply: true,
-    electricity: true,
-    powerBackup: true,
-    lift: false,
-    park: true,
-    ownParking: true,
-    visitParking: false,
-    intercom: false,
-    clubHouse: false,
-    swimming: false,
-    fitness: false,
-    gatedCommunity: true,
-    security: true,
-  });
-
-  // Uploads
-  const [description, setDescription] = useState('');
-  const [images, setImages] = useState<string[]>([
-    '/uploads/sample-flat-1.jpg',
-    '/uploads/sample-flat-2.jpg',
+  const [dynamicAmenitiesList, setDynamicAmenitiesList] = useState<DynamicMasterOption[]>([]);
+  const [selectedAmenities, setSelectedAmenities] = useState<string[]>([
+    'WATER_SUPPLY',
+    'ELECTRICITY',
+    'POWER_BACKUP',
+    'PARK',
+    'OWN_PARKING',
+    'SECURITY',
+    'GATED_COMMUNITY',
   ]);
+  const [loadingSchema, setLoadingSchema] = useState(false);
+
+  // Uploads & REAL FILE UPLOAD STATE
+  const [description, setDescription] = useState('');
+  const [images, setImages] = useState<string[]>([]);
   const [newImageUrl, setNewImageUrl] = useState('');
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   // UI status
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  // 1. Fetch Dynamic Amenities from Admin Master Registry on Mount
+  useEffect(() => {
+    const fetchMasterSchema = async () => {
+      setLoadingSchema(true);
+      try {
+        const res = await fetch('/v1/public/property-schema');
+        if (res.ok) {
+          const schema = await res.json();
+          if (schema.AMENITIES && Array.isArray(schema.AMENITIES) && schema.AMENITIES.length > 0) {
+            setDynamicAmenitiesList(schema.AMENITIES);
+          } else {
+            setDynamicAmenitiesList(DEFAULT_AMENITIES);
+          }
+        } else {
+          setDynamicAmenitiesList(DEFAULT_AMENITIES);
+        }
+      } catch (err) {
+        setDynamicAmenitiesList(DEFAULT_AMENITIES);
+      } finally {
+        setLoadingSchema(false);
+      }
+    };
+
+    fetchMasterSchema();
+  }, []);
 
   // Computed Amount In Words
   const amountInWords = useMemo(() => {
@@ -286,21 +336,31 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
           }
         }
 
-        setFeatures({
-          waterSupply: data.feature_watersupply === 1,
-          electricity: data.feature_electricityconnection === 1,
-          powerBackup: data.featurepowerbackup === 1,
-          lift: data.feature_lift === 1,
-          park: data.feature_park === 1,
-          ownParking: data.feature_ownparking === 1,
-          visitParking: data.feature_visitparking === 1,
-          intercom: data.feature_intercomfac === 1,
-          clubHouse: data.feature_clubhosue === 1,
-          swimming: data.feature_swimming === 1,
-          fitness: data.feature_fitness === 1,
-          gatedCommunity: data.feature_gatedcomm === 1,
-          security: data.feature_security === 1,
-        });
+        // Parse amenities from saved flags and amenities JSON
+        const selected = new Set<string>();
+        if (data.feature_watersupply === 1) selected.add('WATER_SUPPLY');
+        if (data.feature_electricityconnection === 1) selected.add('ELECTRICITY');
+        if (data.featurepowerbackup === 1) selected.add('POWER_BACKUP');
+        if (data.feature_lift === 1) selected.add('LIFT');
+        if (data.feature_park === 1) selected.add('PARK');
+        if (data.feature_ownparking === 1) selected.add('OWN_PARKING');
+        if (data.feature_visitparking === 1) selected.add('VISITOR_PARKING');
+        if (data.feature_intercomfac === 1) selected.add('INTERCOM');
+        if (data.feature_clubhosue === 1) selected.add('CLUB_HOUSE');
+        if (data.feature_swimming === 1) selected.add('SWIMMING_POOL');
+        if (data.feature_fitness === 1) selected.add('GYM');
+        if (data.feature_gatedcomm === 1) selected.add('GATED_COMMUNITY');
+        if (data.feature_security === 1) selected.add('SECURITY');
+
+        if (data.amenities) {
+          try {
+            const parsedAmenities = JSON.parse(data.amenities);
+            if (Array.isArray(parsedAmenities)) {
+              parsedAmenities.forEach((a: string) => selected.add(a));
+            }
+          } catch {}
+        }
+        setSelectedAmenities(Array.from(selected));
       } catch (err: any) {
         setError(err.message || 'Error loading property');
       } finally {
@@ -311,7 +371,94 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
     fetchProperty();
   }, [propertyId]);
 
-  const handleAddImage = () => {
+  // 2. REAL FILE UPLOAD LOGIC WITH STATUTORY VALIDATION
+  const processFiles = async (files: FileList | File[]) => {
+    if (images.length >= 10) {
+      setError('Maximum 10 photos allowed for listing.');
+      return;
+    }
+    setError('');
+    const allowed = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+
+    for (let i = 0; i < files.length; i++) {
+      if (images.length + i >= 10) {
+        setError('Maximum limit of 10 photos reached.');
+        break;
+      }
+      const file = files[i];
+
+      // Format validation
+      if (!allowed.includes(file.type.toLowerCase())) {
+        setError(`File "${file.name}" has invalid format. Accepted formats: PNG, JPG, JPEG, WEBP.`);
+        continue;
+      }
+
+      // Minimum Size check: 10KB
+      if (file.size < 10 * 1024) {
+        setError(`File "${file.name}" is too small (${(file.size / 1024).toFixed(1)} KB). Minimum image size required is 10 KB.`);
+        continue;
+      }
+
+      // Maximum Size check: 2MB
+      if (file.size > 2 * 1024 * 1024) {
+        setError(`File "${file.name}" exceeds 2MB limit (${(file.size / (1024 * 1024)).toFixed(1)} MB). Maximum size is 2 MB.`);
+        continue;
+      }
+
+      setUploadingImage(true);
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        const token = localStorage.getItem('access_token');
+
+        const res = await fetch('/v1/properties/upload-image', {
+          method: 'POST',
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          body: formData,
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          setImages((prev) => [...prev, data.url]);
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          const errMsg = errData.detail || `Upload failed for ${file.name}.`;
+          setError(errMsg);
+        }
+      } catch (err: any) {
+        setError(err.message || `Network error uploading ${file.name}.`);
+      } finally {
+        setUploadingImage(false);
+      }
+    }
+  };
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      processFiles(e.target.files);
+    }
+    // reset input value so re-selecting same file triggers event
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      processFiles(e.dataTransfer.files);
+    }
+  };
+
+  const handleAddImageUrl = () => {
     if (!newImageUrl.trim()) return;
     if (images.length >= 10) {
       setError('Maximum 10 photos allowed.');
@@ -324,6 +471,21 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
 
   const handleRemoveImage = (index: number) => {
     setImages((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleMakeCoverImage = (index: number) => {
+    if (index === 0) return;
+    setImages((prev) => {
+      const copy = [...prev];
+      const [moved] = copy.splice(index, 1);
+      return [moved, ...copy];
+    });
+  };
+
+  const handleToggleAmenity = (code: string) => {
+    setSelectedAmenities((prev) =>
+      prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code]
+    );
   };
 
   const handleToggleMeal = (meal: string) => {
@@ -390,6 +552,9 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
 
     setLoading(true);
 
+    // Map dynamic amenities to specific columns
+    const hasAmenity = (code: string) => selectedAmenities.includes(code);
+
     const payload: any = {
       property_type: propertyType,
       looking_type: lookingType,
@@ -429,19 +594,22 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
       width_facing_road: roadWidth,
       facing: facing,
       corner: isCorner ? 1 : 0,
-      feature_watersupply: features.waterSupply ? 1 : 0,
-      feature_electricityconnection: features.electricity ? 1 : 0,
-      featurepowerbackup: features.powerBackup ? 1 : 0,
-      feature_lift: features.lift ? 1 : 0,
-      feature_park: features.park ? 1 : 0,
-      feature_ownparking: features.ownParking ? 1 : 0,
-      feature_visitparking: features.visitParking ? 1 : 0,
-      feature_intercomfac: features.intercom ? 1 : 0,
-      feature_clubhosue: features.clubHouse ? 1 : 0,
-      feature_swimming: features.swimming ? 1 : 0,
-      feature_fitness: features.fitness ? 1 : 0,
-      feature_gatedcomm: features.gatedCommunity ? 1 : 0,
-      feature_security: features.security ? 1 : 0,
+      // 12 specific column flags
+      feature_watersupply: hasAmenity('WATER_SUPPLY') || hasAmenity('WATER_STORAGE') ? 1 : 0,
+      feature_electricityconnection: hasAmenity('ELECTRICITY') ? 1 : 0,
+      featurepowerbackup: hasAmenity('POWER_BACKUP') ? 1 : 0,
+      feature_lift: hasAmenity('LIFT') ? 1 : 0,
+      feature_park: hasAmenity('PARK') ? 1 : 0,
+      feature_ownparking: hasAmenity('OWN_PARKING') ? 1 : 0,
+      feature_visitparking: hasAmenity('VISITOR_PARKING') ? 1 : 0,
+      feature_intercomfac: hasAmenity('INTERCOM') ? 1 : 0,
+      feature_clubhosue: hasAmenity('CLUB_HOUSE') ? 1 : 0,
+      feature_swimming: hasAmenity('SWIMMING_POOL') ? 1 : 0,
+      feature_fitness: hasAmenity('GYM') ? 1 : 0,
+      feature_gatedcomm: hasAmenity('GATED_COMMUNITY') ? 1 : 0,
+      feature_security: hasAmenity('SECURITY') ? 1 : 0,
+      // Full dynamic list stored as JSON string
+      amenities: JSON.stringify(selectedAmenities),
       description: description.trim() || null,
       images: images.length > 0 ? JSON.stringify(images) : null,
     };
@@ -495,7 +663,7 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
     { id: 'location', label: '2. Location & Geo', icon: MapPin },
     { id: 'specs', label: '3. Property Specs', icon: Building },
     { id: 'price', label: '4. Commercials', icon: DollarSign },
-    { id: 'features', label: '5. Amenities', icon: Sparkles },
+    { id: 'features', label: '5. Amenities (Dynamic)', icon: Sparkles },
     { id: 'media', label: '6. Media Gallery', icon: Camera },
   ];
 
@@ -510,9 +678,18 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+      {/* Hidden File Picker Input */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        multiple
+        accept="image/png,image/jpeg,image/jpg,image/webp"
+        onChange={handleFileInputChange}
+        className="hidden"
+      />
+
       {/* 1. ULTRA-MODERN HEADER DOCK */}
       <div className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 text-white rounded-3xl p-6 sm:p-8 border border-slate-800 shadow-2xl">
-        {/* Glow Accent */}
         <div className="absolute top-0 right-0 w-96 h-96 bg-rose-500/10 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20"></div>
 
         <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
@@ -582,7 +759,7 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
           </div>
         </div>
 
-        {/* 2. MODERN HORIZONTAL PROGRESS STEPPER */}
+        {/* 2. PROGRESS STEPPER */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 mt-8 pt-6 border-t border-slate-800/80">
           {steps.map((s) => {
             const Icon = s.icon;
@@ -638,7 +815,6 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
           id="section-user"
           className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm p-6 sm:p-8 space-y-6"
         >
-          {/* Executive Section Header */}
           <div className="flex items-start justify-between border-b border-slate-100 dark:border-slate-800/80 pb-5">
             <div className="flex items-center gap-3.5">
               <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-rose-500 to-red-600 text-white flex items-center justify-center shadow-md shadow-rose-500/20">
@@ -658,7 +834,6 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
             </span>
           </div>
 
-          {/* Source Type Selector Chips */}
           <div>
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wider">
               Posting As / Source Entity
@@ -693,7 +868,6 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
             </div>
           </div>
 
-          {/* Form Inputs Grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">
@@ -914,7 +1088,6 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
             </span>
           </div>
 
-          {/* Looking Type Grid */}
           <div>
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wider">
               Property Category
@@ -947,7 +1120,6 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
             </div>
           </div>
 
-          {/* Common Dimensions Row */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 pt-2">
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">Sub-Type</label>
@@ -1398,7 +1570,6 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
             </div>
           </div>
 
-          {/* Negotiation & Extra Charges Switchers */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
             <div className="flex items-center justify-between p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40">
               <div>
@@ -1439,7 +1610,7 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
         </div>
 
         {/* ========================================================= */}
-        {/* CARD 5: FEATURES & AMENITIES                              */}
+        {/* CARD 5: FEATURES & DYNAMIC AMENITIES FROM DATABASE        */}
         {/* ========================================================= */}
         <div
           id="section-features"
@@ -1451,11 +1622,16 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
                 <Sparkles className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-                  Property Features & Community Amenities
-                </h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                    Property Features & Community Amenities
+                  </h3>
+                  <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                    100% Dynamic Master Sync
+                  </span>
+                </div>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Road width frontage, cardinal direction, corner plot status, and infrastructure.
+                  Dynamic master options configured from Admin Panel (zero hardcoded enums).
                 </p>
               </div>
             </div>
@@ -1519,65 +1695,49 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
             </div>
           </div>
 
-          {/* Interactive Common Features Grid (Matching Screenshot 9) */}
+          {/* DYNAMIC AMENITIES GRID (LOADED FROM DB) */}
           <div className="pt-2">
             <div className="flex items-center justify-between mb-4">
-              <span className="text-xs font-extrabold text-slate-900 dark:text-white uppercase tracking-wider">
-                Common Amenities & Utilities Checklist
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  const allOn = Object.values(features).every(Boolean);
-                  setFeatures({
-                    waterSupply: !allOn,
-                    electricity: !allOn,
-                    powerBackup: !allOn,
-                    lift: !allOn,
-                    park: !allOn,
-                    ownParking: !allOn,
-                    visitParking: !allOn,
-                    intercom: !allOn,
-                    clubHouse: !allOn,
-                    swimming: !allOn,
-                    fitness: !allOn,
-                    gatedCommunity: !allOn,
-                    security: !allOn,
-                  });
-                }}
-                className="text-xs font-bold text-rose-500 hover:underline"
-              >
-                Toggle All Amenities
-              </button>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-extrabold text-slate-900 dark:text-white uppercase tracking-wider">
+                  Active Amenities from Database Registry ({dynamicAmenitiesList.length})
+                </span>
+                {loadingSchema && (
+                  <RefreshCw className="w-3.5 h-3.5 text-rose-500 animate-spin" />
+                )}
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const allCodes = dynamicAmenitiesList.map((a) => a.code);
+                    if (selectedAmenities.length === allCodes.length) {
+                      setSelectedAmenities([]);
+                    } else {
+                      setSelectedAmenities(allCodes);
+                    }
+                  }}
+                  className="text-xs font-bold text-rose-500 hover:underline"
+                >
+                  {selectedAmenities.length === dynamicAmenitiesList.length ? 'Clear All' : 'Select All'}
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3.5">
-              {[
-                { key: 'waterSupply', label: 'Water Supply', icon: Droplets },
-                { key: 'electricity', label: 'Electricity Con.', icon: Zap },
-                { key: 'powerBackup', label: 'Power Backup', icon: BatteryCharging },
-                { key: 'lift', label: 'Lift / Elevator', icon: Layers },
-                { key: 'park', label: 'Park / Greenery', icon: Trees },
-                { key: 'ownParking', label: 'Covered Parking', icon: Car },
-                { key: 'visitParking', label: 'Visitor Parking', icon: Car },
-                { key: 'intercom', label: 'Intercom Line', icon: PhoneCall },
-                { key: 'clubHouse', label: 'Club House', icon: Building },
-                { key: 'swimming', label: 'Swimming Pool', icon: Waves },
-                { key: 'fitness', label: 'Fitness Gym', icon: Dumbbell },
-                { key: 'security', label: '24x7 Security CCTV', icon: ShieldCheck },
-              ].map((item) => {
-                const Icon = item.icon;
-                const active = (features as any)[item.key];
+              {dynamicAmenitiesList.map((item) => {
+                const active = selectedAmenities.includes(item.code);
+                // Look for an icon or default to Sparkles
+                const fallbackMatch = DEFAULT_AMENITIES.find(
+                  (d) => d.code === item.code || d.code.replace(/_/g, '') === item.code.replace(/_/g, '')
+                );
+                const IconComponent = (fallbackMatch && (fallbackMatch as any).icon) || Sparkles;
+
                 return (
                   <button
-                    key={item.key}
+                    key={item.code}
                     type="button"
-                    onClick={() =>
-                      setFeatures((prev) => ({
-                        ...prev,
-                        [item.key]: !active,
-                      }))
-                    }
+                    onClick={() => handleToggleAmenity(item.code)}
                     className={`relative p-4 rounded-2xl border text-center flex flex-col items-center justify-center gap-2.5 transition-all group ${
                       active
                         ? 'border-rose-500/60 bg-rose-50/70 dark:bg-rose-950/25 shadow-sm ring-1 ring-rose-500/20'
@@ -1596,7 +1756,7 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
                           : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
                       }`}
                     >
-                      <Icon className="w-5 h-5" />
+                      <IconComponent className="w-5 h-5" />
                     </div>
                     <span className="text-[11px] font-bold text-slate-800 dark:text-slate-200 line-clamp-1">
                       {item.label}
@@ -1609,7 +1769,7 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
         </div>
 
         {/* ========================================================= */}
-        {/* CARD 6: MEDIA & MARKETING DESCRIPTION                     */}
+        {/* CARD 6: MEDIA GALLERY & REAL FILE UPLOADS                 */}
         {/* ========================================================= */}
         <div
           id="section-media"
@@ -1647,18 +1807,32 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
             />
           </div>
 
-          {/* High-Tech Photo Upload Box (Matching Screenshot 10 specs) */}
-          <div className="p-6 sm:p-8 rounded-3xl border-2 border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/40 dark:bg-slate-800/20 text-center space-y-4">
-            <div className="w-14 h-14 rounded-2xl bg-rose-50 dark:bg-rose-950/40 text-rose-500 flex items-center justify-center mx-auto shadow-inner">
-              <Camera className="w-7 h-7" />
+          {/* REAL DRAG & DROP PHOTO UPLOAD ZONE */}
+          <div
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            onClick={() => fileInputRef.current?.click()}
+            className={`p-6 sm:p-8 rounded-3xl border-2 border-dashed transition-all text-center space-y-4 cursor-pointer select-none ${
+              isDragging
+                ? 'border-rose-500 bg-rose-50/40 dark:bg-rose-950/30 scale-[1.01]'
+                : 'border-slate-300 dark:border-slate-700 bg-slate-50/40 dark:bg-slate-800/20 hover:border-rose-400'
+            }`}
+          >
+            <div className="w-16 h-16 rounded-2xl bg-rose-50 dark:bg-rose-950/40 text-rose-500 flex items-center justify-center mx-auto shadow-inner">
+              {uploadingImage ? (
+                <RefreshCw className="w-8 h-8 animate-spin" />
+              ) : (
+                <ImagePlus className="w-8 h-8" />
+              )}
             </div>
 
             <div>
-              <h4 className="text-sm font-bold text-slate-900 dark:text-white">
-                Upload Property Photographs
+              <h4 className="text-base font-bold text-slate-900 dark:text-white">
+                {uploadingImage ? 'Uploading & Processing Image...' : 'Click or Drag & Drop Property Photos Here'}
               </h4>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                Drag and drop your photographs or enter image resource URLs below.
+                Select PNG, JPG, JPEG, or WEBP photos from your computer or phone.
               </p>
             </div>
 
@@ -1668,8 +1842,8 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
                 'Max 10 Photos',
                 'Min 10KB Size',
                 'Max 2MB per Image',
-                'PNG / JPG / JPEG Formats',
-                '600 x 400 Recommended Ratio',
+                'PNG / JPG / JPEG / WEBP',
+                '600 x 400 Recommended',
               ].map((spec) => (
                 <span
                   key={spec}
@@ -1680,54 +1854,100 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
               ))}
             </div>
 
-            {/* Add Image Input Bar */}
-            <div className="max-w-lg mx-auto flex gap-2 pt-3">
+            {/* Upload Button */}
+            <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+              <span className="px-6 py-3 rounded-2xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-extrabold text-xs flex items-center gap-2 shadow-lg shadow-rose-500/25 transition-all">
+                <Camera className="w-4 h-4" />
+                {uploadingImage ? 'Uploading...' : 'Choose Photos From Device'}
+              </span>
+            </div>
+          </div>
+
+          {/* Add Image URL Input Bar (Alternative Option) */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+            <span className="text-xs text-slate-400">Or enter direct photo link:</span>
+            <div className="flex gap-2 w-full sm:w-auto flex-1 max-w-lg">
               <input
                 type="text"
                 value={newImageUrl}
                 onChange={(e) => setNewImageUrl(e.target.value)}
-                placeholder="Enter or paste image URL (e.g. /uploads/property-living-room.jpg)"
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-rose-500"
+                placeholder="https://example.com/photo.jpg or /uploads/properties/prop_1.jpg"
+                className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-rose-500"
               />
               <button
                 type="button"
-                onClick={handleAddImage}
-                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-bold text-xs flex items-center gap-2 shadow-md transition-all flex-shrink-0"
+                onClick={handleAddImageUrl}
+                className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-200 font-bold text-xs flex items-center gap-1.5 transition-all flex-shrink-0 cursor-pointer"
               >
-                <Upload className="w-3.5 h-3.5" />
-                Add Photo
+                Add URL
               </button>
             </div>
+          </div>
 
-            {/* Gallery Grid */}
-            {images.length > 0 && (
-              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-4 pt-6">
+          {/* Gallery Grid of Uploaded Photos */}
+          {images.length > 0 && (
+            <div className="pt-6 border-t border-slate-200 dark:border-slate-700/60">
+              <div className="flex items-center justify-between mb-3 text-left">
+                <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                  Uploaded Photos ({images.length} of 10)
+                </span>
+                <span className="text-[11px] text-slate-400">
+                  Click "Set Cover" to reorder primary photo
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
                 {images.map((img, idx) => (
                   <div
                     key={idx}
-                    className="relative group rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 aspect-video bg-slate-100 dark:bg-slate-800 shadow-sm"
+                    className={`relative group rounded-2xl overflow-hidden border transition-all aspect-video bg-slate-100 dark:bg-slate-800 shadow-sm ${
+                      idx === 0
+                        ? 'ring-2 ring-rose-500 border-rose-500'
+                        : 'border-slate-200 dark:border-slate-700'
+                    }`}
                   >
-                    <img src={img} alt={`Property ${idx + 1}`} className="w-full h-full object-cover" />
-                    <div className="absolute inset-0 bg-slate-950/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                    <img
+                      src={img}
+                      alt={`Property ${idx + 1}`}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.target as any).src = 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=400&q=80';
+                      }}
+                    />
+
+                    {/* Primary Cover Badge */}
+                    {idx === 0 && (
+                      <span className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-gradient-to-r from-red-600 to-rose-600 text-[10px] font-extrabold text-white shadow-md flex items-center gap-1">
+                        <Star className="w-3 h-3 fill-white" /> Primary Cover
+                      </span>
+                    )}
+
+                    {/* Hover Overlay Actions */}
+                    <div className="absolute inset-0 bg-slate-950/70 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 p-2">
+                      {idx !== 0 && (
+                        <button
+                          type="button"
+                          onClick={() => handleMakeCoverImage(idx)}
+                          className="px-2.5 py-1.5 rounded-lg bg-white/90 hover:bg-white text-slate-900 text-[11px] font-bold shadow-sm transition-all cursor-pointer"
+                          title="Make this the primary cover photo"
+                        >
+                          Set Cover
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => handleRemoveImage(idx)}
-                        className="p-2 rounded-xl bg-red-600 text-white hover:bg-red-700 transition-colors"
-                        title="Remove image"
+                        className="p-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white shadow-sm transition-all cursor-pointer"
+                        title="Delete photo"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
-                    {idx === 0 && (
-                      <span className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-rose-600 text-[9px] font-bold text-white shadow-xs">
-                        ★ Primary Cover
-                      </span>
-                    )}
                   </div>
                 ))}
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* ========================================================= */}
@@ -1743,7 +1963,7 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
               Cancel & Exit
             </button>
             <span className="text-xs text-slate-500 dark:text-slate-400 hidden sm:inline">
-              Form ready for submission (124 columns)
+              Form ready for submission (124 attributes + {selectedAmenities.length} amenities selected)
             </span>
           </div>
 

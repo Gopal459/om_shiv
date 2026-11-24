@@ -127,6 +127,7 @@ class TblPropertyCreateRequest(BaseModel):
     # Description & Media
     project_name: Optional[str] = None
     description: Optional[str] = None
+    amenities: Optional[str] = None
     images: Optional[str] = None
     images_order: Optional[str] = None
     video: Optional[str] = None
@@ -192,6 +193,7 @@ class TblPropertyUpdateRequest(BaseModel):
     noof_bhk: Optional[int] = None
     project_name: Optional[str] = None
     description: Optional[str] = None
+    amenities: Optional[str] = None
     images: Optional[str] = None
     pg_details: Optional[TblPayingGuestCreate] = None
 

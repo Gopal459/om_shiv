@@ -126,6 +126,7 @@ async def upgrade(engine: AsyncEngine) -> None:
                         total_view INTEGER NOT NULL DEFAULT 0,
                         images TEXT NULL,
                         images_order TEXT NULL,
+                        amenities TEXT NULL,
                         video VARCHAR(264) NULL,
                         deleted_at TIMESTAMP NULL
                     )
@@ -278,6 +279,7 @@ async def upgrade(engine: AsyncEngine) -> None:
                         total_view INTEGER NOT NULL DEFAULT 0,
                         images TEXT NULL,
                         images_order TEXT NULL,
+                        amenities TEXT NULL,
                         video VARCHAR(264) NULL,
                         deleted_at TIMESTAMP WITH TIME ZONE NULL
                     )

@@ -1,5 +1,7 @@
 from typing import Dict, Any, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+import os
+import uuid
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_
 
@@ -24,6 +26,52 @@ from app.services.property_service import (
 )
 
 router = APIRouter()
+
+ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
+MIN_IMAGE_BYTES = 10 * 1024        # 10 KB
+MAX_IMAGE_BYTES = 2 * 1024 * 1024  # 2 MB
+
+
+@router.post("/properties/upload-image", status_code=status.HTTP_201_CREATED)
+async def upload_property_image(
+    file: UploadFile = File(...),
+) -> Dict[str, Any]:
+    """Uploads a property image verifying format (PNG/JPG/WEBP), min 10KB, and max 2MB."""
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    if ext not in ALLOWED_IMAGE_EXTENSIONS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid image format '{ext}'. Accepted formats are PNG, JPG, JPEG, WEBP.",
+        )
+
+    contents = await file.read()
+    file_size = len(contents)
+
+    if file_size < MIN_IMAGE_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Minimum image size must be at least 10KB. (current: {file_size} bytes)",
+        )
+    if file_size > MAX_IMAGE_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Maximum image size cannot exceed 2MB. (current: {file_size} bytes)",
+        )
+
+    upload_dir = os.path.join("uploads", "properties")
+    os.makedirs(upload_dir, exist_ok=True)
+    unique_name = f"prop_{uuid.uuid4().hex[:12]}{ext}"
+    target_path = os.path.join(upload_dir, unique_name)
+
+    with open(target_path, "wb") as f:
+        f.write(contents)
+
+    return {
+        "url": f"/uploads/properties/{unique_name}",
+        "filename": unique_name,
+        "size": file_size,
+        "format": ext.lstrip("."),
+    }
 
 
 @router.get("/properties/hub", response_model=TblPropertyHubListResponse, status_code=status.HTTP_200_OK)

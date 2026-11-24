@@ -264,6 +264,7 @@ class TblProperty(Base):
     total_view: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     images: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     images_order: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    amenities: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     video: Mapped[Optional[str]] = mapped_column(String(264), nullable=True)
     deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
