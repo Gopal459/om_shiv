@@ -93,7 +93,34 @@ export const MyWork: React.FC<MyWorkProps> = ({ onSelectLead }) => {
     fetchKanbanData();
   }, [activeType]);
 
-  const handleStageChange = async (leadId: string, newStatus: number, newStage?: number) => {
+  const handleStageChange = async (
+    leadId: string,
+    newStatus: number,
+    newStage?: number,
+    toColumnKey?: string
+  ) => {
+    // Optimistic UI update: instantly move the lead into the target column
+    const previousBoard = { ...boardData };
+    if (toColumnKey) {
+      setBoardData((prev: any) => {
+        let movedCard: any = null;
+        const nextBoard: any = {};
+        for (const k of Object.keys(prev)) {
+          const found = prev[k].find((item: any) => item.lead_unique_id === leadId);
+          if (found) {
+            movedCard = { ...found, lead_status: newStatus, stage: newStage ?? 1 };
+            nextBoard[k] = prev[k].filter((item: any) => item.lead_unique_id !== leadId);
+          } else {
+            nextBoard[k] = prev[k];
+          }
+        }
+        if (movedCard && nextBoard[toColumnKey]) {
+          nextBoard[toColumnKey] = [movedCard, ...nextBoard[toColumnKey]];
+        }
+        return nextBoard;
+      });
+    }
+
     try {
       const token = localStorage.getItem('access_token');
       const res = await fetch(`/v1/leads/${leadId}/stage`, {
@@ -109,10 +136,15 @@ export const MyWork: React.FC<MyWorkProps> = ({ onSelectLead }) => {
       });
 
       if (res.ok) {
+        // Silently re-sync to get official state from server
         fetchKanbanData(true);
+      } else {
+        // Rollback
+        setBoardData(previousBoard);
       }
     } catch (err) {
       console.error('Failed to advance stage', err);
+      setBoardData(previousBoard);
     }
   };
 
