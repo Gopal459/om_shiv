@@ -43,13 +43,13 @@
 - Test: `backend/tests/test_tbl_property_schema.py`
 
 **Steps:**
-- [ ] Write failing migration test `backend/tests/test_tbl_property_schema.py` checking existence of `tbl_property` (124 columns) and `tbl_payingguest`.
-- [ ] Run `pytest backend/tests/test_tbl_property_schema.py` to confirm failure.
-- [ ] Implement `0006_tbl_property_schema.py` containing complete `CREATE TABLE IF NOT EXISTS tbl_property` and `CREATE TABLE IF NOT EXISTS tbl_payingguest` with SQLite/Postgres compatibility.
-- [ ] Register `app.db.migrations.0006_tbl_property_schema` in `MIGRATION_STEPS` in `runner.py`.
-- [ ] Add `TblProperty` and `TblPayingGuest` SQLAlchemy declarative models in `backend/app/models/properties.py`.
-- [ ] Run `pytest backend/tests/test_tbl_property_schema.py` and verify all tests pass.
-- [ ] Commit changes: `git commit -am "feat(db): add 0006_tbl_property_schema migration and TblProperty ORM models"`
+- [x] Write failing migration test `backend/tests/test_tbl_property_schema.py` checking existence of `tbl_property` (124 columns) and `tbl_payingguest`.
+- [x] Run `pytest backend/tests/test_tbl_property_schema.py` to confirm failure.
+- [x] Implement `0006_tbl_property_schema.py` containing complete `CREATE TABLE IF NOT EXISTS tbl_property` and `CREATE TABLE IF NOT EXISTS tbl_payingguest` with SQLite/Postgres compatibility.
+- [x] Register `app.db.migrations.0006_tbl_property_schema` in `MIGRATION_STEPS` in `runner.py`.
+- [x] Add `TblProperty` and `TblPayingGuest` SQLAlchemy declarative models in `backend/app/models/properties.py`.
+- [x] Run `pytest backend/tests/test_tbl_property_schema.py` and verify all tests pass.
+- [x] Commit changes: `git commit -am "feat(db): add 0006_tbl_property_schema migration and TblProperty ORM models"`
 
 ---
 
@@ -62,25 +62,25 @@
 - Test: `backend/tests/test_tbl_property_api.py`
 
 **Steps:**
-- [ ] Write failing integration tests in `backend/tests/test_tbl_property_api.py`:
+- [x] Write failing integration tests in `backend/tests/test_tbl_property_api.py`:
   - Test `GET /v1/properties/hub?tab=new_assign`
   - Test `POST /v1/properties/create` for Sale with valid fields
   - Test `POST /v1/properties/create` with invalid Sale rule (`carpet_area >= super_area`) expecting 422
   - Test `POST /v1/properties/create` for Rent with partial floor validation
   - Test `POST /v1/properties/create` for PG with food options validation
   - Test `PATCH /v1/properties/{id}/status` for assigning staff and toggling live
-- [ ] Run `pytest backend/tests/test_tbl_property_api.py` to confirm failure.
-- [ ] Implement Pydantic request & response schemas in `backend/app/schemas/tbl_property_schemas.py`.
-- [ ] Implement service methods in `backend/app/services/property_service.py`:
+- [x] Run `pytest backend/tests/test_tbl_property_api.py` to confirm failure.
+- [x] Implement Pydantic request & response schemas in `backend/app/schemas/tbl_property_schemas.py`.
+- [x] Implement service methods in `backend/app/services/property_service.py`:
   - `create_tbl_property(data, db)` with conditional checks
   - `get_tbl_properties_hub(tab, search, page, limit, db)`
   - `get_tbl_property_by_id(property_id, db)`
   - `update_tbl_property(property_id, data, db)`
   - `update_tbl_property_status(property_id, status_data, db)`
-- [ ] Add the endpoints to `backend/app/api/v1/endpoints/properties.py`.
-- [ ] Run `pytest backend/tests/test_tbl_property_api.py` and verify all tests pass.
-- [ ] Run all backend tests: `pytest backend/tests` to ensure no regressions.
-- [ ] Commit changes: `git commit -am "feat(api): add property hub and dynamic create/update endpoints with validation"`
+- [x] Add the endpoints to `backend/app/api/v1/endpoints/properties.py`.
+- [x] Run `pytest backend/tests/test_tbl_property_api.py` and verify all tests pass.
+- [x] Run all backend tests: `pytest backend/tests` to ensure no regressions.
+- [x] Commit changes: `git commit -am "feat(api): add property hub and dynamic create/update endpoints with validation"`
 
 ---
 
@@ -91,7 +91,7 @@
 - Test: Visual inspection & build check
 
 **Steps:**
-- [ ] Update `navItems` under `id: 'PROPERTY'` in `AdminLayout.tsx` to include the 7 submenus:
+- [x] Update `navItems` under `id: 'PROPERTY'` in `AdminLayout.tsx` to include the 7 submenus:
   1. `New & Assign Properties` -> `/properties?tab=new_assign`
   2. `Verify & Live Properties` -> `/properties?tab=verify_live`
   3. `Verification Done` -> `/properties?tab=verification_done`
@@ -99,9 +99,9 @@
   5. `Delete Property` -> `/properties?tab=deleted`
   6. `Sell Property` -> `/properties?tab=sold`
   7. `Request Live Property` -> `/properties?tab=request_live`
-- [ ] Ensure subitems render with bullet ring icon (`Circle` component) matching Screenshot 7 styling.
-- [ ] Verify sidebar navigation routes and query parameters.
-- [ ] Commit changes: `git commit -am "feat(ui): update property sidebar menu with 7 submenus and bullet styling"`
+- [x] Ensure subitems render with bullet ring icon (`Circle` component) matching Screenshot 7 styling.
+- [x] Verify sidebar navigation routes and query parameters.
+- [x] Commit changes: `git commit -am "feat(ui): update property sidebar menu with 7 submenus and bullet styling"`
 
 ---
 
@@ -113,18 +113,18 @@
 - Test: Component compilation and interaction tests
 
 **Steps:**
-- [ ] Create `frontend/src/pages/PropertyForm.tsx` implementing 6 section cards with red header badges:
+- [x] Create `frontend/src/pages/PropertyForm.tsx` implementing 6 section cards with red header badges:
   - **Card 1: User Info** (Owner Name, Owner Email, Owner Mobile, Source Type)
   - **Card 2: Location** (Posted Date, Expire Date, State, City, Location text, Map Lat/Long coordinates, Near By Area)
   - **Card 3: Property Detail** (Property Type: Buy/Rent/PG, Subcategory, Unit/Street, Area & Unit, Boundary, conditional fields based on type)
   - **Card 4: Price** (Select Price Format, Price per unit, Expected Price, Price In Words calculator, Price Negotiable toggle, Extra Charge toggle)
   - **Card 5: Features** (Width Of Facing Road, Facing, Corner toggle, Common Features icons/toggles: Water Supply, Electricity, Lift, Security, etc.)
   - **Card 6: Uploads** (Description textarea, Photos upload section with spec badges: max 10 photos, min 10KB, max 2MB, formats PNG/JPG/JPEG, dimensions 600x400)
-- [ ] Add client-side validation reflecting server-side rules (e.g. carpet < super area, mandatory fields per property type).
-- [ ] Connect form submission to `POST /v1/properties/create` and `PUT /v1/properties/{id}`.
-- [ ] Route `/properties/create` and `/properties/:id/edit` in `App.tsx` to `PropertyForm`.
-- [ ] Verify build: `bun run build`.
-- [ ] Commit changes: `git commit -am "feat(ui): implement dynamic multi-card property form matching specs"`
+- [x] Add client-side validation reflecting server-side rules (e.g. carpet < super area, mandatory fields per property type).
+- [x] Connect form submission to `POST /v1/properties/create` and `PUT /v1/properties/{id}`.
+- [x] Route `/properties/create` and `/properties/:id/edit` in `App.tsx` to `PropertyForm`.
+- [x] Verify build: `bun run build`.
+- [x] Commit changes: `git commit -am "feat(ui): implement dynamic multi-card property form matching specs"`
 
 ---
 
@@ -136,17 +136,17 @@
 - Test: Verification of tab switching, search, staff assignment modal, and actions
 
 **Steps:**
-- [ ] Create `frontend/src/pages/PropertyHub.tsx` with:
+- [x] Create `frontend/src/pages/PropertyHub.tsx` with:
   - Header with title, current tab badge, search bar, and "+ Add Property" button.
   - Submenu navigation tabs corresponding to the 7 views (`new_assign`, `verify_live`, `verification_done`, `expired`, `deleted`, `sold`, `request_live`).
   - Data table showing Property ID, Title, Type/Category, Price, Location, Owner Contact, Status, Assigned Staff, and Actions (View/Edit, Assign, Toggle Live, Move to Trash).
   - Quick Telecaller/Staff Assignment modal for `New & Assign Properties`.
   - Empty states with call-to-actions.
-- [ ] Replace `ModuleHub` route for `/properties` with `PropertyHub` in `frontend/src/App.tsx`.
-- [ ] Test tab switching and ensure URL query param `?tab=...` syncs with state.
-- [ ] Run full frontend build: `bun run build`.
-- [ ] Run all pytest tests: `pytest backend/tests`.
-- [ ] Commit changes: `git commit -am "feat(ui): implement PropertyHub with 7 queue views and staff assignment"`
+- [x] Replace `ModuleHub` route for `/properties` with `PropertyHub` in `frontend/src/App.tsx`.
+- [x] Test tab switching and ensure URL query param `?tab=...` syncs with state.
+- [x] Run full frontend build: `bun run build`.
+- [x] Run all pytest tests: `pytest backend/tests`.
+- [x] Commit changes: `git commit -am "feat(ui): implement PropertyHub with 7 queue views and staff assignment"`
 
 ---
 
@@ -157,7 +157,7 @@
 - Test: Full backend test suite & full frontend production build
 
 **Steps:**
-- [ ] Execute backend pytest suite: `$env:PYTHONPATH='backend'; .venv\Scripts\pytest backend/tests -q`.
-- [ ] Execute frontend build: `cd frontend; bun run build`.
-- [ ] Verify zero console errors and zero failing tests.
-- [ ] Push/commit final clean state.
+- [x] Execute backend pytest suite: `$env:PYTHONPATH='backend'; .venv\Scripts\pytest backend/tests -q`.
+- [x] Execute frontend build: `cd frontend; bun run build`.
+- [x] Verify zero console errors and zero failing tests.
+- [x] Push/commit final clean state.
