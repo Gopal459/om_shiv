@@ -93,13 +93,38 @@ function startFrontend(): ChildProcess {
   return proc;
 }
 
-if (!frontendOnly) {
-  runningProcesses.push(startBackend());
+async function waitForBackend(maxRetries = 40, delayMs = 250): Promise<boolean> {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      const res = await fetch('http://127.0.0.1:8000/v1/health');
+      if (res.ok) return true;
+    } catch {
+      // Waiting for backend to bind port 8000
+    }
+    await new Promise((r) => setTimeout(r, delayMs));
+  }
+  return false;
 }
 
-if (!backendOnly) {
-  runningProcesses.push(startFrontend());
+async function boot() {
+  if (!frontendOnly) {
+    runningProcesses.push(startBackend());
+    if (!backendOnly) {
+      console.log('\x1b[33m[dev]\x1b[0m Waiting for FastAPI backend to initialize on port 8000...');
+      const ready = await waitForBackend();
+      if (ready) {
+        console.log('\x1b[32m[dev]\x1b[0m FastAPI backend is ready! Starting Vite frontend server...');
+      } else {
+        console.log('\x1b[33m[dev]\x1b[0m Backend startup delayed, starting Vite frontend anyway...');
+      }
+      runningProcesses.push(startFrontend());
+    }
+  } else {
+    runningProcesses.push(startFrontend());
+  }
 }
+
+boot();
 
 function cleanup() {
   console.log('\n\x1b[33mShutting down Omshiv CRM dev servers...\x1b[0m');
