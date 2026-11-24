@@ -18,6 +18,34 @@ router = APIRouter()
 security = HTTPBearer(auto_error=False)
 
 
+LEAD_SOURCES_MAP = {
+    1: "Website Inbound Inquiry",
+    2: "Builder Project Landing",
+    3: "Franchisee / Agent Direct",
+    4: "Request a Callback Form",
+    5: "Report a Problem Form",
+    6: "Bulk CSV / Portal Import",
+    7: "Newspaper Advertisement",
+    8: "Facebook Ad Campaign",
+    9: "Google Search Ad",
+    10: "Poster & Hoarding",
+    11: "Direct Incoming Call",
+    12: "Office Walk-in",
+    13: "YouTube Channel",
+    14: "Instagram Reel / Post",
+    15: "WhatsApp Business",
+    16: "Referral / Channel Partner",
+    17: "MagicBricks Sync",
+    18: "99acres Sync",
+    19: "Housing.com Sync",
+    20: "SMS Marketing Blast",
+    21: "Email Newsletter",
+    22: "Property Expo / Exhibition",
+    23: "Telecaller Cold Outreach",
+    24: "Other Inbound Source",
+}
+
+
 # --- Pydantic Schemas ---
 
 class LeadActionCreate(BaseModel):
@@ -67,12 +95,33 @@ class LeadDetailResponse(BaseModel):
     budget_max: Optional[float] = None
     preferred_city: Optional[str] = None
     preferred_locality: Optional[str] = None
-    is_untouched: bool
-    is_duplicate: bool
-    is_test: bool
+    is_untouched: bool = False
+    is_duplicate: bool = False
+    is_test: bool = False
     created_at: datetime
     updated_at: datetime
     activities: List[LeadActivityResponse] = []
+
+    # Dynamic & tbl_leads integrated fields
+    property_idno: Optional[str] = None
+    indv_property_address: Optional[str] = None
+    deal_final_price: Optional[float] = 0.0
+    dealer_have: Optional[int] = 0
+    lead_status_num: Optional[int] = 0
+    stage_num: Optional[int] = 1
+    rating_num: Optional[int] = 3
+    lead_source_id: Optional[int] = 1
+    lead_source_name: Optional[str] = None
+    alternate_contact_mobile: Optional[str] = None
+    refer_by_name: Optional[str] = None
+    refer_by_mobile: Optional[str] = None
+    assign_franch_id: Optional[int] = 0
+    assign_franchstaff_id: Optional[int] = 0
+    lead_remark: Optional[str] = None
+    registry_date: Optional[datetime] = None
+    deal_date: Optional[datetime] = None
+    opportunity_converted: Optional[int] = 0
+    opportunity_id: Optional[int] = 0
 
     model_config = {"from_attributes": True}
 
@@ -498,6 +547,92 @@ async def get_my_leads(
     return leads
 
 
+def build_lead_detail_dict(lead: Optional[Lead], tbl_lead: Optional[TblLead]) -> Dict[str, Any]:
+    lead_uid = lead.lead_id if lead else (tbl_lead.lead_unique_id if tbl_lead and tbl_lead.lead_unique_id else f"LEAD-{tbl_lead.leads_id if tbl_lead else 0}")
+    source_id = tbl_lead.lead_source_id if (tbl_lead and tbl_lead.lead_source_id) else 1
+    source_name = LEAD_SOURCES_MAP.get(source_id, "Website Inbound Inquiry")
+    
+    if tbl_lead and tbl_lead.rating:
+        rating_num = tbl_lead.rating
+        temp = "HOT" if rating_num == 1 else "WARM" if rating_num == 2 else "COLD"
+    elif lead and lead.temperature:
+        temp = lead.temperature
+        rating_num = 1 if temp == "HOT" else 2 if temp == "WARM" else 3
+    else:
+        temp = "WARM"
+        rating_num = 2
+
+    stage_str = lead.stage if (lead and lead.stage) else ("NEW" if not tbl_lead else ("CONNECTED" if tbl_lead.lead_status == 1 else "NEW"))
+    stage_num = tbl_lead.stage if (tbl_lead and tbl_lead.stage) else 1
+
+    acts = []
+    if lead and lead.activities:
+        for a in lead.activities:
+            acts.append({
+                "id": a.id,
+                "lead_id": a.lead_id,
+                "action_type": a.action_type,
+                "outcome": a.outcome,
+                "note": a.note,
+                "next_action": a.next_action,
+                "follow_up_date": a.follow_up_date,
+                "stage_before": a.stage_before,
+                "stage_after": a.stage_after,
+                "temperature": a.temperature,
+                "logged_by": a.logged_by,
+                "performed_by": a.performed_by,
+                "created_at": a.created_at,
+            })
+
+    created_at = lead.created_at if lead else (tbl_lead.created_date if tbl_lead else datetime.now(timezone.utc))
+    updated_at = lead.updated_at if lead else (tbl_lead.modified_date if tbl_lead else datetime.now(timezone.utc))
+
+    return {
+        "id": lead.id if lead else (tbl_lead.leads_id if tbl_lead else 0),
+        "lead_id": lead_uid,
+        "full_name": (lead.full_name if lead else tbl_lead.contact_name) if (lead or tbl_lead) else "Valued Client",
+        "mobile": (lead.mobile if lead else tbl_lead.mobile) if (lead or tbl_lead) else "",
+        "email": (lead.email if lead else tbl_lead.email) if (lead or tbl_lead) else None,
+        "lead_type": (tbl_lead.lead_table_name if (tbl_lead and tbl_lead.lead_table_name) else (lead.lead_type if lead else "BUY")).upper(),
+        "source": lead.source if (lead and lead.source) else f"SOURCE_{source_id}",
+        "assigned_to": lead.assigned_to if (lead and lead.assigned_to) else (f"Staff #{tbl_lead.assign_franchstaff_id}" if (tbl_lead and tbl_lead.assign_franchstaff_id) else None),
+        "stage": stage_str,
+        "temperature": temp,
+        "follow_up_date": lead.follow_up_date if (lead and lead.follow_up_date) else (tbl_lead.nextfollowup_datetime if tbl_lead else None),
+        "last_contacted_at": lead.last_contacted_at if lead else (tbl_lead.last_callstatus_updatetime if tbl_lead else None),
+        "lost_reason": lead.lost_reason if lead else None,
+        "budget_min": lead.budget_min if lead else None,
+        "budget_max": lead.budget_max if lead else None,
+        "preferred_city": lead.preferred_city if (lead and lead.preferred_city) else (tbl_lead.address if tbl_lead else None),
+        "preferred_locality": lead.preferred_locality if (lead and lead.preferred_locality) else (tbl_lead.indv_property_address if tbl_lead else None),
+        "is_untouched": lead.is_untouched if lead else False,
+        "is_duplicate": lead.is_duplicate if lead else False,
+        "is_test": lead.is_test if lead else False,
+        "created_at": created_at,
+        "updated_at": updated_at,
+        "activities": acts,
+        "property_idno": tbl_lead.property_idno if tbl_lead else None,
+        "indv_property_address": tbl_lead.indv_property_address if (tbl_lead and tbl_lead.indv_property_address) else (lead.preferred_locality if lead else None),
+        "deal_final_price": float(tbl_lead.deal_final_price) if (tbl_lead and tbl_lead.deal_final_price) else 0.0,
+        "dealer_have": tbl_lead.dealer_have if tbl_lead else 0,
+        "lead_status_num": tbl_lead.lead_status if tbl_lead else 0,
+        "stage_num": stage_num,
+        "rating_num": rating_num,
+        "lead_source_id": source_id,
+        "lead_source_name": source_name,
+        "alternate_contact_mobile": tbl_lead.alternate_contact_mobile if tbl_lead else None,
+        "refer_by_name": tbl_lead.refer_by_name if tbl_lead else None,
+        "refer_by_mobile": tbl_lead.refer_by_mobile if tbl_lead else None,
+        "assign_franch_id": tbl_lead.assign_franch_id if tbl_lead else 0,
+        "assign_franchstaff_id": tbl_lead.assign_franchstaff_id if tbl_lead else 0,
+        "lead_remark": (tbl_lead.lead_remark if tbl_lead else None) or (acts[0]["note"] if acts else None),
+        "registry_date": tbl_lead.registry_date if tbl_lead else None,
+        "deal_date": tbl_lead.deal_date if tbl_lead else None,
+        "opportunity_converted": tbl_lead.opportunity_converted if tbl_lead else 0,
+        "opportunity_id": tbl_lead.opportunity_id if tbl_lead else 0,
+    }
+
+
 @router.get(
     "/{id}",
     response_model=LeadDetailResponse,
@@ -509,15 +644,25 @@ async def get_lead_detail(
     db: AsyncSession = Depends(get_db),
     actor_id: str = Depends(get_actor_from_token),
 ):
-    """Retrieve complete lead details by ID or lead_id, along with full interaction history."""
+    """Retrieve complete lead details by ID or lead_id, along with full interaction history and tbl_leads data."""
     lead = await find_lead_by_id_or_lead_id(db, id)
-    if not lead:
+    tbl_lead = await find_tbl_lead_by_id_or_unique_id(db, id)
+
+    if not lead and tbl_lead and tbl_lead.lead_unique_id:
+        lead = await find_lead_by_id_or_lead_id(db, tbl_lead.lead_unique_id)
+    if not tbl_lead and lead and lead.lead_id:
+        tbl_lead = await find_tbl_lead_by_id_or_unique_id(db, lead.lead_id)
+
+    if not lead and not tbl_lead:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Lead '{id}' not found",
         )
-    lead.activities.sort(key=lambda a: a.created_at, reverse=True)
-    return lead
+
+    if lead:
+        lead.activities.sort(key=lambda a: a.created_at, reverse=True)
+
+    return build_lead_detail_dict(lead, tbl_lead)
 
 
 @router.post(
@@ -560,12 +705,24 @@ async def log_sales_action(
         actor_id=actor_id,
     )
 
+    # Sync tbl_leads if exists
+    tbl_lead = await find_tbl_lead_by_id_or_unique_id(db, lead.lead_id)
+    if tbl_lead:
+        if payload.follow_up_date:
+            tbl_lead.nextfollowup_datetime = payload.follow_up_date
+        if payload.note:
+            tbl_lead.lead_remark = payload.note
+        if payload.temperature:
+            tbl_lead.rating = 1 if payload.temperature == "HOT" else 2 if payload.temperature == "WARM" else 3
+        tbl_lead.last_callstatus_updatetime = datetime.now(timezone.utc)
+        await db.commit()
+
     # Re-query lead with activities to ensure response serialization
     fresh_lead = await find_lead_by_id_or_lead_id(db, lead.lead_id)
-    if fresh_lead:
-        fresh_lead.activities.sort(key=lambda a: a.created_at, reverse=True)
-        return fresh_lead
-    return updated_lead
+    target_lead = fresh_lead or updated_lead
+    if target_lead:
+        target_lead.activities.sort(key=lambda a: a.created_at, reverse=True)
+    return build_lead_detail_dict(target_lead, tbl_lead)
 
 
 @router.delete(
