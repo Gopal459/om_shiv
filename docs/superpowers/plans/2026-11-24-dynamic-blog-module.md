@@ -57,24 +57,24 @@
   - `TblBlogTag`: Table `tbl_blog_tags` (7 columns matching spec)
   - `TblBlogComment`: Table `tbl_blog_comments` (10 columns matching spec)
 
-- [ ] **Step 1: Write the failing model test**
+- [x] **Step 1: Write the failing model test**
 Create `backend/tests/test_blog_models.py` verifying that all 5 models can be imported, instantiated, and have the correct column definitions and tablenames.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 Run: `.venv\Scripts\pytest backend\tests\test_blog_models.py -v`
 Expected: FAIL with `ModuleNotFoundError: No module named 'app.models.blogs'`
 
-- [ ] **Step 3: Create Migration `0008_tbl_blog_schema.py` and register in `runner.py`**
+- [x] **Step 3: Create Migration `0008_tbl_blog_schema.py` and register in `runner.py`**
 Implement the migration defining `tbl_blog`, `tbl_blog_category`, `tbl_blog_author`, `tbl_blog_tags`, and `tbl_blog_comments` with SQLite and MySQL compatibility, and register `app.db.migrations.0008_tbl_blog_schema` in `runner.py`.
 
-- [ ] **Step 4: Implement SQLAlchemy models in `backend/app/models/blogs.py`**
+- [x] **Step 4: Implement SQLAlchemy models in `backend/app/models/blogs.py`**
 Define classes `TblBlog`, `TblBlogCategory`, `TblBlogAuthor`, `TblBlogTag`, `TblBlogComment` extending `Base` with exact column types, defaults, and relationships. Export them in `backend/app/models/__init__.py`.
 
-- [ ] **Step 5: Run tests and apply migration to verify it passes**
+- [x] **Step 5: Run tests and apply migration to verify it passes**
 Run: `.venv\Scripts\pytest backend\tests\test_blog_models.py -v`
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 ```bash
 git add backend/app/db/migrations/ backend/app/models/ backend/tests/test_blog_models.py
 git commit -m "feat(blogs): add database schema migration and sqlalchemy models for blog cms"
@@ -95,27 +95,27 @@ git commit -m "feat(blogs): add database schema migration and sqlalchemy models 
   - Pydantic schemas: `BlogCreate`, `BlogUpdate`, `BlogResponse`, `BlogCategoryCreate`, `BlogCategoryResponse`, `BlogTagCreate`, `BlogTagResponse`, `BlogAuthorCreate`, `BlogAuthorResponse`, `BlogCommentCreate`, `BlogCommentResponse`
   - Service functions: `create_blog()`, `get_blogs()`, `get_blog_by_id_or_slug()`, `update_blog()`, `delete_blog()`, `toggle_blog_field()`, `create_category()`, `list_categories()`, `create_tag()`, `list_tags()`, `create_author()`, `list_authors()`, `add_comment()`, `moderate_comment()`, `delete_comment()`
 
-- [ ] **Step 1: Write failing service test**
+- [x] **Step 1: Write failing service test**
 Create `backend/tests/test_blog_service.py` testing creation of category, author, tag, bilingual blog post, slug uniqueness, and comment moderation.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 Run: `.venv\Scripts\pytest backend\tests\test_blog_service.py -v`
 Expected: FAIL with `ModuleNotFoundError`
 
-- [ ] **Step 3: Implement Pydantic Schemas in `backend/app/schemas/blog_schemas.py`**
+- [x] **Step 3: Implement Pydantic Schemas in `backend/app/schemas/blog_schemas.py`**
 Define strict validations:
 - `blog_title`, `blog_title_hindi`, `short_description`, `description`, `description_hindi`, `meta_title`, `meta_keyword`, `meta_description` required.
 - Slug generation helper using alphanumeric characters and hyphens.
 - Category & Tag ID list to/from comma-separated string validators.
 
-- [ ] **Step 4: Implement Service Business Logic in `backend/app/services/blog_service.py`**
+- [x] **Step 4: Implement Service Business Logic in `backend/app/services/blog_service.py`**
 Implement CRUD and business logic methods in `BlogService` class with transaction safety, duplicate slug check, and comment reply threading.
 
-- [ ] **Step 5: Run test to verify it passes**
+- [x] **Step 5: Run test to verify it passes**
 Run: `.venv\Scripts\pytest backend\tests\test_blog_service.py -v`
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 ```bash
 git add backend/app/schemas/blog_schemas.py backend/app/services/blog_service.py backend/tests/test_blog_service.py
 git commit -m "feat(blogs): add pydantic schemas and business service logic for blog cms"
@@ -152,25 +152,25 @@ git commit -m "feat(blogs): add pydantic schemas and business service logic for 
   - `PATCH /v1/blogs/comments/{id}/status`: Moderate comment (Approve/Reject)
   - `DELETE /v1/blogs/comments/{id}`: Delete comment
 
-- [ ] **Step 1: Write comprehensive API test suite**
+- [x] **Step 1: Write comprehensive API test suite**
 Create `backend/tests/test_blog_api.py` testing image upload, article lifecycle, duplicate title conflict handling (409), fast status toggles, and threaded admin comments.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 Run: `.venv\Scripts\pytest backend\tests\test_blog_api.py -v`
 Expected: FAIL with 404 Not Found or import error.
 
-- [ ] **Step 3: Implement endpoints in `backend/app/api/v1/endpoints/blogs.py` and register router in `main.py`**
+- [x] **Step 3: Implement endpoints in `backend/app/api/v1/endpoints/blogs.py` and register router in `main.py`**
 Create router with all endpoints and mount at `/v1/blogs` in `backend/app/main.py`. Ensure `uploads/blogs` directory is created on startup.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 Run: `.venv\Scripts\pytest backend\tests\test_blog_api.py -v`
 Expected: PASS
 
-- [ ] **Step 5: Run full test suite to guarantee 0 regressions**
+- [x] **Step 5: Run full test suite to guarantee 0 regressions**
 Run: `.venv\Scripts\pytest backend\tests -q`
 Expected: All 73+ tests pass.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 ```bash
 git add backend/app/api/v1/endpoints/blogs.py backend/app/main.py backend/tests/test_blog_api.py
 git commit -m "feat(blogs): implement blog api endpoints, image upload and router registration"
@@ -194,17 +194,17 @@ git commit -m "feat(blogs): implement blog api endpoints, image upload and route
   - Interactive Tab 4: **Authors** (author list & creation modal with photo upload and bio)
   - Interactive Tab 5: **Comments Moderation** (pending moderation tab vs approved tab, 1-click approve, reject, delete, and threaded inline admin reply form)
 
-- [ ] **Step 1: Create `frontend/src/pages/BlogManager.tsx`**
+- [x] **Step 1: Create `frontend/src/pages/BlogManager.tsx`**
 Build the complete, responsive, modern blog management page styled cleanly with Tailwind CSS, supporting dark/light mode, real-time feedback toasts, and modal dialogs.
 
-- [ ] **Step 2: Update `frontend/src/App.tsx` routing**
+- [x] **Step 2: Update `frontend/src/App.tsx` routing**
 Replace `<ModuleHub ...>` placeholder at path `/blogs` with `<BlogManager />`.
 
-- [ ] **Step 3: Verify frontend compilation and TypeScript safety**
+- [x] **Step 3: Verify frontend compilation and TypeScript safety**
 Run: `cd frontend; bun run build`
 Expected: Zero TypeScript errors, successful production bundle.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 ```bash
 git add frontend/src/pages/BlogManager.tsx frontend/src/App.tsx
 git commit -m "feat(frontend): create modern dynamic blog manager cms interface"
@@ -219,18 +219,18 @@ git commit -m "feat(frontend): create modern dynamic blog manager cms interface"
 - Verify: Frontend production build & dev server
 - Update: Task progress artifact
 
-- [ ] **Step 1: Execute complete backend test suite**
+- [x] **Step 1: Execute complete backend test suite**
 Run: `.venv\Scripts\pytest backend\tests -v`
 Expected: 100% green tests with 0 failures.
 
-- [ ] **Step 2: Execute frontend production build**
+- [x] **Step 2: Execute frontend production build**
 Run: `cd frontend; bun run build`
 Expected: Successful build with 0 errors.
 
-- [ ] **Step 3: Verify live endpoints via curl/powershell**
+- [x] **Step 3: Verify live endpoints via curl/powershell**
 Perform live check of `/v1/blogs`, `/v1/blogs/categories`, `/v1/blogs/tags`, `/v1/blogs/authors`.
 
-- [ ] **Step 4: Final commit and branch review**
+- [x] **Step 4: Final commit and branch review**
 ```bash
 git status
 git log -n 3
