@@ -143,10 +143,13 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
       label: 'Property',
       icon: Building2,
       subItems: [
-        { label: 'All Properties', path: '/properties' },
-        { label: '7-Step Verifications', path: '/verifications' },
-        { label: 'Expired Listings (90/30d)', path: '/properties?status=expired' },
-        { label: 'Recycle Bin & Purge', path: '/recycle-bin' },
+        { label: 'New & Assign Properties', path: '/properties?tab=new_assign' },
+        { label: 'Verify & Live Properties', path: '/properties?tab=verify_live' },
+        { label: 'Verification Done', path: '/properties?tab=verification_done' },
+        { label: 'Expired Properties', path: '/properties?tab=expired' },
+        { label: 'Delete Property', path: '/properties?tab=deleted' },
+        { label: 'Sell Property', path: '/properties?tab=sold' },
+        { label: 'Request Live Property', path: '/properties?tab=request_live' },
       ],
     },
     {
@@ -416,7 +419,12 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                             <Circle className={`w-3 h-3 flex-shrink-0 stroke-[2.5] ${isSubActive ? 'text-rose-500' : 'text-slate-400 group-hover/sub:text-slate-200'}`} />
                             <span className="truncate">{sub.label}</span>
                           </div>
-                          {isSubActive && <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>}
+                          <div className="flex items-center gap-1.5">
+                            {(sub.label.includes('Delete Property') || sub.label.includes('Sell Property')) && (
+                              <ChevronRight className="w-3 h-3 text-slate-400/70 group-hover/sub:text-slate-300" />
+                            )}
+                            {isSubActive && <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>}
+                          </div>
                         </button>
                       );
                     })}

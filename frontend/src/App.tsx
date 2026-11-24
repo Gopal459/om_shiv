@@ -11,6 +11,8 @@ import RecycleBinView from './pages/RecycleBinView';
 import DynamicMastersEditor from './pages/DynamicMastersEditor';
 import SettingsEditor from './pages/SettingsEditor';
 import ModuleHub from './pages/ModuleHub';
+import PropertyHub from './pages/PropertyHub';
+import PropertyForm from './pages/PropertyForm';
 import { ThemeProvider } from './context/ThemeContext';
 
 const LeadDetailPage: React.FC = () => {
@@ -138,24 +140,13 @@ const AppContent: React.FC = () => {
             />
           }
         />
+        <Route path="/properties" element={<PropertyHub />} />
         <Route
-          path="/properties"
+          path="/properties/create"
           element={
-            <ModuleHub
-              title="Propira Property Inventory Management"
-              subtitle="End-to-end residential, commercial, agricultural listings, 7-step verifications, and listing lifecycle."
-              badge="Inventory Management"
-              stats={[
-                { label: 'Total Inventory', value: 348, change: 'Active across Jaipur' },
-                { label: 'Verified & Live', value: 184, change: 'Publicly searchable' },
-                { label: 'Under 7-Step Verification', value: 2, change: 'Documents & physical' },
-                { label: 'Recycled / Deleted', value: 0, change: 'Universal soft-delete' },
-              ]}
-              shortcuts={[
-                { label: '7-Step Property Verification Hub', desc: 'Perform telephonic checks, legal verification, and go-live', path: '/verifications' },
-                { label: 'Recycle Bin & Safe Purge Engine', desc: '1-Click restore or permanent purge with single-pending check', path: '/recycle-bin' },
-                { label: 'Dynamic Property Master Options', desc: 'Configure BHKs, Facing, Furnishing, Agricultural Bigha schemas', path: '/masters' },
-              ]}
+            <PropertyForm
+              onBack={() => navigate('/properties')}
+              onSuccess={() => navigate('/properties')}
             />
           }
         />
