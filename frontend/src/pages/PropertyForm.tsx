@@ -218,6 +218,8 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
   const [newImageUrl, setNewImageUrl] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+  const [uploadSuccess, setUploadSuccess] = useState('');
 
   // UI status
   const [loading, setLoading] = useState(false);
@@ -373,35 +375,45 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
 
   // 2. REAL FILE UPLOAD LOGIC WITH STATUTORY VALIDATION
   const processFiles = async (files: FileList | File[]) => {
+    setUploadError('');
+    setUploadSuccess('');
+    setError('');
+
     if (images.length >= 10) {
-      setError('Maximum 10 photos allowed for listing.');
+      setUploadError('Maximum 10 photos allowed for listing.');
       return;
     }
-    setError('');
-    const allowed = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+
+    const allowedMime = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+    const allowedExt = ['png', 'jpg', 'jpeg', 'webp'];
+    let uploadedCount = 0;
 
     for (let i = 0; i < files.length; i++) {
-      if (images.length + i >= 10) {
-        setError('Maximum limit of 10 photos reached.');
+      if (images.length + uploadedCount >= 10) {
+        setUploadError('Maximum limit of 10 photos reached.');
         break;
       }
       const file = files[i];
+      const ext = file.name.split('.').pop()?.toLowerCase() || '';
 
-      // Format validation
-      if (!allowed.includes(file.type.toLowerCase())) {
-        setError(`File "${file.name}" has invalid format. Accepted formats: PNG, JPG, JPEG, WEBP.`);
+      // Format validation: check both extension and MIME type
+      const isExtValid = allowedExt.includes(ext);
+      const isMimeValid = file.type ? (allowedMime.includes(file.type.toLowerCase()) || file.type.startsWith('image/')) : true;
+
+      if (!isExtValid && !isMimeValid) {
+        setUploadError(`File "${file.name}" has invalid format. Accepted formats: PNG, JPG, JPEG, WEBP.`);
         continue;
       }
 
       // Minimum Size check: 10KB
       if (file.size < 10 * 1024) {
-        setError(`File "${file.name}" is too small (${(file.size / 1024).toFixed(1)} KB). Minimum image size required is 10 KB.`);
+        setUploadError(`File "${file.name}" is too small (${(file.size / 1024).toFixed(1)} KB). Minimum size required is 10 KB.`);
         continue;
       }
 
       // Maximum Size check: 2MB
       if (file.size > 2 * 1024 * 1024) {
-        setError(`File "${file.name}" exceeds 2MB limit (${(file.size / (1024 * 1024)).toFixed(1)} MB). Maximum size is 2 MB.`);
+        setUploadError(`File "${file.name}" exceeds 2MB limit (${(file.size / (1024 * 1024)).toFixed(1)} MB). Maximum size is 2 MB.`);
         continue;
       }
 
@@ -420,13 +432,15 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
         if (res.ok) {
           const data = await res.json();
           setImages((prev) => [...prev, data.url]);
+          uploadedCount++;
+          setUploadSuccess(`Photo "${file.name}" uploaded successfully!`);
         } else {
           const errData = await res.json().catch(() => ({}));
           const errMsg = errData.detail || `Upload failed for ${file.name}.`;
-          setError(errMsg);
+          setUploadError(errMsg);
         }
       } catch (err: any) {
-        setError(err.message || `Network error uploading ${file.name}.`);
+        setUploadError(err.message || `Network error uploading ${file.name}.`);
       } finally {
         setUploadingImage(false);
       }
@@ -443,15 +457,19 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     setIsDragging(true);
   };
 
-  const handleDragLeave = () => {
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     setIsDragging(false);
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     setIsDragging(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       processFiles(e.dataTransfer.files);
@@ -683,7 +701,7 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
         type="file"
         ref={fileInputRef}
         multiple
-        accept="image/png,image/jpeg,image/jpg,image/webp"
+        accept="image/png,image/jpeg,image/jpg,image/webp,.png,.jpg,.jpeg,.webp"
         onChange={handleFileInputChange}
         className="hidden"
       />
@@ -1807,6 +1825,39 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
             />
           </div>
 
+          {/* Section 06 In-Place Feedback Alerts */}
+          {uploadError && (
+            <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-between text-rose-600 dark:text-rose-400 text-xs shadow-xs animate-shake">
+              <div className="flex items-center gap-2.5">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                <span className="font-bold">{uploadError}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setUploadError('')}
+                className="text-xs font-bold hover:underline cursor-pointer"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
+
+          {uploadSuccess && (
+            <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-between text-emerald-600 dark:text-emerald-400 text-xs shadow-xs">
+              <div className="flex items-center gap-2.5">
+                <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+                <span className="font-bold">{uploadSuccess}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setUploadSuccess('')}
+                className="text-xs font-bold hover:underline cursor-pointer"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
+
           {/* REAL DRAG & DROP PHOTO UPLOAD ZONE */}
           <div
             onDragOver={handleDragOver}
@@ -1854,12 +1905,20 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
               ))}
             </div>
 
-            {/* Upload Button */}
+            {/* Explicit Upload Button */}
             <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
-              <span className="px-6 py-3 rounded-2xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-extrabold text-xs flex items-center gap-2 shadow-lg shadow-rose-500/25 transition-all">
+              <button
+                type="button"
+                disabled={uploadingImage || images.length >= 10}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  fileInputRef.current?.click();
+                }}
+                className="px-6 py-3 rounded-2xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-extrabold text-xs flex items-center gap-2 shadow-lg shadow-rose-500/25 transition-all cursor-pointer disabled:opacity-50"
+              >
                 <Camera className="w-4 h-4" />
                 {uploadingImage ? 'Uploading...' : 'Choose Photos From Device'}
-              </span>
+              </button>
             </div>
           </div>
 

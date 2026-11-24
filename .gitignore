@@ -57,5 +57,8 @@ build/
 # Uploads
 uploads/*
 !uploads/.gitkeep
+backend/uploads/*
+!backend/uploads/.gitkeep
+
 
 
