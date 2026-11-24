@@ -696,16 +696,6 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-8">
-      {/* Hidden File Picker Input */}
-      <input
-        type="file"
-        ref={fileInputRef}
-        multiple
-        accept="image/png,image/jpeg,image/jpg,image/webp,.png,.jpg,.jpeg,.webp"
-        onChange={handleFileInputChange}
-        className="hidden"
-      />
-
       {/* 1. ULTRA-MODERN HEADER DOCK */}
       <div className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 text-white rounded-3xl p-6 sm:p-8 border border-slate-800 shadow-2xl">
         <div className="absolute top-0 right-0 w-96 h-96 bg-rose-500/10 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20"></div>
@@ -1793,15 +1783,31 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
           id="section-media"
           className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm p-6 sm:p-8 space-y-6"
         >
+          {/* Native HTML5 File Input (Accessible & Ref Independent) */}
+          <input
+            id="property-photo-file-input"
+            type="file"
+            ref={fileInputRef}
+            multiple
+            accept="image/png,image/jpeg,image/jpg,image/webp,.png,.jpg,.jpeg,.webp"
+            onChange={handleFileInputChange}
+            className="hidden"
+          />
+
           <div className="flex items-start justify-between border-b border-slate-100 dark:border-slate-800/80 pb-5">
             <div className="flex items-center gap-3.5">
               <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-purple-500 to-indigo-600 text-white flex items-center justify-center shadow-md shadow-purple-500/20">
                 <Camera className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-                  Media Gallery & Marketing Narrative
-                </h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                    Media Gallery & Marketing Narrative
+                  </h3>
+                  <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                    v2.5 Native File Engine
+                  </span>
+                </div>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
                   Upload high-definition photographs and craft compelling listing highlights.
                 </p>
@@ -1863,8 +1869,7 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
-            onClick={() => fileInputRef.current?.click()}
-            className={`p-6 sm:p-8 rounded-3xl border-2 border-dashed transition-all text-center space-y-4 cursor-pointer select-none ${
+            className={`p-6 sm:p-8 rounded-3xl border-2 border-dashed transition-all text-center space-y-4 select-none ${
               isDragging
                 ? 'border-rose-500 bg-rose-50/40 dark:bg-rose-950/30 scale-[1.01]'
                 : 'border-slate-300 dark:border-slate-700 bg-slate-50/40 dark:bg-slate-800/20 hover:border-rose-400'
@@ -1905,20 +1910,15 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
               ))}
             </div>
 
-            {/* Explicit Upload Button */}
+            {/* Native HTML5 Label Button */}
             <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
-              <button
-                type="button"
-                disabled={uploadingImage || images.length >= 10}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  fileInputRef.current?.click();
-                }}
-                className="px-6 py-3 rounded-2xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-extrabold text-xs flex items-center gap-2 shadow-lg shadow-rose-500/25 transition-all cursor-pointer disabled:opacity-50"
+              <label
+                htmlFor="property-photo-file-input"
+                className="px-6 py-3 rounded-2xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-extrabold text-xs flex items-center gap-2 shadow-lg shadow-rose-500/25 transition-all cursor-pointer select-none"
               >
                 <Camera className="w-4 h-4" />
                 {uploadingImage ? 'Uploading...' : 'Choose Photos From Device'}
-              </button>
+              </label>
             </div>
           </div>
 
