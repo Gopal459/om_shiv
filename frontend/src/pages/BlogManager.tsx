@@ -29,6 +29,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
+import RichTextEditor from '../components/RichTextEditor';
 
 interface BlogCategory {
   blog_category_id: number;
@@ -125,7 +126,6 @@ export const BlogManager: React.FC = () => {
   // Editor Form State
   const [editingBlogId, setEditingBlogId] = useState<number | null>(null);
   const [titleEn, setTitleEn] = useState('');
-  const [titleHi, setTitleHi] = useState('');
   const [slug, setSlug] = useState('');
   const [autoSlug, setAutoSlug] = useState(true);
   const [authorId, setAuthorId] = useState<number>(0);
@@ -133,7 +133,6 @@ export const BlogManager: React.FC = () => {
   const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
   const [shortDesc, setShortDesc] = useState('');
   const [bodyEn, setBodyEn] = useState('');
-  const [bodyHi, setBodyHi] = useState('');
   const [featuredImage, setFeaturedImage] = useState('');
   const [metaTitle, setMetaTitle] = useState('');
   const [metaKeyword, setMetaKeyword] = useState('');
@@ -339,7 +338,6 @@ export const BlogManager: React.FC = () => {
   const handleStartEdit = (b: BlogItem) => {
     setEditingBlogId(b.blog_id);
     setTitleEn(b.blog_title);
-    setTitleHi(b.blog_title_hindi || '');
     setSlug(b.slug);
     setAutoSlug(false);
     setAuthorId(b.author_name);
@@ -347,7 +345,6 @@ export const BlogManager: React.FC = () => {
     setSelectedTagIds(b.tag_ids || []);
     setShortDesc(b.short_description);
     setBodyEn(b.description);
-    setBodyHi(b.description_hindi || '');
     setFeaturedImage(b.image || '');
     setMetaTitle(b.meta_title);
     setMetaKeyword(b.meta_keyword);
@@ -362,14 +359,12 @@ export const BlogManager: React.FC = () => {
   const handleResetEditor = () => {
     setEditingBlogId(null);
     setTitleEn('');
-    setTitleHi('');
     setSlug('');
     setAutoSlug(true);
     setSelectedCatIds([]);
     setSelectedTagIds([]);
     setShortDesc('');
     setBodyEn('');
-    setBodyHi('');
     setFeaturedImage('');
     setMetaTitle('');
     setMetaKeyword('');
@@ -381,25 +376,23 @@ export const BlogManager: React.FC = () => {
 
   // Save / Submit Article
   const handleSaveArticle = async () => {
-    if (!titleEn.trim()) return showToast('English Title is required', 'error');
-    if (!titleHi.trim()) return showToast('Hindi Title is required for bilingual parity', 'error');
+    if (!titleEn.trim()) return showToast('Article Title is required', 'error');
     if (selectedCatIds.length === 0) return showToast('Select at least one category', 'error');
     if (selectedTagIds.length === 0) return showToast('Select at least one tag', 'error');
     if (!shortDesc.trim()) return showToast('Short excerpt is required', 'error');
-    if (!bodyEn.trim()) return showToast('English article body is required', 'error');
-    if (!bodyHi.trim()) return showToast('Hindi article body is required', 'error');
+    if (!bodyEn.trim()) return showToast('Full article content is required', 'error');
 
     setIsSavingArticle(true);
     const payload = {
       blog_title: titleEn.trim(),
-      blog_title_hindi: titleHi.trim(),
+      blog_title_hindi: null,
       slug: slug.trim(),
       author_name: authorId || (authors[0]?.author_id ?? 1),
       category_ids: selectedCatIds,
       tag_ids: selectedTagIds,
       short_description: shortDesc.trim(),
       description: bodyEn.trim(),
-      description_hindi: bodyHi.trim(),
+      description_hindi: null,
       image: featuredImage.trim(),
       meta_title: metaTitle.trim() || titleEn.trim(),
       meta_keyword: metaKeyword.trim(),
@@ -604,14 +597,14 @@ export const BlogManager: React.FC = () => {
               <span className="px-3 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400">
                 Editorial & Media CMS
               </span>
-              <span className="text-xs text-slate-400">100% Dynamic Bilingual Engine</span>
+              <span className="text-xs text-slate-400">100% Dynamic Content Engine</span>
             </div>
             <h1 className="text-2xl font-bold tracking-tight mt-1 flex items-center gap-2">
               <BookOpen className="w-7 h-7 text-rose-500" />
               Blog & Real Estate Market Insights
             </h1>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-              Publish investment outlooks, locality reports, and NCR real estate news in English & Hindi with SEO metadata.
+              Publish investment outlooks, locality reports, and NCR real estate news with rich text formatting & SEO metadata.
             </p>
           </div>
 
@@ -634,7 +627,7 @@ export const BlogManager: React.FC = () => {
           <div className={`p-4 rounded-xl border ${isDark ? 'bg-slate-800/40 border-slate-800' : 'bg-slate-50/70 border-slate-200'}`}>
             <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">Total Articles</span>
             <div className="text-2xl font-bold mt-1 text-slate-800 dark:text-white">{totalArticles}</div>
-            <span className="text-xs text-emerald-500 font-medium">Bilingual database</span>
+            <span className="text-xs text-emerald-500 font-medium">Dynamic database</span>
           </div>
           <div className={`p-4 rounded-xl border ${isDark ? 'bg-slate-800/40 border-slate-800' : 'bg-slate-50/70 border-slate-200'}`}>
             <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">Active Published</span>
@@ -805,7 +798,7 @@ export const BlogManager: React.FC = () => {
               <table className="w-full text-left text-sm">
                 <thead className={`border-b text-xs font-semibold uppercase tracking-wider ${isDark ? 'bg-slate-800/60 border-slate-800 text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-500'}`}>
                   <tr>
-                    <th className="py-3.5 px-4">Article & Bilingual Title</th>
+                    <th className="py-3.5 px-4">Article Title & Metadata</th>
                     <th className="py-3.5 px-4">Categories & Tags</th>
                     <th className="py-3.5 px-4 text-center">Status</th>
                     <th className="py-3.5 px-4 text-center">Featured</th>
@@ -843,11 +836,6 @@ export const BlogManager: React.FC = () => {
                               <div className="font-semibold text-slate-900 dark:text-white line-clamp-1">
                                 {item.blog_title}
                               </div>
-                              {item.blog_title_hindi && (
-                                <div className="text-xs text-rose-600 dark:text-rose-400 font-medium line-clamp-1 mt-0.5">
-                                  {item.blog_title_hindi}
-                                </div>
-                              )}
                               <div className="text-xs text-slate-400 mt-1 flex items-center gap-2">
                                 <span>Slug: /{item.slug}</span>
                                 <span>•</span>
@@ -990,37 +978,17 @@ export const BlogManager: React.FC = () => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Main Form (2 cols) */}
             <div className="lg:col-span-2 space-y-5">
-              {/* English & Hindi Titles */}
+              {/* Article Title & Slug */}
               <div className={`p-5 rounded-xl border space-y-4 ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
-                <div className="flex items-center gap-2 text-xs font-semibold text-rose-600 uppercase tracking-wider">
-                  <Globe className="w-4 h-4" />
-                  Bilingual Titles (Mandatory)
-                </div>
-
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
-                    English Title *
+                    Article Title *
                   </label>
                   <input
                     type="text"
                     value={titleEn}
                     onChange={(e) => handleTitleChange(e.target.value)}
                     placeholder="e.g. Top 5 Real Estate Investment Corridors in Alwar 2026"
-                    className={`w-full px-4 py-2.5 text-sm rounded-lg border font-medium outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 ${
-                      isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-800'
-                    }`}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
-                    Hindi Title (हिंदी शीर्षक) *
-                  </label>
-                  <input
-                    type="text"
-                    value={titleHi}
-                    onChange={(e) => setTitleHi(e.target.value)}
-                    placeholder="उदा. अलवर में 2026 में निवेश के लिए शीर्ष 5 रियल एस्टेट कॉरिडोर"
                     className={`w-full px-4 py-2.5 text-sm rounded-lg border font-medium outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 ${
                       isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-800'
                     }`}
@@ -1040,7 +1008,7 @@ export const BlogManager: React.FC = () => {
                         onChange={(e) => setAutoSlug(e.target.checked)}
                         className="rounded text-rose-600 focus:ring-rose-500"
                       />
-                      Auto-generate from English Title
+                      Auto-generate from Title
                     </label>
                   </div>
                   <div className="flex items-center">
@@ -1063,7 +1031,7 @@ export const BlogManager: React.FC = () => {
                 </div>
               </div>
 
-              {/* Excerpt & Article Bodies */}
+              {/* Excerpt & Full Article Content (Rich Text Editor) */}
               <div className={`p-5 rounded-xl border space-y-4 ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
@@ -1073,7 +1041,7 @@ export const BlogManager: React.FC = () => {
                     rows={3}
                     value={shortDesc}
                     onChange={(e) => setShortDesc(e.target.value)}
-                    placeholder="A concise executive overview displayed in article listing cards and social share embeds..."
+                    placeholder="A concise executive overview displayed in article listing cards and search snippets..."
                     className={`w-full px-4 py-2.5 text-sm rounded-lg border outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 ${
                       isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-800'
                     }`}
@@ -1081,32 +1049,14 @@ export const BlogManager: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
-                    Full Article Content (English) *
+                  <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
+                    Full Article Content (Rich Text Editor) *
                   </label>
-                  <textarea
-                    rows={8}
+                  <RichTextEditor
                     value={bodyEn}
-                    onChange={(e) => setBodyEn(e.target.value)}
-                    placeholder="Enter comprehensive English market analysis, project breakdowns, and investment advice..."
-                    className={`w-full px-4 py-2.5 text-sm rounded-lg border font-mono text-xs outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 ${
-                      isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-800'
-                    }`}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
-                    Full Article Content (हिंदी विवरण) *
-                  </label>
-                  <textarea
-                    rows={8}
-                    value={bodyHi}
-                    onChange={(e) => setBodyHi(e.target.value)}
-                    placeholder="लेख का संपूर्ण हिंदी विवरण दर्ज करें (स्थान विश्लेषण, मूल्य रुझान, कनेक्टिविटी)..."
-                    className={`w-full px-4 py-2.5 text-sm rounded-lg border font-mono text-xs outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 ${
-                      isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-800'
-                    }`}
+                    onChange={setBodyEn}
+                    placeholder="Write detailed market reports, format headings, add bullet points, insert hyperlinks, and embed photos..."
+                    minHeight="420px"
                   />
                 </div>
               </div>
