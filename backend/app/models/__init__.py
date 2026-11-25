@@ -10,6 +10,13 @@ from app.models.blogs import (
     TblBlogTag,
     TblBlogComment,
 )
+from app.models.ai_agents import (
+    AIAgentConfig,
+    CustomerConsent,
+    AIApprovalQueue,
+    AIAgentExecutionLog,
+    PropertyAlertHistory,
+)
 
 __all__ = [
     "Base",
@@ -30,4 +37,9 @@ __all__ = [
     "TblBlogAuthor",
     "TblBlogTag",
     "TblBlogComment",
+    "AIAgentConfig",
+    "CustomerConsent",
+    "AIApprovalQueue",
+    "AIAgentExecutionLog",
+    "PropertyAlertHistory",
 ]
