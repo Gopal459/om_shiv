@@ -18,10 +18,12 @@ def _format_price_indian(amount: Optional[float]) -> str:
         return "Price on Request"
     if amount >= 10_000_000:
         cr = amount / 10_000_000
-        return f"₹{cr:.2f} Cr".rstrip("0").rstrip(".") + " Cr" if "." in f"{cr:.2f}" else f"₹{int(cr)} Cr"
+        formatted = f"{cr:.2f}".rstrip("0").rstrip(".")
+        return f"₹{formatted} Cr"
     if amount >= 100_000:
         lakh = amount / 100_000
-        return f"₹{lakh:.2f} Lakh".rstrip("0").rstrip(".") + " Lakh" if "." in f"{lakh:.2f}" else f"₹{int(lakh)} Lakh"
+        formatted = f"{lakh:.2f}".rstrip("0").rstrip(".")
+        return f"₹{formatted} Lakh"
     return f"₹{int(amount):,}"
 
 

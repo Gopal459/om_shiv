@@ -2,7 +2,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.ai.agents.property_search_agent import PropertySearchAgent
+from app.services.ai.agents.property_search_agent import PropertySearchAgent, _format_price_indian
 from app.services.ai.safety_guardrails import SafetyGuardrailsService
 from app.models.properties import Property, PropResidentialFlat
 from app.models.ai_agents import AIAgentExecutionLog
@@ -157,3 +157,15 @@ async def test_property_search_agent_default_initialization(db_session: AsyncSes
     assert agent.ai_client is not None
     assert agent.guardrails is not None
     assert agent.tools is not None
+
+
+def test_format_price_indian():
+    assert _format_price_indian(8500000) == "₹85 Lakh"
+    assert "Lakh Lakh" not in _format_price_indian(8500000)
+    assert _format_price_indian(15000000) == "₹1.5 Cr"
+    assert "Cr Cr" not in _format_price_indian(15000000)
+    assert _format_price_indian(12300000) == "₹1.23 Cr"
+    assert _format_price_indian(50000) == "₹50,000"
+    assert _format_price_indian(0) == "Price on Request"
+    assert _format_price_indian(None) == "Price on Request"
+
