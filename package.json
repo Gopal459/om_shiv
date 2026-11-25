@@ -1,0 +1,19 @@
+{
+  "name": "omshiv-crm",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Omshiv Buildvision CRM - Unified Full-Stack Platform",
+  "scripts": {
+    "dev": "bun run scripts/dev.ts",
+    "dev:all": "bun run scripts/dev.ts",
+    "dev:backend": "bun run scripts/dev.ts --backend-only",
+    "dev:frontend": "bun --cwd frontend dev",
+    "build": "bun --cwd frontend build",
+    "preview": "bun --cwd frontend preview",
+    "test:backend": ".venv/Scripts/pytest backend/tests"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.30"
+  }
+}
+
