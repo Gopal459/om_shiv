@@ -3,7 +3,7 @@ import re
 from datetime import datetime, timezone, timedelta
 from typing import Optional, Any, List
 
-from sqlalchemy import select, func, or_
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.ai_agents import (
@@ -31,12 +31,28 @@ def _normalize_phone(phone: Optional[str]) -> str:
     return digits
 
 
+def _get_phone_variants(phone: str) -> list[str]:
+    """Generate symmetric phone variants (10-digit, 12-digit, raw) for resilient lookups."""
+    if not phone:
+        return []
+    raw = str(phone).strip()
+    norm = _normalize_phone(raw)
+    variants = {raw, norm}
+    if len(norm) == 12 and norm.startswith("91"):
+        variants.add(norm[2:])
+    elif len(norm) == 10:
+        variants.add(f"91{norm}")
+    return list(variants - {""})
+
+
 class SafetyGuardrailsService:
     """
     Core safety and governance engine for Omshiv AI agents.
     Provides feature flags/shadow mode, TRAI consent verification,
     sliding-window rate limiting, duplicate alert suppression, and PII masking.
     """
+
+    VALID_MODES = {"DISABLED", "SHADOW", "LIVE"}
 
     def __init__(self, db: Optional[AsyncSession] = None):
         self.db = db
@@ -91,6 +107,11 @@ class SafetyGuardrailsService:
             raise ValueError("Database session required to set agent mode")
 
         valid_mode = mode.upper()
+        if valid_mode not in self.VALID_MODES:
+            raise ValueError(
+                f"Invalid mode '{mode}'. Allowed modes are: {', '.join(sorted(self.VALID_MODES))}"
+            )
+
         stmt = select(AIAgentConfig).where(AIAgentConfig.agent_name == agent_name)
         res = await self.db.execute(stmt)
         config = res.scalar_one_or_none()
@@ -118,8 +139,7 @@ class SafetyGuardrailsService:
         if self.db is None:
             return False
 
-        norm_mobile = _normalize_phone(mobile)
-        phone_variants = list({mobile, norm_mobile} - {""})
+        phone_variants = _get_phone_variants(mobile)
         norm_channel = channel.upper()
 
         stmt = (
@@ -148,12 +168,14 @@ class SafetyGuardrailsService:
     ) -> CustomerConsent:
         """
         Records or updates customer communication consent.
+        Always stores canonical normalized mobile for consistent lookup.
         """
         if self.db is None:
             raise ValueError("Database session required to register consent")
 
+        phone_variants = _get_phone_variants(mobile)
         norm_mobile = _normalize_phone(mobile)
-        phone_variants = list({mobile, norm_mobile} - {""})
+        canonical_mobile = norm_mobile or str(mobile).strip()
         norm_channel = channel.upper()
 
         stmt = (
@@ -170,6 +192,7 @@ class SafetyGuardrailsService:
 
         now = datetime.now(timezone.utc)
         if consent:
+            consent.mobile = canonical_mobile
             consent.is_opted_in = is_opted_in
             consent.consent_source = source
             if is_opted_in:
@@ -181,7 +204,7 @@ class SafetyGuardrailsService:
             consent.updated_at = now
         else:
             consent = CustomerConsent(
-                mobile=mobile,
+                mobile=canonical_mobile,
                 channel=norm_channel,
                 is_opted_in=is_opted_in,
                 consent_source=source,
@@ -205,13 +228,13 @@ class SafetyGuardrailsService:
     ) -> bool:
         """
         Sliding-window rate limiter counting dispatches to a mobile in the last 1 hour.
+        Combines execution log dispatches and property alert notifications.
         Returns True if within rate limit (allowed), False if limit reached (blocked).
         """
         if self.db is None:
             return True
 
-        norm_mobile = _normalize_phone(mobile)
-        phone_variants = list({mobile, norm_mobile} - {""})
+        phone_variants = _get_phone_variants(mobile)
         norm_channel = channel.upper()
         cutoff = datetime.now(timezone.utc) - timedelta(hours=1)
 
@@ -241,7 +264,7 @@ class SafetyGuardrailsService:
         )
         alert_count = (await self.db.execute(alert_stmt)).scalar() or 0
 
-        total_dispatches = max(exec_count, alert_count, exec_count + alert_count if exec_count == 0 or alert_count == 0 else exec_count)
+        total_dispatches = exec_count + alert_count
         return total_dispatches < max_per_hour
 
     async def is_duplicate_property_alert(
@@ -264,6 +287,7 @@ class SafetyGuardrailsService:
                 PropertyAlertHistory.lead_id == lead_id,
                 PropertyAlertHistory.property_id == property_id,
                 PropertyAlertHistory.sent_at >= cutoff,
+                PropertyAlertHistory.status.in_(["SENT", "DELIVERED"]),
             )
             .limit(1)
         )
@@ -286,13 +310,14 @@ class SafetyGuardrailsService:
     ) -> AIAgentExecutionLog:
         """
         Audit log tracking for every agent decision, tool invocation, and shadow execution.
-        Automatically applies PII masking to input and output text.
+        Automatically applies PII masking to input, output text, and error messages.
         """
         if self.db is None:
             raise ValueError("Database session required to record execution log")
 
         masked_input = self.mask_pii(input_summary) if input_summary else None
         masked_output = self.mask_pii(output_response) if output_response else None
+        masked_error = self.mask_pii(error_message) if error_message else None
 
         log = AIAgentExecutionLog(
             agent_name=agent_name,
@@ -305,7 +330,7 @@ class SafetyGuardrailsService:
             tools_called=tools_called,
             status=status.upper(),
             approval_id=approval_id,
-            error_message=error_message,
+            error_message=masked_error,
             created_at=datetime.now(timezone.utc),
         )
         self.db.add(log)
