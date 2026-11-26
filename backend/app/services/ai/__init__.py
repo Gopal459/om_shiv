@@ -13,6 +13,7 @@ from app.services.ai.agents.whatsapp_agent import WhatsAppAgent
 from app.services.ai.agents.voice_calling_agent import VoiceCallingAgent
 from app.services.ai.agents.new_property_alert_agent import NewPropertyAlertAgent
 from app.services.ai.agents.site_visit_agent import SiteVisitAgent
+from app.services.ai.agents.followup_journey_agent import FollowupJourneyAgent
 
 __all__ = [
     "SafetyGuardrailsService",
@@ -30,4 +31,5 @@ __all__ = [
     "VoiceCallingAgent",
     "NewPropertyAlertAgent",
     "SiteVisitAgent",
+    "FollowupJourneyAgent",
 ]
