@@ -8,6 +8,7 @@ from app.services.ai.agents.customer_support_agent import CustomerSupportAgent
 from app.services.ai.agents.sales_assistant_agent import SalesAssistantAgent
 from app.services.ai.agents.document_processing_agent import DocumentProcessingAgent
 from app.services.ai.agents.meta_lead_agent import MetaLeadAgent
+from app.services.ai.agents.whatsapp_agent import WhatsAppAgent
 
 __all__ = [
     "SafetyGuardrailsService",
@@ -20,4 +21,5 @@ __all__ = [
     "SalesAssistantAgent",
     "DocumentProcessingAgent",
     "MetaLeadAgent",
+    "WhatsAppAgent",
 ]

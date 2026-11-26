@@ -19,6 +19,55 @@ class WhatsAppGateway:
         self.api_url = api_url or settings.DOUBLETICK_API_URL
         self.sent_messages: list = []
 
+    async def send_message(self, mobile: str, text: str) -> bool:
+        """Send freeform text message via DoubleTick WhatsApp Business API.
+        
+        Returns True if delivery succeeded, False on failure.
+        """
+        # Testing/Dev mock mode
+        if (
+            os.environ.get("PYTEST_CURRENT_TEST")
+            or os.environ.get("TESTING", "").lower() in ("true", "1")
+            or not self.api_key
+        ):
+            logger.info("WhatsApp Gateway [MOCK]: Dispatched message to %s: %s", mobile, text[:50] if text else "")
+            self.sent_messages.append({"mobile": mobile, "text": text, "channel": "WHATSAPP"})
+            return True
+
+        # Production / Live API call
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "to": f"+91{mobile}" if not mobile.startswith("+") else mobile,
+            "content": {
+                "text": text,
+            },
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.post(
+                    f"{self.api_url}/messages",
+                    json=payload,
+                    headers=headers,
+                )
+                if response.status_code in (200, 201):
+                    logger.info("WhatsApp message dispatched to %s", mobile)
+                    return True
+                else:
+                    logger.warning(
+                        "WhatsApp message delivery failed to %s: HTTP %s - %s",
+                        mobile,
+                        response.status_code,
+                        response.text,
+                    )
+                    return False
+        except Exception as exc:
+            logger.error("WhatsApp delivery exception for %s: %s", mobile, exc)
+            return False
+
     async def send_otp(self, mobile: str, otp: str) -> bool:
         """Send 6-digit numeric OTP via DoubleTick WhatsApp Business API.
         

@@ -4,6 +4,7 @@ from app.services.ai.agents.customer_support_agent import CustomerSupportAgent
 from app.services.ai.agents.sales_assistant_agent import SalesAssistantAgent
 from app.services.ai.agents.document_processing_agent import DocumentProcessingAgent
 from app.services.ai.agents.meta_lead_agent import MetaLeadAgent
+from app.services.ai.agents.whatsapp_agent import WhatsAppAgent
 from app.services.ai.ocr_service import extract_text_from_file_buffer
 
 __all__ = [
@@ -13,5 +14,6 @@ __all__ = [
     "SalesAssistantAgent",
     "DocumentProcessingAgent",
     "MetaLeadAgent",
+    "WhatsAppAgent",
     "extract_text_from_file_buffer",
 ]

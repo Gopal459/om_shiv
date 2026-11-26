@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.services.ai.agents.meta_lead_agent import MetaLeadAgent
+from app.services.ai.agents.whatsapp_agent import WhatsAppAgent
 
 logger = logging.getLogger(__name__)
 
@@ -104,3 +105,71 @@ async def post_instagram_lead(
     agent = MetaLeadAgent(db)
     result = await agent.process_meta_lead(lead_payload, channel="INSTAGRAM")
     return result
+
+
+@router.get("/whatsapp", summary="WhatsApp Webhook Subscription Verification")
+async def verify_whatsapp_webhook(
+    hub_mode: Optional[str] = Query(None, alias="hub.mode"),
+    hub_verify_token: Optional[str] = Query(None, alias="hub.verify_token"),
+    hub_challenge: Optional[str] = Query(None, alias="hub.challenge"),
+):
+    """GET verification challenge for WhatsApp webhook subscription."""
+    return _verify_meta_challenge(hub_mode, hub_verify_token, hub_challenge)
+
+
+@router.post("/whatsapp", summary="WhatsApp Inbound Message Webhook")
+async def post_whatsapp_message(
+    payload: Dict[str, Any],
+    db: AsyncSession = Depends(get_db),
+):
+    """POST endpoint for incoming WhatsApp messages."""
+    mobile = None
+    text = None
+    lead_id = payload.get("lead_id")
+
+    # Direct flat format: {"mobile": "...", "text": "..."}
+    if "mobile" in payload:
+        mobile = payload.get("mobile")
+    elif "from" in payload:
+        mobile = payload.get("from")
+    elif "phone" in payload:
+        mobile = payload.get("phone")
+
+    if "text" in payload and isinstance(payload["text"], str):
+        text = payload.get("text")
+    elif "message" in payload and isinstance(payload["message"], str):
+        text = payload.get("message")
+    elif "body" in payload and isinstance(payload["body"], str):
+        text = payload.get("body")
+
+    # Meta Cloud API nested structure: entry -> changes -> value -> messages
+    if not mobile or not text:
+        if "entry" in payload and isinstance(payload["entry"], list) and len(payload["entry"]) > 0:
+            entry = payload["entry"][0]
+            changes = entry.get("changes", [])
+            if changes and isinstance(changes, list) and len(changes) > 0:
+                val = changes[0].get("value", {})
+                messages = val.get("messages", [])
+                if messages and isinstance(messages, list) and len(messages) > 0:
+                    msg = messages[0]
+                    mobile = mobile or msg.get("from")
+                    msg_text = msg.get("text", {})
+                    if isinstance(msg_text, dict):
+                        text = text or msg_text.get("body")
+                    elif isinstance(msg_text, str):
+                        text = text or msg_text
+
+    if not mobile:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Missing mobile number or sender in webhook payload",
+        )
+
+    agent = WhatsAppAgent(db)
+    result = await agent.handle_incoming_message(
+        mobile=str(mobile),
+        text=str(text or ""),
+        lead_id=str(lead_id) if lead_id else None,
+    )
+    return result
+

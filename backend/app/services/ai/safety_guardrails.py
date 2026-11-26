@@ -175,7 +175,7 @@ class SafetyGuardrailsService:
 
         phone_variants = _get_phone_variants(mobile)
         norm_mobile = _normalize_phone(mobile)
-        canonical_mobile = norm_mobile or str(mobile).strip()
+        canonical_mobile = str(mobile).strip()
         norm_channel = channel.upper()
 
         stmt = (
