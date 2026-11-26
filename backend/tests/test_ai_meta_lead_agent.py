@@ -183,3 +183,68 @@ async def test_instagram_webhook_post_lead(test_client, db_session):
     assert res.status_code == 200
     data = res.json()
     assert data["created"] is True
+
+
+@pytest.mark.asyncio
+async def test_instagram_lead_intake_with_dict_message(db_session):
+    agent = MetaLeadAgent(db_session)
+    payload = {
+        "sender_id": "ig_dict_1",
+        "username": "ananya_realty",
+        "city": "Jaipur",
+        "message": {
+            "mid": "mid_1234567890",
+            "text": "Hi, please WhatsApp me property brochures on 9829011223",
+        },
+    }
+    res = await agent.process_meta_lead(payload, channel="INSTAGRAM")
+    assert res["created"] is True
+    assert res["mobile"] == "9829011223"
+
+    lead = (await db_session.execute(Lead.select().where(Lead.mobile == "9829011223"))).scalar_one_or_none()
+    assert lead is not None
+    assert lead.source == "INSTAGRAM"
+
+    consent = (await db_session.execute(CustomerConsent.select().where(CustomerConsent.mobile == "9829011223"))).scalar_one_or_none()
+    assert consent is not None
+    assert consent.is_opted_in is True
+
+
+@pytest.mark.asyncio
+async def test_meta_webhook_challenge_rejected_on_missing_or_invalid_token(test_client):
+    # Missing verify_token
+    res_missing = await test_client.get(
+        "/v1/ai/webhooks/meta",
+        params={
+            "hub.mode": "subscribe",
+            "hub.challenge": "1158201444",
+        },
+    )
+    assert res_missing.status_code == 403
+    assert res_missing.json()["detail"] == "Verification token mismatch"
+
+    # Invalid verify_token
+    res_invalid = await test_client.get(
+        "/v1/ai/webhooks/meta",
+        params={
+            "hub.mode": "subscribe",
+            "hub.challenge": "1158201444",
+            "hub.verify_token": "wrong_secret_token",
+        },
+    )
+    assert res_invalid.status_code == 403
+    assert res_invalid.json()["detail"] == "Verification token mismatch"
+
+
+@pytest.mark.asyncio
+async def test_instagram_webhook_challenge_rejected_on_missing_token(test_client):
+    res = await test_client.get(
+        "/v1/ai/webhooks/instagram",
+        params={
+            "hub.mode": "subscribe",
+            "hub.challenge": "99887766",
+        },
+    )
+    assert res.status_code == 403
+    assert res.json()["detail"] == "Verification token mismatch"
+

@@ -24,7 +24,7 @@ def _verify_meta_challenge(
     """Verifies standard Meta/Instagram webhook subscription challenge."""
     expected_token = os.environ.get("META_VERIFY_TOKEN", DEFAULT_VERIFY_TOKEN)
     if hub_mode == "subscribe":
-        if hub_verify_token and expected_token and hub_verify_token != expected_token:
+        if expected_token and hub_verify_token != expected_token:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Verification token mismatch",

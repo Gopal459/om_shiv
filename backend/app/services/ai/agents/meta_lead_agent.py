@@ -24,9 +24,11 @@ def _clean_phone(phone: Optional[str]) -> str:
     return digits
 
 
-def _extract_mobile_from_text(text: str) -> Optional[str]:
-    """Extract first 10-12 digit mobile number from freeform text."""
-    if not text:
+def _extract_mobile_from_text(text: Any) -> Optional[str]:
+    """Extract first 10-12 digit mobile number from freeform text or dictionary."""
+    if isinstance(text, dict):
+        text = text.get("text") or text.get("body") or ""
+    if not text or not isinstance(text, str):
         return None
     match = re.search(r"\b(?:(?:\+?91)?[6-9]\d{9})\b", text)
     if match:
@@ -199,7 +201,7 @@ class MetaLeadAgent:
         consent_stmt = (
             select(CustomerConsent)
             .where(
-                CustomerConsent.mobile == mobile,
+                CustomerConsent.mobile.in_(phone_variants),
                 func.upper(CustomerConsent.channel) == "WHATSAPP",
             )
             .order_by(CustomerConsent.id.desc())
@@ -287,8 +289,13 @@ class MetaLeadAgent:
             for k, v in form_data.items():
                 transcript_lines.append(f"{k}: {v}")
 
-        if payload.get("message"):
-            transcript_lines.append(f"Message: {payload['message']}")
+        msg_val = payload.get("message")
+        if isinstance(msg_val, dict):
+            msg_text = msg_val.get("text") or msg_val.get("body") or ""
+            if msg_text:
+                transcript_lines.append(f"Message: {msg_text}")
+        elif msg_val:
+            transcript_lines.append(f"Message: {msg_val}")
 
         if transcript_lines:
             transcript = "\n".join(transcript_lines)
