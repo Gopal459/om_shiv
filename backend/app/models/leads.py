@@ -12,6 +12,7 @@ from sqlalchemy import (
     ForeignKey,
     JSON,
     Text,
+    select,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -87,6 +88,10 @@ class Lead(Base):
         back_populates="lead",
         cascade="all, delete-orphan",
     )
+
+    @classmethod
+    def select(cls):
+        return select(cls)
 
 
 class LeadSequence(Base):
