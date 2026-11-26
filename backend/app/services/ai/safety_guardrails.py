@@ -220,6 +220,21 @@ class SafetyGuardrailsService:
         await self.db.refresh(consent)
         return consent
 
+    async def record_opt_out(
+        self,
+        mobile: str,
+        channel: str = "WHATSAPP",
+        reason: Optional[str] = "Customer requested opt-out / STOP",
+    ) -> CustomerConsent:
+        """Records an opt-out event for customer communication consent."""
+        return await self.register_consent(
+            mobile=mobile,
+            channel=channel,
+            is_opted_in=False,
+            source="INCOMING_MESSAGE",
+            reason=reason,
+        )
+
     async def check_rate_limit(
         self,
         mobile: str,

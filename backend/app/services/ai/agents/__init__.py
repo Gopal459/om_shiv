@@ -8,6 +8,7 @@ from app.services.ai.agents.whatsapp_agent import WhatsAppAgent
 from app.services.ai.agents.voice_calling_agent import VoiceCallingAgent
 from app.services.ai.agents.new_property_alert_agent import NewPropertyAlertAgent
 from app.services.ai.agents.site_visit_agent import SiteVisitAgent
+from app.services.ai.agents.followup_journey_agent import FollowupJourneyAgent
 from app.services.ai.ocr_service import extract_text_from_file_buffer
 
 __all__ = [
@@ -21,5 +22,6 @@ __all__ = [
     "VoiceCallingAgent",
     "NewPropertyAlertAgent",
     "SiteVisitAgent",
+    "FollowupJourneyAgent",
     "extract_text_from_file_buffer",
 ]
