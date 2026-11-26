@@ -12,6 +12,7 @@ from app.services.ai.agents.meta_lead_agent import MetaLeadAgent
 from app.services.ai.agents.whatsapp_agent import WhatsAppAgent
 from app.services.ai.agents.voice_calling_agent import VoiceCallingAgent
 from app.services.ai.agents.new_property_alert_agent import NewPropertyAlertAgent
+from app.services.ai.agents.site_visit_agent import SiteVisitAgent
 
 __all__ = [
     "SafetyGuardrailsService",
@@ -28,4 +29,5 @@ __all__ = [
     "WhatsAppAgent",
     "VoiceCallingAgent",
     "NewPropertyAlertAgent",
+    "SiteVisitAgent",
 ]
