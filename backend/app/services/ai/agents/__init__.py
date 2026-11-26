@@ -6,6 +6,7 @@ from app.services.ai.agents.document_processing_agent import DocumentProcessingA
 from app.services.ai.agents.meta_lead_agent import MetaLeadAgent
 from app.services.ai.agents.whatsapp_agent import WhatsAppAgent
 from app.services.ai.agents.voice_calling_agent import VoiceCallingAgent
+from app.services.ai.agents.new_property_alert_agent import NewPropertyAlertAgent
 from app.services.ai.ocr_service import extract_text_from_file_buffer
 
 __all__ = [
@@ -17,5 +18,6 @@ __all__ = [
     "MetaLeadAgent",
     "WhatsAppAgent",
     "VoiceCallingAgent",
+    "NewPropertyAlertAgent",
     "extract_text_from_file_buffer",
 ]

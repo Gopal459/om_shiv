@@ -11,6 +11,7 @@ from app.services.ai.agents.document_processing_agent import DocumentProcessingA
 from app.services.ai.agents.meta_lead_agent import MetaLeadAgent
 from app.services.ai.agents.whatsapp_agent import WhatsAppAgent
 from app.services.ai.agents.voice_calling_agent import VoiceCallingAgent
+from app.services.ai.agents.new_property_alert_agent import NewPropertyAlertAgent
 
 __all__ = [
     "SafetyGuardrailsService",
@@ -26,4 +27,5 @@ __all__ = [
     "MetaLeadAgent",
     "WhatsAppAgent",
     "VoiceCallingAgent",
+    "NewPropertyAlertAgent",
 ]
