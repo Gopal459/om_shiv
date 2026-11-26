@@ -17,7 +17,9 @@ async def test_voice_call_blocked_without_consent(db_session):
 
     mock_telephony = MockTelephonyClient()
     agent = VoiceCallingAgent(db_session, telephony_client=mock_telephony)
-    res = await agent.trigger_outbound_call("OB-2026-000004")
+    ist = timezone(timedelta(hours=5, minutes=30))
+    day_time = datetime(2026, 11, 26, 14, 0, tzinfo=ist)
+    res = await agent.trigger_outbound_call("OB-2026-000004", check_time=day_time)
 
     assert res["status"] == "BLOCKED_NO_CONSENT"
     assert mock_telephony.calls_dispatched == 0
@@ -33,7 +35,9 @@ async def test_voice_call_shadow_mode_logs_without_calling(db_session):
 
     mock_telephony = MockTelephonyClient()
     agent = VoiceCallingAgent(db_session, telephony_client=mock_telephony)
-    res = await agent.trigger_outbound_call("OB-2026-000004b")
+    ist = timezone(timedelta(hours=5, minutes=30))
+    day_time = datetime(2026, 11, 26, 14, 0, tzinfo=ist)
+    res = await agent.trigger_outbound_call("OB-2026-000004b", check_time=day_time)
 
     assert res["mode"] == "SHADOW"
     assert res["call_dispatched"] is False
@@ -219,4 +223,84 @@ async def test_webhook_voice_transcript(test_client, db_session):
     data = res.json()
     assert data["success"] is True
     assert data["lead_id"] == "OB-2026-000004h"
+
+
+@pytest.mark.asyncio
+async def test_webhook_voice_status_form_encoded(test_client, db_session):
+    lead = Lead(lead_id="OB-2026-000004i", full_name="Sita Devi", mobile="9829066674", stage="NEW")
+    db_session.add(lead)
+    await db_session.commit()
+
+    form_payload = {
+        "CallSid": "exotel-call-form-123",
+        "Status": "completed",
+        "CustomField": "OB-2026-000004i",
+        "Duration": "30",
+        "RecordingUrl": "https://s3.exotel.com/rec/call_form.mp3",
+    }
+    res = await test_client.post("/v1/ai/webhooks/voice/status", data=form_payload)
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "received"
+    assert data["call_sid"] == "exotel-call-form-123"
+
+    activities = (await db_session.execute(
+        select(LeadActivity).where(LeadActivity.lead_id == "OB-2026-000004i")
+    )).scalars().all()
+    assert len(activities) >= 1
+
+
+@pytest.mark.asyncio
+async def test_webhook_voice_status_unknown_lead_no_error(test_client, db_session):
+    form_payload = {
+        "CallSid": "exotel-call-unregistered",
+        "Status": "completed",
+        "CustomField": "OB-NONEXISTENT-9999",
+        "Duration": "15",
+    }
+    res = await test_client.post("/v1/ai/webhooks/voice/status", data=form_payload)
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "received"
+    assert data["call_sid"] == "exotel-call-unregistered"
+
+
+@pytest.mark.asyncio
+async def test_webhook_voice_transcript_form_encoded(test_client, db_session):
+    lead = Lead(lead_id="OB-2026-000004j", full_name="Karan Johar", mobile="9829066675", stage="NEW")
+    db_session.add(lead)
+    await db_session.commit()
+
+    form_payload = {
+        "lead_id": "OB-2026-000004j",
+        "transcript": "Hello, I want to inquire about plots near Delhi-Mumbai Expressway.",
+        "call_duration": "40",
+    }
+    res = await test_client.post("/v1/ai/webhooks/voice/transcript", data=form_payload)
+    assert res.status_code == 200
+    data = res.json()
+    assert data["success"] is True
+    assert data["lead_id"] == "OB-2026-000004j"
+
+
+@pytest.mark.asyncio
+async def test_voice_call_live_mode_failed_dispatch(db_session):
+    cfg = AIAgentConfig(agent_name="voice_calling_agent", display_name="Voice Call", mode="LIVE")
+    lead = Lead(lead_id="OB-2026-000004k", full_name="Neeraj Sharma", mobile="9829066676", stage="NEW")
+    consent = CustomerConsent(mobile="9829066676", channel="VOICE", is_opted_in=True)
+    db_session.add_all([cfg, lead, consent])
+    await db_session.commit()
+
+    mock_telephony = MockTelephonyClient()
+    mock_telephony.set_canned_call_result({"success": False, "error": "Gateway timeout", "status": "FAILED"})
+    agent = VoiceCallingAgent(db_session, telephony_client=mock_telephony)
+
+    ist = timezone(timedelta(hours=5, minutes=30))
+    day_time = datetime(2026, 11, 26, 14, 0, tzinfo=ist)
+
+    res = await agent.trigger_outbound_call("OB-2026-000004k", check_time=day_time)
+
+    assert res["status"] == "FAILED"
+    assert res["call_dispatched"] is False
+    assert mock_telephony.calls_dispatched == 1
 

@@ -5,10 +5,11 @@ from datetime import datetime, timezone
 from typing import Dict, Any, Optional
 
 from fastapi import APIRouter, Depends, Query, Response, HTTPException, Request, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.models.leads import LeadActivity
+from app.models.leads import Lead, LeadActivity
 from app.services.ai.agents.meta_lead_agent import MetaLeadAgent
 from app.services.ai.agents.whatsapp_agent import WhatsAppAgent
 from app.services.ai.agents.voice_calling_agent import VoiceCallingAgent
@@ -180,20 +181,17 @@ async def post_whatsapp_message(
 @router.post("/voice/status", summary="Exotel Call Status Webhook")
 async def post_voice_status(
     request: Request,
-    payload: Optional[Dict[str, Any]] = None,
     db: AsyncSession = Depends(get_db),
 ):
     """POST endpoint for Exotel call status callbacks."""
-    data = payload or {}
-    if not data:
+    try:
+        data = await request.json()
+    except Exception:
         try:
-            data = await request.json()
+            form = await request.form()
+            data = dict(form)
         except Exception:
-            try:
-                form = await request.form()
-                data = dict(form)
-            except Exception:
-                data = {}
+            data = {}
 
     call_sid = data.get("CallSid") or data.get("call_sid") or data.get("Sid")
     call_status = data.get("Status") or data.get("status") or data.get("CallStatus") or "COMPLETED"
@@ -202,16 +200,20 @@ async def post_voice_status(
     recording_url = data.get("RecordingUrl") or data.get("recording_url")
 
     if lead_id:
-        activity = LeadActivity(
-            lead_id=str(lead_id),
-            action_type="VOICE_CALL_STATUS",
-            outcome=str(call_status),
-            note=f"Call {call_sid} status: {call_status} (duration: {duration}s)" + (f" | Recording: {recording_url}" if recording_url else ""),
-            performed_by="EXOTEL_WEBHOOK",
-            created_at=datetime.now(timezone.utc),
-        )
-        db.add(activity)
-        await db.commit()
+        lead_exists = (
+            await db.execute(select(Lead.lead_id).where(Lead.lead_id == str(lead_id)))
+        ).scalar_one_or_none()
+        if lead_exists:
+            activity = LeadActivity(
+                lead_id=str(lead_id),
+                action_type="VOICE_CALL_STATUS",
+                outcome=str(call_status),
+                note=f"Call {call_sid} status: {call_status} (duration: {duration}s)" + (f" | Recording: {recording_url}" if recording_url else ""),
+                performed_by="EXOTEL_WEBHOOK",
+                created_at=datetime.now(timezone.utc),
+            )
+            db.add(activity)
+            await db.commit()
 
     return {
         "status": "received",
@@ -224,20 +226,17 @@ async def post_voice_status(
 @router.post("/voice/transcript", summary="Exotel Voice Transcript Ingestion Endpoint")
 async def post_voice_transcript(
     request: Request,
-    payload: Optional[Dict[str, Any]] = None,
     db: AsyncSession = Depends(get_db),
 ):
     """POST endpoint for inbound speech-to-text call transcripts."""
-    data = payload or {}
-    if not data:
+    try:
+        data = await request.json()
+    except Exception:
         try:
-            data = await request.json()
+            form = await request.form()
+            data = dict(form)
         except Exception:
-            try:
-                form = await request.form()
-                data = dict(form)
-            except Exception:
-                data = {}
+            data = {}
 
     lead_id = data.get("lead_id") or data.get("CustomField") or data.get("custom_field")
     transcript = (

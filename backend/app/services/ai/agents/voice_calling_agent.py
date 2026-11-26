@@ -200,6 +200,10 @@ class VoiceCallingAgent:
             lead_id=lead_id,
         )
 
+        is_success = bool(call_res.get("success", True))
+        status_str = "SUCCESS" if is_success else "FAILED"
+        err_msg = call_res.get("error") if not is_success else None
+
         await self.guardrails.record_execution_log(
             agent_name=self.agent_name,
             lead_id=lead_id,
@@ -207,16 +211,17 @@ class VoiceCallingAgent:
             mode="LIVE",
             trigger_event=caller_reason,
             input_summary=f"Mobile: {lead.mobile}, Reason: {caller_reason}",
-            output_response=f"Outbound call dispatched: {call_res.get('call_sid')}",
+            output_response=f"Outbound call result: {status_str} ({call_res.get('call_sid') or err_msg})",
             tools_called=[{"tool": "telephony_client.dispatch_call", "result": call_res}],
-            status="SUCCESS",
+            status=status_str,
+            error_message=err_msg,
         )
 
         return {
-            "status": "SUCCESS",
+            "status": status_str,
             "mode": "LIVE",
             "lead_id": lead_id,
-            "call_dispatched": True,
+            "call_dispatched": is_success,
             "call_details": call_res,
         }
 
