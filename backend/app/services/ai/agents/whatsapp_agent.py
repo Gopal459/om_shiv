@@ -31,6 +31,15 @@ OPT_OUT_KEYWORDS = {
     "NO MORE MESSAGES",
 }
 
+RE_OPT_IN_KEYWORDS = {
+    "START",
+    "SUBSCRIBE",
+    "YES",
+    "HAAN",
+    "SHURU KARO",
+    "RESUME",
+}
+
 
 def _detect_opt_out(text: str) -> bool:
     """Detects whether text indicates an opt-out intent."""
@@ -42,13 +51,6 @@ def _detect_opt_out(text: str) -> bool:
     if re.search(r"\b(stop|unsubscribe|opt\s*out|optout|band\s*karo|roko|hatao)\b", text, re.IGNORECASE):
         return True
     return False
-
-
-def _clean_phone(phone: Optional[str]) -> str:
-    """Extract clean digits from phone number."""
-    if not phone:
-        return ""
-    return re.sub(r"\D", "", str(phone))
 
 
 class WhatsAppAgent:
@@ -70,6 +72,7 @@ class WhatsAppAgent:
         guardrails: Optional[SafetyGuardrailsService] = None,
         tools: Optional[Any] = None,
         search_agent: Optional[PropertySearchAgent] = None,
+        gateway: Optional[WhatsAppGateway] = None,
         whatsapp_gateway: Optional[WhatsAppGateway] = None,
     ):
         self.db = db
@@ -77,7 +80,7 @@ class WhatsAppAgent:
         self.guardrails = guardrails or SafetyGuardrailsService(db)
         self.tools = tools
         self.search_agent = search_agent or PropertySearchAgent(db, ai_client=self.ai_client, guardrails=self.guardrails)
-        self.gateway = whatsapp_gateway or globals()["whatsapp_gateway"]
+        self.gateway = gateway or whatsapp_gateway or globals()["whatsapp_gateway"]
         self.agent_name = "whatsapp_agent"
 
     async def handle_incoming_message(
@@ -101,6 +104,7 @@ class WhatsAppAgent:
 
         # 1. Instant Opt-Out Detection
         if _detect_opt_out(clean_text):
+            mode = await self.guardrails.get_agent_mode(self.agent_name)
             await self.guardrails.register_consent(
                 mobile=clean_mobile,
                 channel="WHATSAPP",
@@ -112,7 +116,7 @@ class WhatsAppAgent:
                 agent_name=self.agent_name,
                 lead_id=lead_id,
                 channel="WHATSAPP",
-                mode="LIVE",
+                mode=mode,
                 trigger_event="OPT_OUT",
                 input_summary=clean_text,
                 output_response="User opted out from WhatsApp messaging.",
@@ -122,7 +126,7 @@ class WhatsAppAgent:
                 "status": "OPTED_OUT",
                 "opt_out": True,
                 "dispatched_live": False,
-                "mode": "LIVE",
+                "mode": mode,
                 "reply_text": "You have been unsubscribed from WhatsApp notifications. Reply START to resubscribe.",
             }
 
@@ -148,17 +152,48 @@ class WhatsAppAgent:
                 "error": "WhatsApp agent is disabled by configuration.",
             }
 
-        # 3. Consent Management (Inbound interaction implies consent or re-opt-in)
-        if clean_text.upper() in {"START", "SUBSCRIBE", "SHURU KARO"}:
-            await self.guardrails.register_consent(
-                mobile=clean_mobile,
-                channel="WHATSAPP",
-                is_opted_in=True,
-                source="WHATSAPP_INCOMING",
-                reason="START",
+        # 3. Consent Management (Prevent silent re-opt-in for previously opted-out users)
+        phone_variants = [clean_mobile]
+        if len(clean_mobile) == 10:
+            phone_variants.append(f"91{clean_mobile}")
+        elif len(clean_mobile) == 12 and clean_mobile.startswith("91"):
+            phone_variants.append(clean_mobile[2:])
+
+        consent_stmt = (
+            select(CustomerConsent)
+            .where(
+                CustomerConsent.mobile.in_(phone_variants),
+                func.upper(CustomerConsent.channel) == "WHATSAPP",
             )
+            .order_by(CustomerConsent.updated_at.desc(), CustomerConsent.id.desc())
+            .limit(1)
+        )
+        c_res = await self.db.execute(consent_stmt)
+        existing_consent = c_res.scalar_one_or_none()
+
+        is_explicit_reopt = clean_text.upper() in RE_OPT_IN_KEYWORDS
+
+        if existing_consent is not None:
+            if existing_consent.is_opted_in is False:
+                # User previously opted out: ONLY re-opt-in if they send explicit re-subscribe keyword
+                if is_explicit_reopt:
+                    await self.guardrails.register_consent(
+                        mobile=clean_mobile,
+                        channel="WHATSAPP",
+                        is_opted_in=True,
+                        source="WHATSAPP_INCOMING",
+                        reason=clean_text,
+                    )
+            elif is_explicit_reopt:
+                await self.guardrails.register_consent(
+                    mobile=clean_mobile,
+                    channel="WHATSAPP",
+                    is_opted_in=True,
+                    source="WHATSAPP_INCOMING",
+                    reason=clean_text,
+                )
         else:
-            # Auto-consent for inbound inquiry
+            # First-time inbound inquiry: auto-register consent
             await self.guardrails.register_consent(
                 mobile=clean_mobile,
                 channel="WHATSAPP",
@@ -205,10 +240,9 @@ class WhatsAppAgent:
 
         if is_property_query and self.search_agent:
             try:
-                search_res = await self.search_agent.search_properties(
+                search_res = await self.search_agent.search_properties_conversational(
                     query=clean_text,
-                    lead_id=lead_id,
-                    channel="WHATSAPP",
+                    session_context={"lead_id": lead_id, "channel": "WHATSAPP"},
                 )
                 if search_res.get("success"):
                     recommended_properties = search_res.get("properties", [])
@@ -225,7 +259,7 @@ class WhatsAppAgent:
             property_context
             or "Namaste! Thank you for reaching out to Propira Omshiv Real Estate. How can we assist you with properties in Rajasthan & NCR today? 😊"
         )
-        rec_ids = [
+        rec_catalog_ids = [
             str(p.get("property_id") or p.get("id"))
             for p in recommended_properties
             if isinstance(p, dict) and (p.get("property_id") or p.get("id"))
@@ -238,7 +272,7 @@ class WhatsAppAgent:
                 "reply_text": fallback_reply,
                 "intent": "PROPERTY_SEARCH" if is_property_query else "GENERAL_FAQ",
                 "opt_out_detected": False,
-                "recommended_property_ids": rec_ids,
+                "recommended_property_ids": rec_catalog_ids,
                 "requires_agent_followup": False,
             },
         )
@@ -261,7 +295,8 @@ class WhatsAppAgent:
             }
 
         reply_text = parsed.get("reply_text") or fallback_reply
-        recommended_property_ids = parsed.get("recommended_property_ids") or rec_ids
+        llm_rec_ids = [str(pid) for pid in (parsed.get("recommended_property_ids") or [])]
+        recommended_property_ids = list(dict.fromkeys(llm_rec_ids + rec_catalog_ids))
         intent = parsed.get("intent", "GENERAL_FAQ")
         requires_agent_followup = bool(parsed.get("requires_agent_followup", False))
 

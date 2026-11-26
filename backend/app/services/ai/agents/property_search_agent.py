@@ -267,3 +267,6 @@ class PropertySearchAgent:
                 "response_text": "An error occurred while processing your property search. Please try again.",
                 "total_found": 0,
             }
+
+    # Compatibility alias for callers using search_properties
+    search_properties = search_properties_conversational
