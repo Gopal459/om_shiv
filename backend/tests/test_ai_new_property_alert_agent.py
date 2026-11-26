@@ -435,3 +435,69 @@ async def test_filtering_by_city_and_budget_and_deleted(db_session):
     assert res["success"] is True
     assert res["eligible_leads_count"] == 1
     assert res["shadow_count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_delivery_failure_handling(db_session):
+    prop = Property(
+        property_id="OP-2026-00014",
+        listing_type=2,
+        category_code=1,
+        sub_category_code=1,
+        title="Commercial Space",
+        city="Alwar",
+        pincode="301001",
+        expected_price=2500000,
+        owner_name="Seller",
+        owner_mobile="9999999990",
+        is_live=True,
+    )
+    lead = Lead(
+        lead_id="OB-2026-FAIL-1",
+        full_name="Failed Lead",
+        mobile="9829077788",
+        preferred_city="Alwar",
+        budget_max=3000000,
+    )
+    consent = CustomerConsent(
+        mobile="9829077788",
+        channel="WHATSAPP",
+        is_opted_in=True,
+    )
+    config = AIAgentConfig(
+        agent_name="new_property_alert_agent",
+        display_name="Property Alert Agent",
+        mode="LIVE",
+    )
+    db_session.add_all([prop, lead, consent, config])
+    await db_session.commit()
+
+    class MockFailingWhatsAppAgent:
+        async def dispatch_outbound_message(self, mobile, text, lead_id=None):
+            return {"status": "DELIVERY_FAILED", "mode": "LIVE", "dispatched_live": True}
+
+    agent = NewPropertyAlertAgent(db_session, whatsapp_agent=MockFailingWhatsAppAgent())
+    res = await agent.dispatch_alerts_for_property("OP-2026-00014")
+
+    assert res["success"] is True
+    assert res["eligible_leads_count"] == 1
+    assert res["dispatched_count"] == 0
+
+    # Verify PropertyAlertHistory status is FAILED
+    stmt = select(PropertyAlertHistory).where(
+        PropertyAlertHistory.lead_id == "OB-2026-FAIL-1",
+        PropertyAlertHistory.property_id == "OP-2026-00014",
+    )
+    alert = (await db_session.execute(stmt)).scalar_one_or_none()
+    assert alert is not None
+    assert alert.status == "FAILED"
+
+    # Verify AIAgentExecutionLog status is DELIVERY_FAILED
+    stmt_log = select(AIAgentExecutionLog).where(
+        AIAgentExecutionLog.lead_id == "OB-2026-FAIL-1",
+        AIAgentExecutionLog.agent_name == "new_property_alert_agent",
+    )
+    log = (await db_session.execute(stmt_log)).scalar_one_or_none()
+    assert log is not None
+    assert log.status == "DELIVERY_FAILED"
+

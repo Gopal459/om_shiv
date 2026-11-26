@@ -246,13 +246,10 @@ class NewPropertyAlertAgent:
                             text=message_text,
                             lead_id=lead.lead_id,
                         )
-                        if res.get("dispatched_live") is True or res.get("status") == "SUCCESS":
+                        if res.get("dispatched_live") is True and res.get("status") == "SUCCESS":
                             sent_successfully = True
-                        elif hasattr(self.gateway, "send_message"):
-                            sent_successfully = await self.gateway.send_message(
-                                mobile=lead.mobile,
-                                text=message_text,
-                            )
+                        else:
+                            sent_successfully = False
                     except Exception as exc:
                         logger.warning("whatsapp_agent dispatch exception: %s", exc)
                         if hasattr(self.gateway, "send_message"):
