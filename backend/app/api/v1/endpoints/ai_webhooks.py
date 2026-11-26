@@ -1,14 +1,17 @@
 from __future__ import annotations
 import os
 import logging
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional
 
-from fastapi import APIRouter, Depends, Query, Response, HTTPException, status
+from fastapi import APIRouter, Depends, Query, Response, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.models.leads import LeadActivity
 from app.services.ai.agents.meta_lead_agent import MetaLeadAgent
 from app.services.ai.agents.whatsapp_agent import WhatsAppAgent
+from app.services.ai.agents.voice_calling_agent import VoiceCallingAgent
 
 logger = logging.getLogger(__name__)
 
@@ -172,4 +175,98 @@ async def post_whatsapp_message(
         lead_id=str(lead_id) if lead_id else None,
     )
     return result
+
+
+@router.post("/voice/status", summary="Exotel Call Status Webhook")
+async def post_voice_status(
+    request: Request,
+    payload: Optional[Dict[str, Any]] = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """POST endpoint for Exotel call status callbacks."""
+    data = payload or {}
+    if not data:
+        try:
+            data = await request.json()
+        except Exception:
+            try:
+                form = await request.form()
+                data = dict(form)
+            except Exception:
+                data = {}
+
+    call_sid = data.get("CallSid") or data.get("call_sid") or data.get("Sid")
+    call_status = data.get("Status") or data.get("status") or data.get("CallStatus") or "COMPLETED"
+    lead_id = data.get("CustomField") or data.get("custom_field") or data.get("lead_id")
+    duration = data.get("Duration") or data.get("duration") or data.get("CallDuration") or 0
+    recording_url = data.get("RecordingUrl") or data.get("recording_url")
+
+    if lead_id:
+        activity = LeadActivity(
+            lead_id=str(lead_id),
+            action_type="VOICE_CALL_STATUS",
+            outcome=str(call_status),
+            note=f"Call {call_sid} status: {call_status} (duration: {duration}s)" + (f" | Recording: {recording_url}" if recording_url else ""),
+            performed_by="EXOTEL_WEBHOOK",
+            created_at=datetime.now(timezone.utc),
+        )
+        db.add(activity)
+        await db.commit()
+
+    return {
+        "status": "received",
+        "call_sid": call_sid,
+        "call_status": call_status,
+        "lead_id": lead_id,
+    }
+
+
+@router.post("/voice/transcript", summary="Exotel Voice Transcript Ingestion Endpoint")
+async def post_voice_transcript(
+    request: Request,
+    payload: Optional[Dict[str, Any]] = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """POST endpoint for inbound speech-to-text call transcripts."""
+    data = payload or {}
+    if not data:
+        try:
+            data = await request.json()
+        except Exception:
+            try:
+                form = await request.form()
+                data = dict(form)
+            except Exception:
+                data = {}
+
+    lead_id = data.get("lead_id") or data.get("CustomField") or data.get("custom_field")
+    transcript = (
+        data.get("transcript")
+        or data.get("conversation")
+        or data.get("text")
+        or data.get("SpeechResult")
+        or ""
+    )
+    raw_duration = data.get("call_duration") or data.get("duration") or data.get("CallDuration") or 0
+    try:
+        duration = int(raw_duration)
+    except (ValueError, TypeError):
+        duration = 0
+    recording_url = data.get("recording_url") or data.get("RecordingUrl")
+
+    if not lead_id:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Missing lead_id or CustomField in payload",
+        )
+
+    agent = VoiceCallingAgent(db)
+    result = await agent.process_call_transcript(
+        lead_id=str(lead_id),
+        transcript=str(transcript),
+        call_duration=duration,
+        recording_url=str(recording_url) if recording_url else None,
+    )
+    return result
+
 
