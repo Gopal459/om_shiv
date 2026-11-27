@@ -266,6 +266,44 @@ class IntakeService:
             is_converted=False,
         )
         db.add(inquiry)
+
+        if (inquiry_type or "").upper() == "CALLBACK":
+            from app.services.callback_service import callback_service
+
+            await db.flush()
+            raw_details = details if isinstance(details, dict) else {}
+            raw_prop_id = raw_details.get("property_id")
+            try:
+                prop_id_int = int(raw_prop_id) if raw_prop_id is not None else None
+            except (TypeError, ValueError):
+                prop_id_int = None
+
+            msg = raw_details.get("message") or raw_details.get("note")
+            if not msg and raw_details:
+                parts = [
+                    f"{k}: {v}"
+                    for k, v in raw_details.items()
+                    if k
+                    not in ("phone_code", "property_id", "property_code", "related_property_code")
+                    and v is not None
+                    and str(v).strip()
+                ]
+                msg = "; ".join(parts) if parts else None
+
+            await callback_service.create_callback(
+                db,
+                name=full_name,
+                mobile_number=normalized_mobile,
+                phone_code=str(raw_details.get("phone_code") or "+91"),
+                message=msg,
+                property_id=prop_id_int,
+                property_code=raw_details.get("property_code")
+                or raw_details.get("related_property_code"),
+                website_inquiry_id=inquiry.id,
+            )
+            await db.refresh(inquiry)
+            return inquiry
+
         await db.commit()
         await db.refresh(inquiry)
         return inquiry
@@ -338,6 +376,34 @@ class IntakeService:
         inquiry.converted_lead_id = lead_id
         inquiry.converted_by_emp_id = converted_by_emp_id
         inquiry.converted_at = datetime.now(timezone.utc)
+
+        # Sync any paired TblCallback created from this WebsiteInquiry
+        from app.models.callbacks import TblCallback, CallbackActivity
+
+        cb_res = await db.execute(
+            select(TblCallback).where(
+                TblCallback.website_inquiry_id == inquiry.id,
+                TblCallback.deleted_at.is_(None),
+            )
+        )
+        paired_callbacks = list(cb_res.scalars().all())
+        for cb in paired_callbacks:
+            status_before = cb.lead_status
+            cb.lead_status = 5
+            cb.lead_converted = 1
+            cb.lead_open = 0
+            cb.converted_lead_id = lead_id
+            db.add(
+                CallbackActivity(
+                    callback_id=cb.callback_id,
+                    action_type="CONVERTED",
+                    title="Converted to Lead",
+                    status_before=status_before,
+                    status_after=5,
+                    remark=f"Synced conversion from WebsiteInquiry #{inquiry.id} to Lead {lead_id}",
+                    performed_by=converted_by_emp_id or "SYSTEM",
+                )
+            )
 
         # Activity log
         activity = LeadActivity(

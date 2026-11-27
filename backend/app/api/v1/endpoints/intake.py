@@ -1,13 +1,15 @@
 from __future__ import annotations
+import re
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, Depends, Query, Request, Response, status, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.security import decode_access_token
+from app.services.callback_service import callback_service
 from app.services.intake_service import intake_service
 
 router = APIRouter()
@@ -54,6 +56,53 @@ class WebsiteInquiryCreateRequest(BaseModel):
     mobile: str = Field(..., description="Mobile number")
     email: Optional[str] = Field(None, description="Email address")
     details: Optional[Dict[str, Any]] = Field(None, description="Custom form payload/specifications")
+
+
+class CallbackIntakeRequest(BaseModel):
+    name: str = Field(..., description="Customer name")
+    mobile_number: str = Field(
+        ...,
+        validation_alias=AliasChoices("mobile_number", "phone"),
+        description="Customer mobile number",
+    )
+    phone_code: str = Field(default="+91", description="Country calling code")
+    message: Optional[str] = Field(default=None, description="Optional callback note")
+    property_id: Optional[int] = Field(default=None, description="Optional numeric property ID")
+    property_code: Optional[str] = Field(default=None, description="Optional property code OP-YYYY-NNNNN")
+
+    @field_validator("name")
+    @classmethod
+    def validate_name_non_blank(cls, v: str) -> str:
+        cleaned = (v or "").strip()
+        if not cleaned:
+            raise ValueError("Name must not be blank")
+        return cleaned
+
+    @field_validator("mobile_number")
+    @classmethod
+    def validate_mobile_non_blank(cls, v: str) -> str:
+        cleaned = (v or "").strip()
+        if not cleaned or not re.search(r"\d", cleaned):
+            raise ValueError("Valid mobile number is required")
+        return cleaned
+
+
+class CallbackIntakeResponse(BaseModel):
+    callback_id: int
+    lead_unique_id: Optional[str] = None
+    name: str
+    mobile_number: str
+    phone_code: str
+    message: Optional[str] = None
+    property_id: Optional[int] = None
+    property_code: Optional[str] = None
+    assigned_user_id: Optional[str] = None
+    lead_status: int
+    calls_status: int
+    lead_open: int
+    created_date: datetime
+
+    model_config = {"from_attributes": True}
 
 
 class WebsiteInquiryResponse(BaseModel):
@@ -155,6 +204,29 @@ async def intake_lead(
         response.status_code = status.HTTP_200_OK
 
     return result
+
+
+@router.post(
+    "/intake/callback",
+    response_model=CallbackIntakeResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Public Request A Callback Form Intake",
+)
+async def submit_callback_request(
+    payload: CallbackIntakeRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Submit a public Request A Callback form with automatic TELECALLER round-robin."""
+    callback = await callback_service.create_callback(
+        db,
+        name=payload.name,
+        mobile_number=payload.mobile_number,
+        phone_code=payload.phone_code,
+        message=payload.message,
+        property_id=payload.property_id,
+        property_code=payload.property_code,
+    )
+    return callback
 
 
 @router.post(
