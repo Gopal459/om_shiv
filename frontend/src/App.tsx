@@ -14,6 +14,8 @@ import ModuleHub from './pages/ModuleHub';
 import PropertyHub from './pages/PropertyHub';
 import PropertyForm from './pages/PropertyForm';
 import BlogManager from './pages/BlogManager';
+import AIAgentHub from './pages/AIAgentHub';
+import AIApprovalsQueue from './pages/AIApprovalsQueue';
 import { ThemeProvider } from './context/ThemeContext';
 
 const LeadDetailPage: React.FC = () => {
@@ -68,6 +70,8 @@ const AppContent: React.FC = () => {
       PROPIRA_USERS: '/users',
       PAGES: '/pages',
       FRANCHISE: '/franchise',
+      AI_AGENTS: '/ai-agents',
+      AI_APPROVALS: '/ai-approvals',
     };
     navigate(pathToTab[tab] || '/dashboard');
   };
@@ -99,6 +103,8 @@ const AppContent: React.FC = () => {
         <Route path="/recycle-bin" element={<RecycleBinView />} />
         <Route path="/masters" element={<DynamicMastersEditor />} />
         <Route path="/settings" element={<SettingsEditor />} />
+        <Route path="/ai-agents" element={<AIAgentHub />} />
+        <Route path="/ai-approvals" element={<AIApprovalsQueue />} />
 
         {/* 11 Enterprise Module Hub Routes */}
         <Route

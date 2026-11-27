@@ -31,6 +31,7 @@ import {
   FileText,
   Check,
   PhoneCall,
+  Bot,
 } from 'lucide-react';
 
 interface LeadDetailProps {
@@ -78,6 +79,11 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
   // Inline quick note state
   const [inlineNote, setInlineNote] = useState('');
   const [inlineActionType, setInlineActionType] = useState('NOTE');
+
+  // AI Assistant & Consent state
+  const [aiLogs, setAiLogs] = useState<any[]>([]);
+  const [consentChannels, setConsentChannels] = useState<Record<string, any>>({});
+  const [togglingConsent, setTogglingConsent] = useState(false);
 
   // Helper to generate a sensible future follow-up default (Tomorrow 10:00 AM)
   const getDefaultFollowUpDate = () => {
@@ -148,6 +154,27 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
         setSelectedStage(data.stage || 'NEW');
         if (data.temperature) setTemperature(data.temperature);
         if (data.assigned_to) setSelectedAssignee(data.assigned_to);
+
+        // Fetch AI execution history and consent status for this lead
+        try {
+          const authHdr: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+          const [logsRes, consentRes] = await Promise.all([
+            fetch(`/v1/ai/logs?lead_id=${encodeURIComponent(leadId)}&limit=10`, { headers: authHdr }),
+            data.mobile
+              ? fetch(`/v1/ai/consent/${encodeURIComponent(data.mobile)}`, { headers: authHdr })
+              : Promise.resolve(null),
+          ]);
+          if (logsRes.ok) {
+            const lData = await logsRes.json();
+            setAiLogs(lData.logs || []);
+          }
+          if (consentRes && consentRes.ok) {
+            const cData = await consentRes.json();
+            setConsentChannels(cData.channels || {});
+          }
+        } catch {
+          // Non-blocking AI panel enrichment
+        }
       } else {
         setError('Lead profile not found in database');
       }
@@ -162,6 +189,32 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
   useEffect(() => {
     fetchLead();
   }, [leadId]);
+
+  const handleToggleConsent = async (channel: 'WHATSAPP' | 'VOICE', currentlyOptedIn: boolean) => {
+    if (!lead?.mobile) return;
+    setTogglingConsent(true);
+    try {
+      const token = localStorage.getItem('access_token');
+      const endpoint = currentlyOptedIn ? '/v1/ai/consent/opt-out' : '/v1/ai/consent/opt-in';
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          mobile: lead.mobile,
+          channel,
+          reason: currentlyOptedIn ? 'Staff toggled opt-out on LeadDetail' : 'Staff toggled opt-in on LeadDetail',
+        }),
+      });
+      if (res.ok) {
+        await fetchLead();
+      }
+    } finally {
+      setTogglingConsent(false);
+    }
+  };
 
   const formatDate = (dateStr?: string | null) => {
     if (!dateStr) return 'Not Specified';
@@ -925,6 +978,73 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
             </button>
           </div>
         </div>
+      </div>
+
+      {/* 4B. AI ASSISTANT & TRAI CONSENT INSIGHTS */}
+      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/90 dark:border-slate-800 p-6 sm:p-7 shadow-sm space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <Bot className="w-4 h-4 text-emerald-500" />
+              <span>AI Assistant, Consent & Execution History</span>
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              TRAI opt-in/opt-out controls and recent automated AI actions for this lead.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {(['WHATSAPP', 'VOICE'] as const).map((ch) => {
+              const optedIn = Boolean(consentChannels[ch]?.is_opted_in);
+              return (
+                <button
+                  key={ch}
+                  type="button"
+                  disabled={togglingConsent}
+                  onClick={() => handleToggleConsent(ch, optedIn)}
+                  className={`px-3 py-1.5 rounded-xl text-[11px] font-bold border transition-colors cursor-pointer ${
+                    optedIn
+                      ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300'
+                      : 'bg-rose-50 dark:bg-rose-950/60 border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300'
+                  }`}
+                >
+                  {ch}: {optedIn ? 'Opted-In' : 'Opted-Out'}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {aiLogs.length > 0 ? (
+          <div className="space-y-2">
+            {aiLogs.slice(0, 5).map((log: any) => (
+              <div
+                key={log.id}
+                className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-700/60 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+              >
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-slate-800 dark:text-slate-200">{log.agent_name}</span>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 dark:bg-slate-700">
+                      {log.status}
+                    </span>
+                    <span className="text-[10px] font-mono text-slate-400">{log.mode}</span>
+                  </div>
+                  {log.output_response && (
+                    <div className="text-slate-600 dark:text-slate-400">{log.output_response}</div>
+                  )}
+                </div>
+                <span className="text-[11px] font-mono text-slate-400 shrink-0">
+                  {formatDate(log.created_at)}
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-xs text-slate-400">
+            No AI agent runs recorded for this lead yet.
+          </div>
+        )}
       </div>
 
       {/* 5. INTERACTIVE ACTIVITY TIMELINE & INLINE QUICK NOTE */}

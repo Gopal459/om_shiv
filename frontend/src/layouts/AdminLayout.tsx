@@ -23,6 +23,7 @@ import {
   ChevronRight,
   ChevronDown,
   Circle,
+  Bot,
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 
@@ -43,7 +44,9 @@ export type AdminTab =
   | 'VERIFICATION'
   | 'RECYCLE_BIN'
   | 'MY_WORK'
-  | 'LEAD_DETAIL';
+  | 'LEAD_DETAIL'
+  | 'AI_AGENTS'
+  | 'AI_APPROVALS';
 
 export interface SubMenuItem {
   label: string;
@@ -213,6 +216,18 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
       subItems: [
         { label: 'Channel Partners', path: '/franchise?type=partners' },
         { label: 'Franchise Outlets', path: '/franchise?type=outlets' },
+      ],
+    },
+    {
+      id: 'AI_AGENTS',
+      path: '/ai-agents',
+      label: 'AI Agents',
+      icon: Bot,
+      badge: '13 AI',
+      badgeColor: 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20',
+      subItems: [
+        { label: 'All Agents Control', path: '/ai-agents' },
+        { label: 'HITL Approvals Queue', path: '/ai-approvals' },
       ],
     },
     {
