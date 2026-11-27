@@ -26,6 +26,7 @@ import {
   Bot,
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
+import alwarMapLogo from '../image/logo1.png';
 
 export type AdminTab =
   | 'DASHBOARD'
@@ -295,31 +296,29 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
       >
         {/* Brand Header */}
         <div
-          className={`h-16 px-4 border-b flex items-center justify-between ${
+          className={`h-16 px-3.5 border-b flex items-center justify-between ${
             isDark ? 'border-slate-800' : 'border-slate-200'
           }`}
         >
           <div
             onClick={() => navigate('/dashboard')}
-            className="flex items-center gap-3 overflow-hidden cursor-pointer"
+            className="flex items-center gap-2.5 overflow-hidden cursor-pointer w-full"
           >
-            <div className="relative p-2.5 bg-gradient-to-tr from-emerald-600 to-green-500 rounded-xl shadow-md shadow-emerald-900/30 flex-shrink-0 group">
-              <Building2 className="w-5 h-5 text-white" />
-              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 rounded-full animate-ping opacity-75"></span>
-              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 rounded-full"></span>
-            </div>
-            {(!isCollapsed || isMobileOpen) && (
-              <div className="overflow-hidden leading-tight">
-                <h1
-                  className={`text-sm font-black tracking-tight truncate ${
-                    isDark ? 'text-white' : 'text-slate-900'
-                  }`}
-                >
-                  Omshiv Buildvision
-                </h1>
-                <p className="text-[10px] text-emerald-500 font-mono tracking-wider font-bold">
-                  PROPORTAL ENGINE
-                </p>
+            {(!isCollapsed || isMobileOpen) ? (
+              <div className="flex flex-col w-full overflow-hidden">
+                <div className="bg-white rounded-xl px-2.5 py-1.5 border border-slate-200/80 shadow-xs inline-flex items-center justify-center max-w-[180px]">
+                  <img
+                    src={alwarMapLogo}
+                    alt="AlwarMap.com"
+                    className="h-7 w-auto object-contain"
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="relative mx-auto w-9 h-9 rounded-xl bg-[#291BB0] border-2 border-[#F04B42]/80 flex items-center justify-center shadow-md shadow-[#291BB0]/30">
+                <span className="text-white font-display font-black text-sm tracking-tight">
+                  A<span className="text-[#F04B42]">.</span>
+                </span>
               </div>
             )}
           </div>
@@ -359,7 +358,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                       : 'justify-between px-3.5 py-2.5'
                   } ${
                     active
-                      ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-l-4 border-rose-500 font-bold shadow-xs'
+                      ? 'bg-[#291BB0]/10 dark:bg-[#291BB0]/25 text-[#291BB0] dark:text-indigo-300 border-l-4 border-[#F04B42] font-bold shadow-xs'
                       : isDark
                       ? 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
                       : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
@@ -369,10 +368,10 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                     <Icon
                       className={`w-4 h-4 flex-shrink-0 transition-transform duration-200 group-hover:scale-110 ${
                         active
-                          ? 'text-rose-500 dark:text-rose-400'
+                          ? 'text-[#F04B42]'
                           : isDark
-                          ? 'text-slate-400 group-hover:text-rose-400'
-                          : 'text-slate-500 group-hover:text-rose-600'
+                          ? 'text-slate-400 group-hover:text-indigo-300'
+                          : 'text-slate-500 group-hover:text-[#291BB0]'
                       }`}
                     />
                     {(!isCollapsed || isMobileOpen) && (
@@ -426,19 +425,19 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                           }}
                           className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center justify-between group/sub ${
                             isSubActive
-                              ? 'text-rose-600 dark:text-rose-400 font-bold bg-rose-50/80 dark:bg-rose-950/40'
+                              ? 'text-[#291BB0] dark:text-indigo-300 font-bold bg-[#291BB0]/10 dark:bg-[#291BB0]/25'
                               : 'text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/50'
                           }`}
                         >
                           <div className="flex items-center gap-2 truncate">
-                            <Circle className={`w-3 h-3 flex-shrink-0 stroke-[2.5] ${isSubActive ? 'text-rose-500' : 'text-slate-400 group-hover/sub:text-slate-200'}`} />
+                            <Circle className={`w-3 h-3 flex-shrink-0 stroke-[2.5] ${isSubActive ? 'text-[#F04B42]' : 'text-slate-400 group-hover/sub:text-slate-200'}`} />
                             <span className="truncate">{sub.label}</span>
                           </div>
                           <div className="flex items-center gap-1.5">
                             {(sub.label.includes('Delete Property') || sub.label.includes('Sell Property')) && (
                               <ChevronRight className="w-3 h-3 text-slate-400/70 group-hover/sub:text-slate-300" />
                             )}
-                            {isSubActive && <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>}
+                            {isSubActive && <span className="w-1.5 h-1.5 rounded-full bg-[#F04B42]"></span>}
                           </div>
                         </button>
                       );
@@ -483,7 +482,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
             } pt-1`}
           >
             <div className="flex items-center gap-2.5 overflow-hidden">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-600 to-green-500 flex items-center justify-center text-white font-bold text-xs flex-shrink-0 shadow-sm">
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#291BB0] to-[#F04B42] flex items-center justify-center text-white font-bold text-xs flex-shrink-0 shadow-sm">
                 {user?.name ? user.name.slice(0, 2).toUpperCase() : 'AD'}
               </div>
               {(!isCollapsed || isMobileOpen) && (
@@ -495,8 +494,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                   >
                     {user?.name || 'Super Admin'}
                   </div>
-                  <div className="flex items-center gap-1 text-[10px] text-emerald-500 font-mono font-semibold">
-                    <Shield className="w-2.5 h-2.5" />
+                  <div className="flex items-center gap-1 text-[10px] text-[#3b2cc9] dark:text-indigo-400 font-mono font-semibold">
+                    <Shield className="w-2.5 h-2.5 text-[#F04B42]" />
                     <span>{user?.role || 'SUPER_ADMIN'}</span>
                   </div>
                 </div>
@@ -565,12 +564,12 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
 
             {/* Breadcrumb Module Badge */}
             <div className="flex items-center gap-2">
-              <span className="hidden sm:inline text-xs text-slate-400 font-medium">Console &gt;</span>
+              <span className="hidden sm:inline text-xs text-slate-400 font-medium">AlwarMap &gt;</span>
               <span
                 className={`text-xs font-bold px-3 py-1 rounded-lg border ${
                   isDark
-                    ? 'bg-slate-800/90 border-slate-700 text-rose-400'
-                    : 'bg-rose-50 border-rose-200 text-rose-800'
+                    ? 'bg-[#291BB0]/20 border-[#291BB0]/40 text-indigo-300'
+                    : 'bg-[#eef0ff] border-[#dce0ff] text-[#291BB0]'
                 }`}
               >
                 {currentNav.label}

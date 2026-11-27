@@ -7,13 +7,23 @@ export default {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['"Plus Jakarta Sans"', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+        display: ['"Outfit"', '"Plus Jakarta Sans"', 'sans-serif'],
+      },
       colors: {
         primary: {
-          50: '#f0fdf4',
-          100: '#dcfce7',
-          500: '#22c55e',
-          600: '#16a34a',
-          700: '#15803d',
+          50: '#eef0ff',
+          100: '#dce0ff',
+          500: '#3b2cc9',
+          600: '#291bb0',
+          700: '#1f138e',
+        },
+        brand: {
+          blue: '#291bb0',
+          blueDark: '#1d1287',
+          coral: '#f04b42',
+          coralDark: '#d93b32',
         },
         navy: {
           800: '#1e293b',

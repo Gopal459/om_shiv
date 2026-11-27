@@ -193,41 +193,41 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = () => {
   return (
     <div className="space-y-8 animate-fade-in">
       {/* 1. TOP HERO BANNER */}
-      <div className="relative overflow-hidden rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-gradient-to-br from-slate-900 via-slate-900/95 to-emerald-950/90 text-white p-6 sm:p-8 lg:p-10 shadow-2xl shadow-emerald-950/20 group">
-        <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-emerald-500/20 blur-3xl pointer-events-none animate-float"></div>
-        <div className="absolute -bottom-24 -right-24 w-96 h-96 rounded-full bg-cyan-500/20 blur-3xl pointer-events-none animate-float-delayed"></div>
+      <div className="relative overflow-hidden rounded-3xl border border-[#291BB0]/30 dark:border-slate-800 bg-gradient-to-br from-[#140D5C] via-[#1F1588] to-[#291BB0] text-white p-6 sm:p-8 lg:p-10 shadow-2xl shadow-[#291BB0]/25 group">
+        <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-[#3b2cc9]/35 blur-3xl pointer-events-none animate-float"></div>
+        <div className="absolute -bottom-24 -right-24 w-96 h-96 rounded-full bg-[#F04B42]/25 blur-3xl pointer-events-none animate-float-delayed"></div>
 
         <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           <div className="space-y-3 max-w-2xl">
             <div className="flex flex-wrap items-center gap-2.5">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-300 text-xs font-bold shadow-xs backdrop-blur-md">
-                <span className="w-2 h-2 rounded-full bg-rose-400 animate-ping"></span>
-                <Sparkles className="w-3.5 h-3.5 text-rose-400" />
-                <span>Executive Command Center</span>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#F04B42]/20 border border-[#F04B42]/50 text-rose-200 text-xs font-bold shadow-xs backdrop-blur-md">
+                <span className="w-2 h-2 rounded-full bg-[#F04B42] animate-ping"></span>
+                <Sparkles className="w-3.5 h-3.5 text-[#F04B42]" />
+                <span>AlwarMap Command Center</span>
               </div>
 
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/10 text-slate-300 text-xs font-medium backdrop-blur-md">
-                <Calendar className="w-3 h-3 text-slate-400" />
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/10 text-slate-200 text-xs font-medium backdrop-blur-md">
+                <Calendar className="w-3 h-3 text-slate-300" />
                 <span>{currentDateString}</span>
               </div>
             </div>
 
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight leading-tight">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-display font-black tracking-tight leading-tight">
               {greeting},{' '}
-              <span className="bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-300 bg-clip-text text-transparent">
-                Omshiv Buildvision CRM
+              <span className="bg-gradient-to-r from-white via-indigo-200 to-[#FF8A80] bg-clip-text text-transparent">
+                AlwarMap CRM
               </span>
             </h1>
 
-            <p className="text-xs sm:text-sm text-slate-300/90 leading-relaxed max-w-xl">
-              Enterprise real estate operations, 6-way inbound routing, real-time 3-hour SLA escalation monitoring, and automated property verification pipeline.
+            <p className="text-xs sm:text-sm text-indigo-100/85 leading-relaxed max-w-xl">
+              Enterprise real estate operations, 4-tier Channel Partner governance, AI agent automation, and verified property pipeline.
             </p>
           </div>
 
           <div className="relative z-10 flex flex-wrap items-center gap-3 lg:flex-col lg:items-end flex-shrink-0">
             <button
               onClick={() => navigate('/staff')}
-              className="shimmer-effect group flex items-center gap-2.5 px-5 py-3 bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white rounded-2xl text-xs font-bold transition-all duration-300 shadow-xl shadow-emerald-900/40 hover:-translate-y-1 active:translate-y-0"
+              className="shimmer-effect group flex items-center gap-2.5 px-5 py-3 bg-[#F04B42] hover:bg-[#d93b32] text-white rounded-2xl text-xs font-bold transition-all duration-300 shadow-xl shadow-[#F04B42]/30 hover:-translate-y-1 active:translate-y-0"
             >
               <PlusCircle className="w-4 h-4 transition-transform group-hover:rotate-90 duration-300" />
               <span>+ Add Staff Member</span>

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Lock, User, Phone, ShieldCheck, AlertCircle, Building2, KeyRound, Sun, Moon } from 'lucide-react';
+import { Lock, User, Phone, ShieldCheck, AlertCircle, KeyRound, Sun, Moon } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
+import alwarMapLogo from '../image/logo1.png';
 
 interface LoginProps {
   onLoginSuccess: (user: any, token: string) => void;
@@ -142,18 +143,18 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
       </div>
 
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-        <div className="inline-flex p-3 bg-gradient-to-tr from-emerald-600 to-green-500 rounded-2xl shadow-xl shadow-emerald-900/30 mb-3">
-          <Building2 className="w-8 h-8 text-white" />
+        <div className="inline-flex px-5 py-3 bg-white rounded-2xl border border-slate-200/80 shadow-xl shadow-[#291BB0]/15 mb-3">
+          <img src={alwarMapLogo} alt="AlwarMap.com" className="h-10 w-auto object-contain" />
         </div>
         <h1
-          className={`text-2xl font-black tracking-tight sm:text-3xl ${
+          className={`text-2xl font-display font-black tracking-tight sm:text-3xl ${
             isDark ? 'text-white' : 'text-slate-900'
           }`}
         >
-          Omshiv Buildvision CRM
+          AlwarMap <span className="text-[#F04B42]">CRM</span>
         </h1>
         <p className="mt-1 text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-          Propira Enterprise Real Estate Engine & Admin Portal
+          AlwarMap Enterprise Real Estate Engine & Admin Portal
         </p>
       </div>
 
@@ -181,7 +182,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
               }}
               className={`flex-1 py-2 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all ${
                 loginMode === 'PASSWORD'
-                  ? 'bg-gradient-to-r from-emerald-600 to-green-600 text-white shadow-sm'
+                  ? 'bg-gradient-to-r from-[#291BB0] to-[#3b2cc9] text-white shadow-sm'
                   : isDark
                   ? 'text-slate-400 hover:text-white'
                   : 'text-slate-600 hover:text-slate-900'
@@ -198,7 +199,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
               }}
               className={`flex-1 py-2 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all ${
                 loginMode === 'OTP'
-                  ? 'bg-gradient-to-r from-emerald-600 to-green-600 text-white shadow-sm'
+                  ? 'bg-gradient-to-r from-[#291BB0] to-[#3b2cc9] text-white shadow-sm'
                   : isDark
                   ? 'text-slate-400 hover:text-white'
                   : 'text-slate-600 hover:text-slate-900'
@@ -257,7 +258,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-2.5 px-4 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 disabled:opacity-50 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-emerald-900/30 transition-all hover:-translate-y-0.5 active:translate-y-0"
+                  className="w-full py-2.5 px-4 bg-gradient-to-r from-[#291BB0] to-[#F04B42] hover:opacity-95 disabled:opacity-50 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-[#291BB0]/30 transition-all hover:-translate-y-0.5 active:translate-y-0"
                 >
                   {loading ? 'Authenticating...' : 'Sign In to Admin Console'}
                 </button>
@@ -268,7 +269,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                 <button
                   type="button"
                   onClick={fillAdminCredentials}
-                  className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline font-mono font-bold"
+                  className="text-xs text-[#291BB0] dark:text-indigo-400 hover:underline font-mono font-bold"
                 >
                   ⚡ Auto-fill Super Admin (admin / Admin@123)
                 </button>
@@ -300,7 +301,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full py-2.5 px-4 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 disabled:opacity-50 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-emerald-900/30 transition-all"
+                    className="w-full py-2.5 px-4 bg-gradient-to-r from-[#291BB0] to-[#F04B42] hover:opacity-95 disabled:opacity-50 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-[#291BB0]/30 transition-all"
                   >
                     {loading ? 'Sending OTP...' : 'Send WhatsApp OTP'}
                   </button>
@@ -327,7 +328,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full py-2.5 px-4 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 disabled:opacity-50 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-emerald-900/30 transition-all"
+                    className="w-full py-2.5 px-4 bg-gradient-to-r from-[#291BB0] to-[#F04B42] hover:opacity-95 disabled:opacity-50 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-[#291BB0]/30 transition-all"
                   >
                     {loading ? 'Verifying...' : 'Verify & Enter Console'}
                   </button>
