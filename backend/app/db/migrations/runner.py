@@ -20,6 +20,7 @@ MIGRATION_STEPS = [
     "app.db.migrations.0010_franchise_network_schema",
     "app.db.migrations.0011_cp_4_tier_governance",
     "app.db.migrations.0012_link_cp_employee",
+    "app.db.migrations.0013_website_forms_callback_schema",
 ]
 
 

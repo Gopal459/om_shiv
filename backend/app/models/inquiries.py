@@ -46,11 +46,27 @@ class WebsiteInquiry(Base):
         nullable=True,
     )
     converted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    status: Mapped[str] = mapped_column(String(32), default="NEW", nullable=False)
+    assigned_to: Mapped[Optional[str]] = mapped_column(
+        String(32),
+        ForeignKey("employees.employee_id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    related_property_code: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    resolution_remark: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    resolved_by: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
         nullable=False,
+    )
+    updated_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=True,
     )
 
 
