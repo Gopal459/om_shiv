@@ -10,6 +10,7 @@ from fastapi import HTTPException, status
 from app.models.leads import Lead, LeadSequence, LeadActivity
 from app.models.inquiries import WebsiteInquiry
 from app.models.settings import SystemSetting
+from app.models.franchise import ChannelPartner
 
 logger = logging.getLogger(__name__)
 
@@ -98,6 +99,9 @@ class IntakeService:
         preferred_city: Optional[str] = "Alwar",
         preferred_locality: Optional[str] = None,
         idempotency_key: Optional[str] = None,
+        referral_code: Optional[str] = None,
+        partner_id: Optional[int] = None,
+        accompanied_by: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Ingest an inbound lead with normalization, test suppression, and 24h deduplication."""
         normalized_mobile = normalize_phone(mobile)
@@ -174,6 +178,24 @@ class IntakeService:
         # 4. Fresh Lead Generation
         lead_id = await get_next_lead_id(db)
 
+        resolved_partner_id = partner_id
+        clean_ref = referral_code.strip() if referral_code else None
+        if clean_ref and not resolved_partner_id:
+            cp_stmt = select(ChannelPartner).where(
+                ChannelPartner.deleted_at.is_(None),
+                ChannelPartner.is_active.is_(True),
+                (ChannelPartner.tracking_code == clean_ref) | (ChannelPartner.partner_code == clean_ref),
+            )
+            matched_cp = (await db.execute(cp_stmt)).scalar_one_or_none()
+            if matched_cp:
+                resolved_partner_id = matched_cp.id
+
+        # L1 Active CP rule: accompanied_by employee required if submitted directly by an Active CP at L1
+        if resolved_partner_id:
+            cp_obj = await db.get(ChannelPartner, resolved_partner_id)
+            if cp_obj and cp_obj.cp_type == "ACTIVE_CP" and cp_obj.active_level == "L1" and not accompanied_by:
+                logger.info("L1 Active CP lead created; visit requires accompanied Omshiv staff.")
+
         new_lead = Lead(
             lead_id=lead_id,
             idempotency_key=idempotency_key,
@@ -185,6 +207,9 @@ class IntakeService:
             related_listing_id=related_listing_id,
             related_project_id=related_project_id,
             assigned_to=assigned_to,
+            partner_id=resolved_partner_id,
+            referral_code=clean_ref,
+            accompanied_by=accompanied_by.strip() if accompanied_by else None,
             stage="NEW",
             temperature=None,
             budget_min=budget_min,

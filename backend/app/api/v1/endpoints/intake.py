@@ -29,6 +29,9 @@ class LeadIntakeRequest(BaseModel):
     preferred_city: Optional[str] = Field("Alwar", description="Preferred city")
     preferred_locality: Optional[str] = Field(None, description="Preferred locality / sector")
     idempotency_key: Optional[str] = Field(None, description="Unique idempotency token")
+    referral_code: Optional[str] = Field(None, description="Creator tracking code or CP code")
+    partner_id: Optional[int] = Field(None, description="Explicit ChannelPartner ID")
+    accompanied_by: Optional[str] = Field(None, description="Omshiv employee ID for L1 accompanied visit")
 
 
 class LeadIntakeResponse(BaseModel):
@@ -142,6 +145,9 @@ async def intake_lead(
         preferred_city=payload.preferred_city,
         preferred_locality=payload.preferred_locality,
         idempotency_key=payload.idempotency_key,
+        referral_code=payload.referral_code,
+        partner_id=payload.partner_id,
+        accompanied_by=payload.accompanied_by,
     )
     if result.get("status") == "created":
         response.status_code = status.HTTP_201_CREATED

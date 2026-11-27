@@ -48,6 +48,14 @@ class Lead(Base):
         nullable=True,
         index=True,
     )
+    partner_id: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        ForeignKey("channel_partners.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    referral_code: Mapped[Optional[str]] = mapped_column(String(40), nullable=True, index=True)
+    accompanied_by: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
 
     stage: Mapped[str] = mapped_column(String(32), default="NEW", nullable=False, index=True)
     temperature: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)  # HOT, WARM, COLD
