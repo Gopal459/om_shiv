@@ -628,6 +628,25 @@ async def create_partner(payload: PartnerCreateRequest, db: AsyncSession = Depen
             db, username=clean_uname, mobile=payload.mobile.strip(), email=payload.email
         )
         if existing_emp:
+            existing_cp_for_emp = (
+                await db.execute(
+                    select(ChannelPartner).where(ChannelPartner.employee_id == existing_emp.employee_id)
+                )
+            ).scalar_one_or_none()
+            if existing_cp_for_emp:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=(
+                        f"Mobile or username already belongs to staff {existing_emp.name} "
+                        f"({existing_emp.employee_id}), already linked to {existing_cp_for_emp.partner_code}. "
+                        "Please use a unique mobile and login username."
+                    ),
+                )
+            if existing_emp.username and existing_emp.username.lower() == clean_uname and existing_emp.mobile != payload.mobile.strip():
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"Login username '{clean_uname}' is already in use by {existing_emp.employee_id}.",
+                )
             linked_emp_id = existing_emp.employee_id
         else:
             dept = await department_repo.get_by_code(db, "SALES")
@@ -646,6 +665,18 @@ async def create_partner(payload: PartnerCreateRequest, db: AsyncSession = Depen
                     is_active=True,
                 )
                 await staff_repo.create(db, new_emp)
+
+    if linked_emp_id:
+        dup_cp = (
+            await db.execute(
+                select(ChannelPartner).where(ChannelPartner.employee_id == linked_emp_id)
+            )
+        ).scalar_one_or_none()
+        if dup_cp:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Staff member {linked_emp_id} is already linked to Channel Partner {dup_cp.partner_code}.",
+            )
 
     partner = ChannelPartner(
         partner_code=code,

@@ -268,3 +268,17 @@ class Test4TierChannelPartnerGovernance:
         staff_list = (await test_client.get("/v1/admin/staff")).json()
         ramesh_row = next(s for s in staff_list if s["employee_id"] == emp_id)
         assert ramesh_row["is_active"] is False
+
+        # Reusing same mobile/username to create another CP with login returns clean 409 (not 500 IntegrityError)
+        dup_res = await test_client.post(
+            "/v1/franchise/partners",
+            json={
+                "cp_type": "REFERRAL_PARTNER",
+                "full_name": "Duplicate Attempt",
+                "mobile": "7788995566",
+                "city": "Jaipur",
+                "username": "another_cp",
+                "password": "password123",
+            },
+        )
+        assert dup_res.status_code == 409
