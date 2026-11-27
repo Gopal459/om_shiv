@@ -142,6 +142,8 @@ export const FranchiseHub: React.FC = () => {
   const [pSocialHandle, setPSocialHandle] = useState('');
   const [pTopCreator, setPTopCreator] = useState(false);
   const [pRetainer, setPRetainer] = useState('0');
+  const [pUsername, setPUsername] = useState('');
+  const [pPassword, setPPassword] = useState('');
 
   // Outlet form
   const [oName, setOName] = useState('');
@@ -225,6 +227,8 @@ export const FranchiseHub: React.FC = () => {
           social_handle: pType === 'CREATOR_PARTNER' ? pSocialHandle || undefined : undefined,
           is_top_creator: pType === 'CREATOR_PARTNER' ? pTopCreator : false,
           monthly_retainer_amount: pType === 'CREATOR_PARTNER' ? Number(pRetainer) || 0 : 0,
+          username: pUsername.trim() || undefined,
+          password: pPassword || undefined,
         }),
       });
       if (!res.ok) await handleApiError(res, 'Could not add partner');
@@ -236,6 +240,8 @@ export const FranchiseHub: React.FC = () => {
       setPOfficeAddress('');
       setPTrackingCode('');
       setPSocialHandle('');
+      setPUsername('');
+      setPPassword('');
       setBanner({ type: 'success', text: `${CP_TYPE_META[pType].short} registered successfully.` });
       await fetchAll();
     } catch (err: any) {
@@ -807,6 +813,11 @@ export const FranchiseHub: React.FC = () => {
                             >
                               {p.is_active ? 'ACTIVE' : 'SUSPENDED'}
                             </span>
+                            {p.employee_id && (
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 border border-indigo-500/20">
+                                Staff Login: {p.employee_id}
+                              </span>
+                            )}
                           </div>
                           <h4 className="text-sm font-bold text-slate-900 dark:text-white">
                             {p.full_name} <span className="text-xs font-mono text-slate-400">({p.partner_code})</span>
@@ -1389,6 +1400,16 @@ export const FranchiseHub: React.FC = () => {
                     <option key={o.id} value={o.id}>{o.name} ({o.city})</option>
                   ))}
                 </select>
+
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-2">
+                  <div className="text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                    CRM Staff Login (Optional — links directly with Panel User / Staff)
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input placeholder="Login Username" value={pUsername} onChange={(e) => setPUsername(e.target.value)} className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900" />
+                    <input type="password" minLength={6} placeholder="Password (min 6 chars)" value={pPassword} onChange={(e) => setPPassword(e.target.value)} className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900" />
+                  </div>
+                </div>
 
                 <button disabled={submitting} type="submit" className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold cursor-pointer">
                   {submitting ? 'Saving...' : 'Save Partner'}

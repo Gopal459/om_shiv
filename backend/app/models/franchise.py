@@ -70,6 +70,13 @@ class ChannelPartner(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     partner_code: Mapped[str] = mapped_column(String(32), unique=True, index=True, nullable=False)
+    employee_id: Mapped[Optional[str]] = mapped_column(
+        String(32),
+        ForeignKey("employees.employee_id", ondelete="SET NULL"),
+        unique=True,
+        index=True,
+        nullable=True,
+    )
     cp_type: Mapped[str] = mapped_column(
         String(32), default="BROKER_CP", index=True, nullable=False
     )  # BROKER_CP, ACTIVE_CP, REFERRAL_PARTNER, CREATOR_PARTNER

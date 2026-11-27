@@ -230,3 +230,41 @@ class Test4TierChannelPartnerGovernance:
         assert ret2.status_code == 200
         assert ret2.json()["generated_count"] == 0
         assert ret2.json()["skipped_existing"] == 1
+
+    @pytest.mark.asyncio
+    async def test_staff_franchisee_syncs_and_suspend_syncs_back(self, test_client, db_session):
+        from app.services.identity_seed import seed_departments_and_roles
+        await seed_departments_and_roles(db_session)
+
+        # Create staff member with FRANCHISEE_AGENT role via /v1/admin/staff
+        st_res = await test_client.post(
+            "/v1/admin/staff",
+            json={
+                "name": "Ramesh Chandra",
+                "username": "ramesh_cp",
+                "password": "password123",
+                "mobile": "7788995566",
+                "email": "ramesh@gmail.com",
+                "department_code": "SALES",
+                "role_code": "FRANCHISEE_AGENT",
+            },
+        )
+        assert st_res.status_code == 201
+        emp_id = st_res.json()["employee_id"]
+
+        # Automatically appears in /v1/franchise/partners with employee_id linked
+        partners_res = await test_client.get("/v1/franchise/partners")
+        assert partners_res.status_code == 200
+        matched = [p for p in partners_res.json()["partners"] if p["employee_id"] == emp_id]
+        assert len(matched) == 1
+        assert matched[0]["full_name"] == "Ramesh Chandra"
+
+        # Instant Suspend on Partner also deactivates linked Employee login
+        susp = await test_client.post(
+            f"/v1/franchise/partners/{matched[0]['id']}/suspend",
+            json={"reason": "Policy violation"},
+        )
+        assert susp.status_code == 200
+        staff_list = (await test_client.get("/v1/admin/staff")).json()
+        ramesh_row = next(s for s in staff_list if s["employee_id"] == emp_id)
+        assert ramesh_row["is_active"] is False

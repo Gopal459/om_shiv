@@ -25,6 +25,7 @@ from app.models.franchise import (
     PAYOUT_TYPES,
     current_fiscal_year,
 )
+from app.models.identity import Employee, Role
 from app.models.leads import Lead
 from app.models.properties import Property
 from app.models.settings import AuditLog
@@ -215,6 +216,13 @@ async def suspend_partner(
     partner.violation_notes = reason.strip()
     partner.updated_at = now
 
+    if partner.employee_id:
+        emp = (
+            await db.execute(select(Employee).where(Employee.employee_id == partner.employee_id))
+        ).scalar_one_or_none()
+        if emp:
+            emp.is_active = False
+
     db.add(
         AuditLog(
             id=str(uuid.uuid4()),
@@ -246,6 +254,13 @@ async def reinstate_partner(
     partner.suspension_reason = None
     partner.updated_at = now
 
+    if partner.employee_id:
+        emp = (
+            await db.execute(select(Employee).where(Employee.employee_id == partner.employee_id))
+        ).scalar_one_or_none()
+        if emp:
+            emp.is_active = True
+
     db.add(
         AuditLog(
             id=str(uuid.uuid4()),
@@ -261,6 +276,76 @@ async def reinstate_partner(
     await db.commit()
     await db.refresh(partner)
     return partner
+
+
+async def sync_franchisee_staff_to_partners(db: AsyncSession) -> int:
+    """Ensure every Staff member with role FRANCHISEE_AGENT is linked in channel_partners.
+
+    Prevents duplicate/disconnected records between Staff Directory and Franchise Hub.
+    Returns count of newly synced or linked ChannelPartner records.
+    """
+    role = (
+        await db.execute(select(Role).where(Role.code == "FRANCHISEE_AGENT"))
+    ).scalar_one_or_none()
+    if not role:
+        return 0
+
+    emps = (
+        await db.execute(
+            select(Employee).where(
+                Employee.role_id == role.id,
+                Employee.deleted_at.is_(None),
+            )
+        )
+    ).scalars().all()
+
+    synced = 0
+    for emp in emps:
+        by_emp = (
+            await db.execute(
+                select(ChannelPartner).where(ChannelPartner.employee_id == emp.employee_id)
+            )
+        ).scalar_one_or_none()
+        if by_emp:
+            if by_emp.is_active != emp.is_active:
+                by_emp.is_active = emp.is_active
+            continue
+
+        # Link by mobile if an unlinked ChannelPartner exists with same mobile
+        by_mobile = (
+            await db.execute(
+                select(ChannelPartner).where(
+                    ChannelPartner.mobile == emp.mobile,
+                    ChannelPartner.employee_id.is_(None),
+                    ChannelPartner.deleted_at.is_(None),
+                )
+            )
+        ).scalar_one_or_none()
+        if by_mobile:
+            by_mobile.employee_id = emp.employee_id
+            by_mobile.is_active = emp.is_active
+            synced += 1
+            continue
+
+        code = await next_franchise_code(db, ChannelPartner, ChannelPartner.partner_code, "CP")
+        cp = ChannelPartner(
+            partner_code=code,
+            employee_id=emp.employee_id,
+            cp_type="BROKER_CP",
+            full_name=emp.name,
+            mobile=emp.mobile,
+            email=emp.email,
+            city="Jaipur",
+            is_active=bool(emp.is_active),
+            joined_at=emp.created_at or datetime.now(timezone.utc),
+        )
+        db.add(cp)
+        await db.flush()
+        synced += 1
+
+    if synced:
+        await db.commit()
+    return synced
 
 
 async def get_cp_scoped_inventory(

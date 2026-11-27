@@ -10,6 +10,7 @@ from app.core.database import get_db
 from app.models.identity import Employee, Role
 from app.core.passwords import hash_password
 from app.repositories import staff_repo, role_repo, department_repo
+from app.services.cp_governance_service import sync_franchisee_staff_to_partners
 
 logger = logging.getLogger(__name__)
 
@@ -450,6 +451,8 @@ async def create_staff(
         deleted_at=None,
     )
     saved_emp = await staff_repo.create(db, new_employee)
+    if role.code == "FRANCHISEE_AGENT":
+        await sync_franchisee_staff_to_partners(db)
 
     return StaffResponse(
         id=saved_emp.id,
@@ -522,6 +525,7 @@ async def update_staff(
         emp.is_active = payload.is_active
 
     updated = await staff_repo.update(db, emp)
+    await sync_franchisee_staff_to_partners(db)
 
     return StaffResponse(
         id=updated.id,

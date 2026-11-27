@@ -41,9 +41,13 @@ from app.services.cp_governance_service import (
     promote_active_cp,
     reinstate_partner,
     suspend_partner,
+    sync_franchisee_staff_to_partners,
     tenure_days,
     validate_and_create_payout,
 )
+from app.core.passwords import hash_password
+from app.models.identity import Employee
+from app.repositories import department_repo, role_repo, staff_repo
 
 logger = logging.getLogger(__name__)
 
@@ -130,6 +134,10 @@ class PartnerCreateRequest(BaseModel):
     social_handle: Optional[str] = Field(default=None, max_length=150)
     is_top_creator: bool = False
     monthly_retainer_amount: float = Field(default=0.0, ge=0.0)
+    # Optional Staff Login linkage (unifies Staff Directory & Franchise CP)
+    employee_id: Optional[str] = Field(default=None, max_length=32)
+    username: Optional[str] = Field(default=None, max_length=50)
+    password: Optional[str] = Field(default=None, min_length=6, max_length=100)
 
 
 class PartnerUpdateRequest(BaseModel):
@@ -235,6 +243,7 @@ def _serialize_partner(
     return {
         "id": p.id,
         "partner_code": p.partner_code,
+        "employee_id": p.employee_id,
         "cp_type": p.cp_type or "BROKER_CP",
         "full_name": p.full_name,
         "company_name": p.company_name,
@@ -336,6 +345,7 @@ async def _get_partner_or_404(db: AsyncSession, partner_id: int) -> ChannelPartn
 @router.get("/overview", summary="Live 4-Tier Franchise & Channel Partner network KPIs")
 async def get_franchise_overview(db: AsyncSession = Depends(get_db)) -> Dict[str, Any]:
     """Compute live network metrics & tier breakdown directly from DB tables."""
+    await sync_franchisee_staff_to_partners(db)
     total_partners = (
         await db.execute(
             select(func.count(ChannelPartner.id)).where(ChannelPartner.deleted_at.is_(None))
@@ -527,6 +537,7 @@ async def list_partners(
     status_filter: Optional[str] = Query(default=None, alias="status"),
     db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
+    await sync_franchisee_staff_to_partners(db)
     stmt = (
         select(ChannelPartner)
         .where(ChannelPartner.deleted_at.is_(None))
@@ -610,8 +621,35 @@ async def create_partner(payload: PartnerCreateRequest, db: AsyncSession = Depen
                 detail=f"Tracking code '{tracking_code}' is already in use.",
             )
 
+    linked_emp_id = payload.employee_id.strip() if payload.employee_id else None
+    if not linked_emp_id and payload.username and payload.password:
+        clean_uname = payload.username.strip().lower()
+        existing_emp = await staff_repo.check_duplicate(
+            db, username=clean_uname, mobile=payload.mobile.strip(), email=payload.email
+        )
+        if existing_emp:
+            linked_emp_id = existing_emp.employee_id
+        else:
+            dept = await department_repo.get_by_code(db, "SALES")
+            role = await role_repo.get_by_code(db, "FRANCHISEE_AGENT")
+            if dept and role:
+                linked_emp_id = await staff_repo.generate_emp_id(db)
+                new_emp = Employee(
+                    employee_id=linked_emp_id,
+                    name=payload.full_name.strip(),
+                    username=clean_uname,
+                    password_hash=hash_password(payload.password),
+                    mobile=payload.mobile.strip(),
+                    email=payload.email.strip().lower() if payload.email else None,
+                    department_id=dept.id,
+                    role_id=role.id,
+                    is_active=True,
+                )
+                await staff_repo.create(db, new_emp)
+
     partner = ChannelPartner(
         partner_code=code,
+        employee_id=linked_emp_id,
         cp_type=norm_type,
         full_name=payload.full_name.strip(),
         company_name=payload.company_name.strip() if payload.company_name else None,

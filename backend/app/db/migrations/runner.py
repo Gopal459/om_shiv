@@ -19,6 +19,7 @@ MIGRATION_STEPS = [
     "app.db.migrations.0009_ai_agents_safety_schema",
     "app.db.migrations.0010_franchise_network_schema",
     "app.db.migrations.0011_cp_4_tier_governance",
+    "app.db.migrations.0012_link_cp_employee",
 ]
 
 
