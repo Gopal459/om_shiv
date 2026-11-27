@@ -16,6 +16,7 @@ import PropertyForm from './pages/PropertyForm';
 import BlogManager from './pages/BlogManager';
 import AIAgentHub from './pages/AIAgentHub';
 import AIApprovalsQueue from './pages/AIApprovalsQueue';
+import FranchiseHub from './pages/FranchiseHub';
 import { ThemeProvider } from './context/ThemeContext';
 
 const LeadDetailPage: React.FC = () => {
@@ -218,26 +219,7 @@ const AppContent: React.FC = () => {
             />
           }
         />
-        <Route
-          path="/franchise"
-          element={
-            <ModuleHub
-              title="Franchise & Channel Partner Network"
-              subtitle="Manage authorized real estate channel partners, franchise branch outlets, and commission structures."
-              badge="Partner Ecosystem"
-              stats={[
-                { label: 'Channel Partners', value: 32, change: 'Active brokers' },
-                { label: 'Franchise Outlets', value: 5, change: 'Jaipur locations' },
-                { label: 'Partner Sourced Leads', value: 88, change: 'Converted to pipeline' },
-                { label: 'Settled Payouts', value: 12, change: 'Commission cleared' },
-              ]}
-              shortcuts={[
-                { label: 'Assign Franchise Dynamic Roles', desc: 'Configure permissions for franchisee staff members', path: '/staff?tab=roles' },
-                { label: 'Prioritized Sales Lead Queue', desc: 'Review partner submitted customer inquiries', path: '/leads' },
-              ]}
-            />
-          }
-        />
+        <Route path="/franchise" element={<FranchiseHub />} />
 
         <Route path="/login" element={<Navigate to="/dashboard" replace />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
