@@ -689,3 +689,199 @@ async def test_callback_dashboard_tabs_detail_export_and_reverse_sync(test_clien
     assert paired_cb.lead_converted == 1
     assert paired_cb.lead_open == 0
     assert paired_cb.converted_lead_id == lead.lead_id
+
+
+@pytest.mark.asyncio
+async def test_callback_conversion_truncates_preferred_locality_and_validates_assignees(db_session):
+    from fastapi import HTTPException
+    from sqlalchemy import select
+    from app.models.identity import Department, Role, Employee
+    from app.models.leads import Lead, TblLead
+    from app.services.callback_service import callback_service
+
+    dept = Department(name="Sales", code="SALES")
+    db_session.add(dept)
+    await db_session.flush()
+    mgr_role = Role(
+        department_id=dept.id,
+        name="Sales Manager",
+        code="SALES_MANAGER",
+        permissions={"leads": ["view_all"]},
+    )
+    db_session.add(mgr_role)
+    await db_session.flush()
+
+    mgr = Employee(
+        employee_id="EMP-M020",
+        name="Manager Twenty",
+        email="mgr20@omshiv.in",
+        mobile="9829071001",
+        department_id=dept.id,
+        role_id=mgr_role.id,
+        is_active=True,
+    )
+    inactive_emp = Employee(
+        employee_id="EMP-INACT",
+        name="Inactive Staff",
+        email="inact@omshiv.in",
+        mobile="9829071002",
+        department_id=dept.id,
+        role_id=mgr_role.id,
+        is_active=False,
+    )
+    db_session.add_all([mgr, inactive_emp])
+    await db_session.commit()
+    await db_session.refresh(mgr)
+
+    # 1. create_callback rejects non-existent or inactive explicit assigned_user_id
+    for bad_emp_id in ("EMP-NOPE", "EMP-INACT"):
+        with pytest.raises(HTTPException) as exc_create:
+            await callback_service.create_callback(
+                db_session,
+                name="Bad Assignee Test",
+                mobile_number="9829071111",
+                assigned_user_id=bad_emp_id,
+            )
+        assert exc_create.value.status_code in (400, 404)
+
+    cb = await callback_service.create_callback(
+        db_session,
+        name="Long Address Customer",
+        mobile_number="9829071112",
+        assigned_user_id="EMP-M020",
+    )
+
+    # 2. convert_callback_to_lead rejects non-existent or inactive explicit assigned_to
+    for bad_emp_id in ("EMP-NOPE", "EMP-INACT"):
+        with pytest.raises(HTTPException) as exc_conv_bad:
+            await callback_service.convert_callback_to_lead(
+                db_session,
+                mgr,
+                cb.callback_id,
+                customer_type="BUY",
+                name="Long Address Customer",
+                email=None,
+                mobile="9829071112",
+                alternate_mobile=None,
+                address="Short Address",
+                refer_by_relation=None,
+                refer_by_name=None,
+                refer_by_mobile=None,
+                source="Website Callback",
+                assigned_to=bad_emp_id,
+            )
+        assert exc_conv_bad.value.status_code in (400, 404)
+
+    # 3. Long address (>100 chars) truncates Lead.preferred_locality to 100 while preserving full TblLead.address
+    long_address = "Plot No 42, Near Main Circle, Opposite Central Park, Sector 7 Extension, Alwar, Rajasthan - 301001, India"
+    assert len(long_address) > 100
+
+    conv = await callback_service.convert_callback_to_lead(
+        db_session,
+        mgr,
+        cb.callback_id,
+        customer_type="BUY",
+        name="Long Address Customer",
+        email=None,
+        mobile="9829071112",
+        alternate_mobile=None,
+        address=long_address,
+        refer_by_relation=None,
+        refer_by_name=None,
+        refer_by_mobile=None,
+        source="Website Callback",
+        assigned_to="EMP-M020",
+    )
+    lead_id = conv["lead_id"]
+    lead_row = (await db_session.execute(select(Lead).where(Lead.lead_id == lead_id))).scalar_one()
+    tbl_lead_row = (
+        await db_session.execute(select(TblLead).where(TblLead.lead_unique_id == lead_id))
+    ).scalar_one()
+
+    assert lead_row.preferred_locality == long_address[:100]
+    assert len(lead_row.preferred_locality) == 100
+    assert tbl_lead_row.address == long_address
+    assert tbl_lead_row.indv_property_address == long_address
+
+
+@pytest.mark.asyncio
+async def test_convert_inquiry_blocked_when_paired_callback_closed_or_terminal(test_client, db_session):
+    from fastapi import HTTPException
+    from sqlalchemy import select
+    from app.models.identity import Department, Role, Employee
+    from app.models.leads import Lead
+    from app.services.callback_service import callback_service
+    from app.services.intake_service import intake_service
+
+    dept = Department(name="Sales", code="SALES")
+    db_session.add(dept)
+    await db_session.flush()
+    mgr_role = Role(
+        department_id=dept.id,
+        name="Sales Manager",
+        code="SALES_MANAGER",
+        permissions={"leads": ["view_all"]},
+    )
+    db_session.add(mgr_role)
+    await db_session.flush()
+    mgr = Employee(
+        employee_id="EMP-M030",
+        name="Manager Thirty",
+        email="mgr30@omshiv.in",
+        mobile="9829072001",
+        department_id=dept.id,
+        role_id=mgr_role.id,
+        is_active=True,
+    )
+    db_session.add(mgr)
+    await db_session.commit()
+    await db_session.refresh(mgr)
+
+    # Case A: Paired callback closed via Disqualified (status 2, lead_open=0)
+    resp_a = await test_client.post(
+        "/v1/intake/inquiry",
+        json={
+            "inquiry_type": "CALLBACK",
+            "full_name": "Disqualified User",
+            "mobile": "9829072011",
+            "details": {"message": "Test"},
+        },
+    )
+    assert resp_a.status_code == 201
+    inq_a_id = resp_a.json()["id"]
+    cb_a = (
+        await db_session.execute(select(TblCallback).where(TblCallback.website_inquiry_id == inq_a_id))
+    ).scalar_one()
+    await callback_service.change_callback_status(
+        db_session, mgr, cb_a.callback_id, lead_status=2, remark="Not interested", disqualified_reason=2
+    )
+
+    leads_before = len((await db_session.execute(select(Lead))).scalars().all())
+    with pytest.raises(HTTPException) as exc_a:
+        await intake_service.convert_inquiry_to_lead(db_session, inquiry_id=inq_a_id, assigned_to="EMP-M030")
+    assert exc_a.value.status_code == 400
+    assert len((await db_session.execute(select(Lead))).scalars().all()) == leads_before
+
+    # Case B: Paired callback closed via Converted Property (status 6, lead_open=0)
+    resp_b = await test_client.post(
+        "/v1/intake/inquiry",
+        json={
+            "inquiry_type": "CALLBACK",
+            "full_name": "Converted Property User",
+            "mobile": "9829072012",
+            "details": {"message": "Test"},
+        },
+    )
+    assert resp_b.status_code == 201
+    inq_b_id = resp_b.json()["id"]
+    cb_b = (
+        await db_session.execute(select(TblCallback).where(TblCallback.website_inquiry_id == inq_b_id))
+    ).scalar_one()
+    await callback_service.change_callback_status(
+        db_session, mgr, cb_b.callback_id, lead_status=6, remark="Property deal done"
+    )
+
+    with pytest.raises(HTTPException) as exc_b:
+        await intake_service.convert_inquiry_to_lead(db_session, inquiry_id=inq_b_id, assigned_to="EMP-M030")
+    assert exc_b.value.status_code == 400
+    assert len((await db_session.execute(select(Lead))).scalars().all()) == leads_before

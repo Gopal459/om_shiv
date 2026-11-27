@@ -242,6 +242,26 @@ class CallbackService:
         )
         return {emp_id: emp_name for emp_id, emp_name in res.all()}
 
+    async def _get_active_employee(
+        self, db: AsyncSession, employee_id: str, *, label: str = "Target assignee"
+    ) -> Employee:
+        clean_id = (employee_id or "").strip()
+        emp = (
+            await db.execute(
+                select(Employee).where(
+                    Employee.employee_id == clean_id,
+                    Employee.is_active.is_(True),
+                    Employee.deleted_at.is_(None),
+                )
+            )
+        ).scalar_one_or_none()
+        if not emp:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"{label} '{clean_id}' not found or inactive.",
+            )
+        return emp
+
     async def create_callback(
         self,
         db: AsyncSession,
@@ -279,7 +299,12 @@ class CallbackService:
             if actor and not self.has_view_all(actor):
                 target_assignee = actor.employee_id
 
-        if target_assignee is None:
+        if target_assignee is not None:
+            valid_assignee = await self._get_active_employee(
+                db, target_assignee, label="Assigned telecaller"
+            )
+            target_assignee = valid_assignee.employee_id
+        else:
             target_assignee = await self._pick_round_robin_telecaller(db)
 
         cb = TblCallback(
@@ -632,21 +657,9 @@ class CallbackService:
         cb = await self._get_scoped_callback(db, actor, callback_id)
         self._ensure_open_for_mutation(cb, "transfer it")
 
-        target_id = (assigned_user_id or "").strip()
-        target_emp = (
-            await db.execute(
-                select(Employee).where(
-                    Employee.employee_id == target_id,
-                    Employee.is_active.is_(True),
-                    Employee.deleted_at.is_(None),
-                )
-            )
-        ).scalar_one_or_none()
-        if not target_emp:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Target assignee '{target_id}' not found or inactive.",
-            )
+        target_emp = await self._get_active_employee(
+            db, assigned_user_id, label="Target assignee"
+        )
 
         clean_remark = (remark or "").strip()
         if not clean_remark:
@@ -754,16 +767,25 @@ class CallbackService:
                     detail=f"Website inquiry #{linked_inquiry.id} is already converted to lead {linked_inquiry.converted_lead_id}",
                 )
 
+        explicit_assignee = (
+            assigned_to.strip()
+            if isinstance(assigned_to, str) and assigned_to.strip()
+            else None
+        )
+        if explicit_assignee is not None:
+            valid_assignee = await self._get_active_employee(
+                db, explicit_assignee, label="Assignee"
+            )
+            final_assignee = valid_assignee.employee_id
+        else:
+            final_assignee = cb.assigned_user_id or actor.employee_id
+
         lead_id = await get_next_lead_id(db)
         norm_mobile = normalize_phone(mobile or cb.mobile_number)
         clean_name = (name or cb.name).strip()
         lead_type = (customer_type or "BUY").strip().upper()
-        final_assignee = (
-            assigned_to.strip()
-            if isinstance(assigned_to, str) and assigned_to.strip()
-            else (cb.assigned_user_id or actor.employee_id)
-        )
         clean_source = (source or "Website Callback").strip()
+        clean_address = address.strip() if isinstance(address, str) and address.strip() else None
 
         new_lead = Lead(
             lead_id=lead_id,
@@ -775,7 +797,7 @@ class CallbackService:
             related_listing_id=cb.property_code,
             assigned_to=final_assignee,
             stage="NEW",
-            preferred_locality=address.strip() if address else None,
+            preferred_locality=clean_address[:100] if clean_address else None,
             is_untouched=True,
             is_duplicate=False,
             is_test=False,
@@ -787,12 +809,12 @@ class CallbackService:
             contact_name=clean_name,
             mobile=norm_mobile,
             email=new_lead.email,
-            address=address.strip() if address else None,
+            address=clean_address,
             lead_table_name=lead_type,
             lead_source_id=4,
             property_id=cb.property_id or 0,
             property_idno=cb.property_code,
-            indv_property_address=address.strip() if address else None,
+            indv_property_address=clean_address,
             reference_relation_by=refer_by_relation,
             refer_by_name=refer_by_name,
             refer_by_mobile=refer_by_mobile,

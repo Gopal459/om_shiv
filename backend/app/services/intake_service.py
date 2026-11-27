@@ -348,6 +348,26 @@ class IntakeService:
                 detail=f"Website inquiry #{inquiry_id} is already converted to lead {inquiry.converted_lead_id}",
             )
 
+        # Guard against paired callbacks already closed or converted
+        from app.models.callbacks import TblCallback, CallbackActivity
+
+        cb_res = await db.execute(
+            select(TblCallback).where(
+                TblCallback.website_inquiry_id == inquiry.id,
+                TblCallback.deleted_at.is_(None),
+            )
+        )
+        paired_callbacks = list(cb_res.scalars().all())
+        for cb in paired_callbacks:
+            if cb.lead_status in (5, 6) or cb.lead_converted == 1 or cb.lead_open == 0:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=(
+                        f"Paired callback {cb.lead_unique_id or cb.callback_id} is closed "
+                        "or already converted."
+                    ),
+                )
+
         # Allocate new lead_id
         lead_id = await get_next_lead_id(db)
 
@@ -378,15 +398,6 @@ class IntakeService:
         inquiry.converted_at = datetime.now(timezone.utc)
 
         # Sync any paired TblCallback created from this WebsiteInquiry
-        from app.models.callbacks import TblCallback, CallbackActivity
-
-        cb_res = await db.execute(
-            select(TblCallback).where(
-                TblCallback.website_inquiry_id == inquiry.id,
-                TblCallback.deleted_at.is_(None),
-            )
-        )
-        paired_callbacks = list(cb_res.scalars().all())
         for cb in paired_callbacks:
             status_before = cb.lead_status
             cb.lead_status = 5
