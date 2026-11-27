@@ -171,10 +171,10 @@ export const MyWork: React.FC<MyWorkProps> = ({ onSelectLead }) => {
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-5">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <span className="p-2 rounded-xl bg-rose-500/10 text-rose-500 border border-rose-500/20">
+            <span className="p-2 rounded-xl bg-[#291BB0]/10 text-[#291BB0] dark:text-indigo-300 border border-[#291BB0]/20">
               <Rocket className="w-5 h-5" />
             </span>
-            <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-display font-black text-slate-900 dark:text-white tracking-tight">
               Enterprise Leads Command Center
             </h1>
           </div>
@@ -192,7 +192,7 @@ export const MyWork: React.FC<MyWorkProps> = ({ onSelectLead }) => {
               onClick={() => setViewMode('KANBAN')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
                 viewMode === 'KANBAN'
-                  ? 'bg-white dark:bg-slate-900 text-rose-600 dark:text-rose-400 shadow-xs'
+                  ? 'bg-white dark:bg-slate-900 text-[#291BB0] dark:text-indigo-300 shadow-xs'
                   : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
@@ -205,7 +205,7 @@ export const MyWork: React.FC<MyWorkProps> = ({ onSelectLead }) => {
               onClick={() => setViewMode('TABLE')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
                 viewMode === 'TABLE'
-                  ? 'bg-white dark:bg-slate-900 text-rose-600 dark:text-rose-400 shadow-xs'
+                  ? 'bg-white dark:bg-slate-900 text-[#291BB0] dark:text-indigo-300 shadow-xs'
                   : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
@@ -219,9 +219,9 @@ export const MyWork: React.FC<MyWorkProps> = ({ onSelectLead }) => {
             onClick={() => fetchKanbanData(true)}
             disabled={refreshing}
             title="Refresh Leads"
-            className="p-2.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:text-rose-500 transition-colors shadow-xs"
+            className="p-2.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:text-[#291BB0] transition-colors shadow-xs"
           >
-            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin text-rose-500' : ''}`} />
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin text-[#291BB0]' : ''}`} />
           </button>
 
           {/* Bulk Import */}
@@ -229,16 +229,16 @@ export const MyWork: React.FC<MyWorkProps> = ({ onSelectLead }) => {
             onClick={() => setIsImportOpen(true)}
             className="flex items-center gap-2 px-3.5 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold transition-all shadow-xs"
           >
-            <FileSpreadsheet className="w-4 h-4 text-blue-500" />
+            <FileSpreadsheet className="w-4 h-4 text-[#291BB0] dark:text-indigo-400" />
             <span>Import Leads</span>
           </button>
 
           {/* Create Lead */}
           <button
             onClick={() => setIsCreateOpen(true)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700 text-white text-xs font-bold transition-all shadow-md shadow-rose-500/20 active:scale-95"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-[#291BB0] hover:bg-[#1f138e] text-white text-xs font-bold transition-all shadow-md shadow-[#291BB0]/25 active:scale-95"
           >
-            <PlusCircle className="w-4 h-4" />
+            <PlusCircle className="w-4 h-4 text-[#F04B42]" />
             <span>+ Create Lead</span>
           </button>
         </div>
@@ -258,8 +258,8 @@ export const MyWork: React.FC<MyWorkProps> = ({ onSelectLead }) => {
               onClick={() => handleTypeTabChange(tab.id)}
               className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-bold transition-all border ${
                 activeType === tab.id
-                  ? 'bg-rose-500 text-white border-rose-500 shadow-sm'
-                  : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300'
+                  ? 'bg-[#291BB0] text-white border-[#291BB0] shadow-sm shadow-[#291BB0]/20'
+                  : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-[#291BB0]/40'
               }`}
             >
               <span>{tab.label}</span>

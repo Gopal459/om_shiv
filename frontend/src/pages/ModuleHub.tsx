@@ -33,8 +33,8 @@ export const ModuleHub: React.FC<ModuleHubProps> = ({
       {/* Header Banner */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="space-y-2">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-bold">
-            <Sparkles className="w-3.5 h-3.5 text-rose-500" />
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#291BB0]/10 border border-[#291BB0]/20 text-[#291BB0] dark:text-indigo-300 text-xs font-bold">
+            <Sparkles className="w-3.5 h-3.5 text-[#F04B42]" />
             <span>{badge}</span>
           </div>
           <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
@@ -84,7 +84,7 @@ export const ModuleHub: React.FC<ModuleHubProps> = ({
       {shortcuts.length > 0 && (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm space-y-4">
           <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <Layers className="w-4 h-4 text-rose-500" />
+            <Layers className="w-4 h-4 text-[#F04B42]" />
             <span>Available Sub-Sections & Operations</span>
           </h3>
 
@@ -93,17 +93,17 @@ export const ModuleHub: React.FC<ModuleHubProps> = ({
               <div
                 key={idx}
                 onClick={() => navigate(sc.path)}
-                className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 hover:border-rose-400 dark:hover:border-rose-500 flex items-center justify-between cursor-pointer transition-all duration-200 hover:-translate-y-0.5 group shadow-xs"
+                className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 hover:border-[#291BB0] dark:hover:border-indigo-400 flex items-center justify-between cursor-pointer transition-all duration-200 hover:-translate-y-0.5 group shadow-xs"
               >
                 <div>
-                  <div className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors">
+                  <div className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-[#291BB0] dark:group-hover:text-indigo-300 transition-colors">
                     {sc.label}
                   </div>
                   <div className="text-[11px] text-slate-500 dark:text-slate-400">
                     {sc.desc}
                   </div>
                 </div>
-                <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-rose-500 group-hover:translate-x-1 transition-all" />
+                <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-[#F04B42] group-hover:translate-x-1 transition-all" />
               </div>
             ))}
           </div>

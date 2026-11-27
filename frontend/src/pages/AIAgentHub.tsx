@@ -205,8 +205,8 @@ export const AIAgentHub: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2.5">
-            <Bot className="w-6 h-6 text-emerald-500" />
+          <h2 className="text-xl font-display font-bold text-slate-900 dark:text-white flex items-center gap-2.5">
+            <Bot className="w-6 h-6 text-[#291BB0] dark:text-indigo-400" />
             <span>AI Agents Control Center</span>
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
@@ -295,7 +295,7 @@ export const AIAgentHub: React.FC = () => {
               onClick={() => setSelectedCategory(cat)}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
                 selectedCategory === cat
-                  ? 'bg-slate-900 dark:bg-emerald-600 text-white'
+                  ? 'bg-[#291BB0] text-white shadow-xs'
                   : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
               }`}
             >

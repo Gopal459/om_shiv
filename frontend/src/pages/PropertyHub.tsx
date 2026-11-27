@@ -293,7 +293,7 @@ export const PropertyHub: React.FC = () => {
               onClick={() => handleTabChange(tabKey)}
               className={`px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 ${
                 isActive
-                  ? 'bg-rose-500 text-white shadow-sm'
+                  ? 'bg-[#291BB0] text-white shadow-sm shadow-[#291BB0]/25'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
               }`}
             >
@@ -350,7 +350,7 @@ export const PropertyHub: React.FC = () => {
             </p>
             <button
               onClick={() => setViewMode('CREATE')}
-              className="mt-2 px-4 py-2 rounded-lg bg-rose-500 text-white text-xs font-bold hover:bg-rose-600 transition-colors inline-flex items-center gap-1.5"
+              className="mt-2 px-4 py-2 rounded-lg bg-[#291BB0] text-white text-xs font-bold hover:bg-[#1f138e] transition-colors inline-flex items-center gap-1.5"
             >
               <Plus className="w-3.5 h-3.5" />
               Add First Property
@@ -616,7 +616,7 @@ export const PropertyHub: React.FC = () => {
                     `Property successfully assigned to Staff #${selectedStaffId}`
                   )
                 }
-                className="px-5 py-2 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs shadow-md transition-all flex items-center gap-1.5"
+                className="px-5 py-2 rounded-xl bg-[#291BB0] hover:bg-[#1f138e] text-white font-bold text-xs shadow-md transition-all flex items-center gap-1.5"
               >
                 {updatingStatus ? 'Assigning...' : 'Confirm Assignment'}
               </button>

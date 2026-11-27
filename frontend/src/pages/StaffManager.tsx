@@ -682,7 +682,7 @@ export const StaffManager: React.FC = () => {
           onClick={() => setActiveSubTab('ROSTER')}
           className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${
             activeSubTab === 'ROSTER'
-              ? 'bg-emerald-600 text-white shadow-sm'
+              ? 'bg-[#291BB0] text-white shadow-sm'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
           }`}
         >
@@ -692,7 +692,7 @@ export const StaffManager: React.FC = () => {
           onClick={() => setActiveSubTab('ROLES')}
           className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${
             activeSubTab === 'ROLES'
-              ? 'bg-emerald-600 text-white shadow-sm'
+              ? 'bg-[#291BB0] text-white shadow-sm'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
           }`}
         >
@@ -702,7 +702,7 @@ export const StaffManager: React.FC = () => {
           onClick={() => setActiveSubTab('PERMISSIONS')}
           className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${
             activeSubTab === 'PERMISSIONS'
-              ? 'bg-emerald-600 text-white shadow-sm'
+              ? 'bg-[#291BB0] text-white shadow-sm'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
           }`}
         >
@@ -1421,7 +1421,7 @@ export const StaffManager: React.FC = () => {
 
               <button
                 onClick={handleSavePermissions}
-                className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md transition-colors flex-shrink-0"
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#291BB0] hover:bg-[#1f138e] text-white font-bold text-xs rounded-xl shadow-md transition-colors flex-shrink-0"
               >
                 <Save className="w-4 h-4" />
                 Save Permissions

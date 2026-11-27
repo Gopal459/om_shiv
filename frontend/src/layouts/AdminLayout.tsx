@@ -121,7 +121,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
       label: 'Leads',
       icon: Rocket,
       badge: 'Active',
-      badgeColor: 'bg-rose-500/10 text-rose-500 border border-rose-500/20',
+      badgeColor: 'bg-[#F04B42]/10 text-[#F04B42] border border-[#F04B42]/25',
       subItems: [
         { label: 'Buy', path: '/leads?type=buy' },
         { label: 'Rent', path: '/leads?type=rent' },
@@ -296,27 +296,25 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
       >
         {/* Brand Header */}
         <div
-          className={`h-16 px-3.5 border-b flex items-center justify-between ${
+          className={`h-20 px-3 border-b flex items-center justify-between ${
             isDark ? 'border-slate-800' : 'border-slate-200'
           }`}
         >
           <div
             onClick={() => navigate('/dashboard')}
-            className="flex items-center gap-2.5 overflow-hidden cursor-pointer w-full"
+            className="flex items-center justify-center overflow-hidden cursor-pointer w-full"
           >
             {(!isCollapsed || isMobileOpen) ? (
-              <div className="flex flex-col w-full overflow-hidden">
-                <div className="bg-white rounded-xl px-2.5 py-1.5 border border-slate-200/80 shadow-xs inline-flex items-center justify-center max-w-[180px]">
-                  <img
-                    src={alwarMapLogo}
-                    alt="AlwarMap.com"
-                    className="h-7 w-auto object-contain"
-                  />
-                </div>
+              <div className="w-full bg-white rounded-2xl px-2 py-1 border border-slate-200/90 shadow-sm flex items-center justify-center overflow-hidden">
+                <img
+                  src={alwarMapLogo}
+                  alt="AlwarMap.com"
+                  className="h-14 w-full object-contain scale-125"
+                />
               </div>
             ) : (
-              <div className="relative mx-auto w-9 h-9 rounded-xl bg-[#291BB0] border-2 border-[#F04B42]/80 flex items-center justify-center shadow-md shadow-[#291BB0]/30">
-                <span className="text-white font-display font-black text-sm tracking-tight">
+              <div className="relative mx-auto w-10 h-10 rounded-xl bg-[#291BB0] border-2 border-[#F04B42] flex items-center justify-center shadow-md shadow-[#291BB0]/30">
+                <span className="text-white font-display font-black text-base tracking-tight">
                   A<span className="text-[#F04B42]">.</span>
                 </span>
               </div>
@@ -385,7 +383,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                         <span
                           className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
                             active
-                              ? 'bg-rose-500 text-white'
+                              ? 'bg-[#F04B42] text-white'
                               : item.badgeColor || 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
                           }`}
                         >

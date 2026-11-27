@@ -146,7 +146,7 @@ export const AIApprovalsQueue: React.FC = () => {
             onClick={() => setStatusFilter(tab)}
             className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
               statusFilter === tab
-                ? 'bg-slate-900 dark:bg-emerald-600 text-white'
+                ? 'bg-[#291BB0] text-white shadow-xs'
                 : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300'
             }`}
           >
