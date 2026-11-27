@@ -621,7 +621,7 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
             <button
               type="button"
               onClick={() => openActionModal('CALL')}
-              className="group flex items-center justify-center gap-2 px-3 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md shadow-indigo-950/40 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+              className="group flex items-center justify-center gap-2 px-3 py-2.5 rounded-2xl bg-[#291BB0] hover:bg-[#1f138e] text-white font-bold text-xs shadow-md shadow-[#291BB0]/30 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
             >
               <Phone className="w-4 h-4 transition-transform group-hover:rotate-12" />
               <span>Call / Log</span>
@@ -631,7 +631,7 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
             <button
               type="button"
               onClick={() => openActionModal('SHARE')}
-              className="group flex items-center justify-center gap-2 px-3 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-950/40 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+              className="group flex items-center justify-center gap-2 px-3 py-2.5 rounded-2xl bg-[#291BB0] hover:bg-[#1f138e] text-white font-bold text-xs shadow-md shadow-[#291BB0]/30 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
             >
               <MessageSquare className="w-4 h-4 transition-transform group-hover:scale-110" />
               <span>WhatsApp</span>
@@ -641,7 +641,7 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
             <button
               type="button"
               onClick={() => openActionModal('FOLLOWUP')}
-              className="group flex items-center justify-center gap-2 px-3 py-2.5 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-md shadow-rose-950/40 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+              className="group flex items-center justify-center gap-2 px-3 py-2.5 rounded-2xl bg-[#F04B42] hover:bg-[#d93b32] text-white font-bold text-xs shadow-md shadow-[#F04B42]/30 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
             >
               <Clock className="w-4 h-4 transition-transform group-hover:scale-110" />
               <span>Follow-up</span>
@@ -1062,7 +1062,7 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
 
           <button
             onClick={() => openActionModal('CALL')}
-            className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+            className="px-3.5 py-1.5 rounded-xl bg-[#291BB0] hover:bg-[#1f138e] text-white font-bold text-xs flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
           >
             <Phone className="w-3.5 h-3.5" />
             <span>Log Call Event</span>
@@ -1227,7 +1227,7 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
                       )}`}
                       target="_blank"
                       rel="noreferrer"
-                      className="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-emerald-950/30 transition-all cursor-pointer"
+                      className="w-full py-3 rounded-2xl bg-[#291BB0] hover:bg-[#1f138e] text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-[#291BB0]/25 transition-all cursor-pointer"
                     >
                       <MessageSquare className="w-4 h-4" />
                       <span>Launch WhatsApp Web / App</span>
@@ -1326,7 +1326,7 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold cursor-pointer transition-colors"
+                    className="px-5 py-2 rounded-xl bg-[#291BB0] hover:bg-[#1f138e] text-white font-bold cursor-pointer transition-colors"
                   >
                     {submitting ? 'Reassigning...' : 'Confirm Reassignment'}
                   </button>
@@ -1372,7 +1372,7 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
                         </div>
                         <a
                           href={`tel:${phone}`}
-                          className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs transition-colors"
+                          className="px-3 py-1.5 rounded-xl bg-[#291BB0] hover:bg-[#1f138e] text-white font-bold text-xs shadow-xs transition-colors"
                         >
                           Dial Now
                         </a>
@@ -1462,7 +1462,7 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
                       onClick={() => setTemperature('HOT')}
                       className={`py-2 rounded-xl border font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all ${
                         temperature === 'HOT'
-                          ? 'bg-rose-500 text-white border-rose-500 shadow-sm'
+                          ? 'bg-[#F04B42] text-white border-[#F04B42] shadow-sm'
                           : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50'
                       }`}
                     >
@@ -1520,7 +1520,7 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition-colors shadow-xs cursor-pointer"
+                    className="px-5 py-2 rounded-xl bg-[#291BB0] hover:bg-[#1f138e] text-white font-bold transition-colors shadow-xs cursor-pointer"
                   >
                     {submitting ? 'Saving...' : 'Save & Record Action'}
                   </button>

@@ -349,7 +349,7 @@ export const LeadKanbanBoard: React.FC<LeadKanbanBoardProps> = ({
                             type="button"
                             onClick={(e) => handleQuickAdvance(e, lead, col.key)}
                             title="Advance to Next Stage"
-                            className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-rose-500 hover:text-white transition-all text-[10px] font-bold"
+                            className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-[#291BB0] hover:text-white transition-all text-[10px] font-bold"
                           >
                             <span>Next Stage</span>
                             <ChevronRight className="w-3 h-3" />

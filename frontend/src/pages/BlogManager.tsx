@@ -790,7 +790,7 @@ export const BlogManager: React.FC = () => {
                 handleResetEditor();
                 setActiveTab('editor');
               }}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-500 to-rose-600 text-white font-medium text-sm shadow-md hover:shadow-rose-500/25 hover:from-rose-600 hover:to-rose-700 transition"
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#291BB0] text-white font-medium text-sm shadow-md hover:shadow-[#291BB0]/25 hover:bg-[#1f138e] transition"
             >
               <Plus className="w-4 h-4" />
               Write New Article
@@ -1155,7 +1155,7 @@ export const BlogManager: React.FC = () => {
               <button
                 onClick={handleSaveArticle}
                 disabled={isSavingArticle}
-                className="flex items-center gap-2 px-6 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-medium text-sm shadow transition disabled:opacity-50"
+                className="flex items-center gap-2 px-6 py-2 rounded-lg bg-[#291BB0] hover:bg-[#1f138e] text-white font-medium text-sm shadow transition disabled:opacity-50"
               >
                 {isSavingArticle ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                 {editingBlogId ? 'Update Article' : 'Publish Article'}
@@ -1345,7 +1345,7 @@ export const BlogManager: React.FC = () => {
                           }}
                           className={`px-3 py-1 rounded-full text-xs font-medium transition ${
                             isSelected
-                              ? 'bg-rose-500 text-white shadow-sm'
+                              ? 'bg-[#291BB0] text-white shadow-sm'
                               : isDark
                               ? 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                               : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -1544,7 +1544,7 @@ export const BlogManager: React.FC = () => {
               />
               <button
                 onClick={handleCreateTag}
-                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold rounded-lg transition"
+                className="px-4 py-2 bg-[#291BB0] hover:bg-[#1f138e] text-white text-sm font-semibold rounded-lg transition cursor-pointer"
               >
                 Add Tag
               </button>
@@ -1579,7 +1579,7 @@ export const BlogManager: React.FC = () => {
             </h3>
             <button
               onClick={() => setShowAuthorModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-sm font-medium rounded-xl shadow transition"
+              className="flex items-center gap-2 px-4 py-2 bg-[#291BB0] hover:bg-[#1f138e] text-white text-sm font-medium rounded-xl shadow transition cursor-pointer"
             >
               <Plus className="w-4 h-4" /> Add Author Profile
             </button>
@@ -1630,7 +1630,7 @@ export const BlogManager: React.FC = () => {
                 onClick={() => setCommentFilter(0)}
                 className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition ${
                   commentFilter === 0
-                    ? 'bg-rose-500 text-white shadow'
+                    ? 'bg-[#291BB0] text-white shadow'
                     : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
                 }`}
               >
@@ -1640,7 +1640,7 @@ export const BlogManager: React.FC = () => {
                 onClick={() => setCommentFilter(1)}
                 className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition ${
                   commentFilter === 1
-                    ? 'bg-rose-500 text-white shadow'
+                    ? 'bg-[#291BB0] text-white shadow'
                     : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
                 }`}
               >
@@ -1698,7 +1698,7 @@ export const BlogManager: React.FC = () => {
                       {comm.status === 0 ? (
                         <button
                           onClick={() => handleModerateComment(comm.blog_comm_id, 1)}
-                          className="flex items-center gap-1.5 px-3 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition"
+                          className="flex items-center gap-1.5 px-3 py-1 rounded bg-[#291BB0] hover:bg-[#1f138e] text-white text-xs font-semibold transition cursor-pointer"
                         >
                           <Check className="w-3.5 h-3.5" /> Approve Comment
                         </button>
@@ -1773,7 +1773,7 @@ export const BlogManager: React.FC = () => {
               <button
                 onClick={handleSendAdminReply}
                 disabled={isSendingReply}
-                className="flex items-center gap-2 px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-lg transition"
+                className="flex items-center gap-2 px-5 py-2 bg-[#291BB0] hover:bg-[#1f138e] text-white text-xs font-semibold rounded-lg transition cursor-pointer"
               >
                 <Send className="w-3.5 h-3.5" />
                 Post Reply
@@ -1824,7 +1824,7 @@ export const BlogManager: React.FC = () => {
               <button onClick={() => setShowCategoryModal(false)} className="px-4 py-2 text-xs font-semibold rounded-lg border text-slate-500">
                 Cancel
               </button>
-              <button onClick={handleCreateCategory} className="px-5 py-2 bg-rose-600 text-white text-xs font-semibold rounded-lg">
+              <button onClick={handleCreateCategory} className="px-5 py-2 bg-[#291BB0] hover:bg-[#1f138e] text-white text-xs font-semibold rounded-lg transition cursor-pointer">
                 Create
               </button>
             </div>
@@ -1882,7 +1882,7 @@ export const BlogManager: React.FC = () => {
               <button onClick={() => setShowAuthorModal(false)} className="px-4 py-2 text-xs font-semibold rounded-lg border text-slate-500">
                 Cancel
               </button>
-              <button onClick={handleCreateAuthor} className="px-5 py-2 bg-rose-600 text-white text-xs font-semibold rounded-lg">
+              <button onClick={handleCreateAuthor} className="px-5 py-2 bg-[#291BB0] hover:bg-[#1f138e] text-white text-xs font-semibold rounded-lg transition cursor-pointer">
                 Save Author
               </button>
             </div>
@@ -2121,7 +2121,7 @@ export const BlogManager: React.FC = () => {
                   <button
                     type="button"
                     onClick={handleApplyAIResultToEditor}
-                    className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold shadow-md shadow-emerald-500/20 transition"
+                    className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#291BB0] hover:bg-[#1f138e] text-white text-xs font-bold shadow-md shadow-[#291BB0]/20 transition"
                   >
                     <Check className="w-4 h-4" />
                     <span>Load into Rich Text Editor</span>

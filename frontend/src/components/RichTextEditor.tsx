@@ -327,7 +327,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
             onClick={() => setMode('visual')}
             className={`flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded transition ${
               mode === 'visual'
-                ? 'bg-rose-600 text-white shadow-sm'
+                ? 'bg-[#291BB0] text-white shadow-sm'
                 : 'text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-800'
             }`}
           >
@@ -338,7 +338,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
             onClick={() => setMode('html')}
             className={`flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded transition ${
               mode === 'html'
-                ? 'bg-rose-600 text-white shadow-sm'
+                ? 'bg-[#291BB0] text-white shadow-sm'
                 : 'text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-800'
             }`}
           >
@@ -349,7 +349,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
             onClick={() => setMode('preview')}
             className={`flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded transition ${
               mode === 'preview'
-                ? 'bg-rose-600 text-white shadow-sm'
+                ? 'bg-[#291BB0] text-white shadow-sm'
                 : 'text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-800'
             }`}
           >

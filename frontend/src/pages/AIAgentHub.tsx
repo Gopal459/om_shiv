@@ -389,7 +389,7 @@ export const AIAgentHub: React.FC = () => {
                       title={agent.is_active ? 'Click to Deactivate (Disable)' : 'Click to Activate (Shadow Mode)'}
                       className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer flex-shrink-0 ${
                         agent.is_active
-                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
+                          ? 'bg-[#291BB0] hover:bg-[#1f138e] text-white shadow-xs'
                           : 'bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300'
                       }`}
                     >
@@ -417,7 +417,7 @@ export const AIAgentHub: React.FC = () => {
                         onClick={() => updateAgent(agent.agent_name, { mode: 'DISABLED' })}
                         className={`py-1.5 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer ${
                           agent.mode === 'DISABLED'
-                            ? 'bg-rose-600 text-white shadow-xs'
+                            ? 'bg-[#F04B42] text-white shadow-xs'
                             : 'text-slate-500 hover:text-slate-800 dark:hover:text-white'
                         }`}
                       >
@@ -445,7 +445,7 @@ export const AIAgentHub: React.FC = () => {
                         onClick={() => updateAgent(agent.agent_name, { mode: 'LIVE' })}
                         className={`py-1.5 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer ${
                           agent.mode === 'LIVE'
-                            ? 'bg-emerald-600 text-white shadow-xs'
+                            ? 'bg-[#291BB0] text-white shadow-xs'
                             : 'text-slate-500 hover:text-slate-800 dark:hover:text-white'
                         }`}
                       >

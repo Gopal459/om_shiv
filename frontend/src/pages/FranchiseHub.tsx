@@ -700,7 +700,7 @@ export const FranchiseHub: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleGenerateRetainers}
-                  className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold cursor-pointer"
+                  className="px-3 py-1.5 rounded-xl bg-[#F04B42] hover:bg-[#d93b32] text-white text-xs font-bold cursor-pointer"
                 >
                   Generate Monthly Retainers
                 </button>
@@ -710,7 +710,7 @@ export const FranchiseHub: React.FC = () => {
                     if (partners.length > 0 && !payPartnerId) setPayPartnerId(String(partners[0].id));
                     setModalType('payout');
                   }}
-                  className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1 cursor-pointer"
+                  className="px-3 py-1.5 rounded-xl bg-[#291BB0] hover:bg-[#1f138e] text-white text-xs font-bold flex items-center gap-1 cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Log Payout</span>
@@ -725,7 +725,7 @@ export const FranchiseHub: React.FC = () => {
                   if (l3s.length > 0) setMPartnerId(String(l3s[0].id));
                   setModalType('meeting');
                 }}
-                className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1 cursor-pointer"
+                className="px-3 py-1.5 rounded-xl bg-[#291BB0] hover:bg-[#1f138e] text-white text-xs font-bold flex items-center gap-1 cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Request L3 Meeting</span>
@@ -868,7 +868,7 @@ export const FranchiseHub: React.FC = () => {
                                 <button
                                   type="button"
                                   onClick={() => handleCertify(p)}
-                                  className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                                  className="px-2.5 py-1 rounded-lg bg-[#291BB0] hover:bg-[#1f138e] text-white text-[11px] font-bold flex items-center gap-1 cursor-pointer"
                                 >
                                   <Award className="w-3 h-3" />
                                   <span>Mark Certified</span>
@@ -878,7 +878,7 @@ export const FranchiseHub: React.FC = () => {
                                 <button
                                   type="button"
                                   onClick={() => handlePromote(p, 'L2')}
-                                  className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                                  className="px-2.5 py-1 rounded-lg bg-[#291BB0] hover:bg-[#1f138e] text-white text-[11px] font-bold flex items-center gap-1 cursor-pointer"
                                 >
                                   <ArrowUpRight className="w-3 h-3" />
                                   <span>Promote → L2</span>
@@ -888,7 +888,7 @@ export const FranchiseHub: React.FC = () => {
                                 <button
                                   type="button"
                                   onClick={() => handlePromote(p, 'L3')}
-                                  className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                                  className="px-2.5 py-1 rounded-lg bg-[#291BB0] hover:bg-[#1f138e] text-white text-[11px] font-bold flex items-center gap-1 cursor-pointer"
                                 >
                                   <ArrowUpRight className="w-3 h-3" />
                                   <span>Promote → L3</span>
@@ -949,7 +949,7 @@ export const FranchiseHub: React.FC = () => {
                               setSuspendReason('');
                               setModalType('suspend');
                             }}
-                            className="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold flex items-center gap-1 cursor-pointer"
+                            className="px-2.5 py-1 rounded-lg bg-[#F04B42] hover:bg-[#d93b32] text-white font-bold flex items-center gap-1 cursor-pointer"
                           >
                             <ShieldAlert className="w-3 h-3" />
                             <span>Instant Suspend</span>
@@ -1000,7 +1000,7 @@ export const FranchiseHub: React.FC = () => {
                       onClick={() => toggleOutletActive(o)}
                       className={`px-2.5 py-1 rounded-lg text-[10px] font-bold cursor-pointer ${
                         o.is_active
-                          ? 'bg-emerald-600 text-white'
+                          ? 'bg-[#291BB0] text-white'
                           : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
                       }`}
                     >
@@ -1046,14 +1046,14 @@ export const FranchiseHub: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => updateMeetingStatus(m.id, 'APPROVED')}
-                          className="px-3 py-1 rounded-lg bg-emerald-600 text-white font-bold cursor-pointer"
+                          className="px-3 py-1 rounded-lg bg-[#291BB0] hover:bg-[#1f138e] text-white font-bold cursor-pointer"
                         >
                           Approve
                         </button>
                         <button
                           type="button"
                           onClick={() => updateMeetingStatus(m.id, 'REJECTED')}
-                          className="px-3 py-1 rounded-lg bg-rose-600 text-white font-bold cursor-pointer"
+                          className="px-3 py-1 rounded-lg bg-[#F04B42] hover:bg-[#d93b32] text-white font-bold cursor-pointer"
                         >
                           Reject
                         </button>
@@ -1177,7 +1177,7 @@ export const FranchiseHub: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => markPayoutSettled(pay.id)}
-                            className="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold cursor-pointer"
+                            className="px-3 py-1 rounded-lg bg-[#291BB0] hover:bg-[#1f138e] text-white text-[11px] font-bold cursor-pointer"
                           >
                             Mark Settled
                           </button>
@@ -1323,7 +1323,7 @@ export const FranchiseHub: React.FC = () => {
                       onClick={() => setPType(t)}
                       className={`p-2 rounded-xl border text-left font-bold cursor-pointer ${
                         pType === t
-                          ? 'bg-emerald-600 text-white border-emerald-600'
+                          ? 'bg-[#291BB0] text-white border-[#291BB0]'
                           : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700'
                       }`}
                     >
@@ -1411,7 +1411,7 @@ export const FranchiseHub: React.FC = () => {
                   </div>
                 </div>
 
-                <button disabled={submitting} type="submit" className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold cursor-pointer">
+                <button disabled={submitting} type="submit" className="w-full py-2.5 rounded-xl bg-[#291BB0] hover:bg-[#1f138e] text-white font-bold cursor-pointer">
                   {submitting ? 'Saving...' : 'Save Partner'}
                 </button>
               </form>
@@ -1428,7 +1428,7 @@ export const FranchiseHub: React.FC = () => {
                   <input placeholder="Branch Manager Name" value={oManager} onChange={(e) => setOManager(e.target.value)} className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800" />
                   <input placeholder="Manager Mobile" value={oMobile} onChange={(e) => setOMobile(e.target.value)} className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800" />
                 </div>
-                <button disabled={submitting} type="submit" className="w-full py-2.5 rounded-xl bg-slate-900 dark:bg-emerald-600 text-white font-bold cursor-pointer">
+                <button disabled={submitting} type="submit" className="w-full py-2.5 rounded-xl bg-[#291BB0] hover:bg-[#1f138e] text-white font-bold cursor-pointer">
                   {submitting ? 'Saving...' : 'Create Outlet'}
                 </button>
               </form>
@@ -1451,7 +1451,7 @@ export const FranchiseHub: React.FC = () => {
                   <input type="number" placeholder="Reward / Commission (₹)" value={payComm} onChange={(e) => setPayComm(e.target.value)} className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800" />
                 </div>
                 <input placeholder="Note / Reference" value={payNote} onChange={(e) => setPayNote(e.target.value)} className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800" />
-                <button disabled={submitting} type="submit" className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold cursor-pointer">
+                <button disabled={submitting} type="submit" className="w-full py-2.5 rounded-xl bg-[#291BB0] hover:bg-[#1f138e] text-white font-bold cursor-pointer">
                   {submitting ? 'Saving...' : 'Save Payout'}
                 </button>
               </form>
@@ -1471,7 +1471,7 @@ export const FranchiseHub: React.FC = () => {
                 </div>
                 <input required type="datetime-local" value={mSlot} onChange={(e) => setMSlot(e.target.value)} className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800" />
                 <input placeholder="Notes for Omshiv Supervisor" value={mNotes} onChange={(e) => setMNotes(e.target.value)} className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800" />
-                <button disabled={submitting} type="submit" className="w-full py-2.5 rounded-xl bg-emerald-600 text-white font-bold cursor-pointer">
+                <button disabled={submitting} type="submit" className="w-full py-2.5 rounded-xl bg-[#291BB0] hover:bg-[#1f138e] text-white font-bold cursor-pointer">
                   {submitting ? 'Submitting...' : 'Request Omshiv-Mediated Meeting'}
                 </button>
               </form>
@@ -1479,11 +1479,11 @@ export const FranchiseHub: React.FC = () => {
 
             {modalType === 'suspend' && (
               <form onSubmit={handleConfirmSuspend} className="space-y-3 text-xs">
-                <p className="text-rose-600 dark:text-rose-400 font-semibold">
+                <p className="text-[#F04B42] font-semibold">
                   Warning: Instant Suspend immediately revokes all inventory, meeting, and payout access for {suspendTarget?.full_name}.
                 </p>
-                <textarea required rows={3} placeholder="Reason for suspension / violation details *" value={suspendReason} onChange={(e) => setSuspendReason(e.target.value)} className="w-full px-3 py-2 rounded-xl border border-rose-300 dark:border-rose-800 bg-slate-50 dark:bg-slate-800" />
-                <button disabled={submitting} type="submit" className="w-full py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold cursor-pointer">
+                <textarea required rows={3} placeholder="Reason for suspension / violation details *" value={suspendReason} onChange={(e) => setSuspendReason(e.target.value)} className="w-full px-3 py-2 rounded-xl border border-[#F04B42]/40 bg-slate-50 dark:bg-slate-800" />
+                <button disabled={submitting} type="submit" className="w-full py-2.5 rounded-xl bg-[#F04B42] hover:bg-[#d93b32] text-white font-bold cursor-pointer">
                   {submitting ? 'Suspending...' : 'Confirm Instant Suspend'}
                 </button>
               </form>

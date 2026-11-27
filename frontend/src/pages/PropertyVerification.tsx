@@ -114,7 +114,7 @@ export const PropertyVerification: React.FC = () => {
             onClick={() => setActiveTab('RECYCLE')}
             className={`px-4 py-1.5 rounded-lg flex items-center gap-1 transition-all ${
               activeTab === 'RECYCLE'
-                ? 'bg-rose-600 text-white shadow-sm'
+                ? 'bg-[#291BB0] text-white shadow-sm'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
@@ -216,7 +216,7 @@ export const PropertyVerification: React.FC = () => {
                   </div>
                   <button
                     onClick={() => handleRestore(p.property_id)}
-                    className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1 shadow-sm transition-colors"
+                    className="px-3 py-1.5 rounded-lg bg-[#291BB0] hover:bg-[#1f138e] text-white font-bold text-xs flex items-center gap-1 shadow-sm transition-colors"
                   >
                     <RefreshCw className="w-3.5 h-3.5" /> 1-Click Restore
                   </button>

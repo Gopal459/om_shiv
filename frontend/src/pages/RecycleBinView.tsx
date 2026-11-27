@@ -127,7 +127,7 @@ export const RecycleBinView: React.FC = () => {
                     <td className="p-4 text-right">
                       <button
                         onClick={() => handleRestore(item.property_id || item.id)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition-colors shadow-sm"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#291BB0] hover:bg-[#1f138e] text-white rounded-lg text-xs font-bold transition-colors shadow-sm"
                       >
                         <RotateCcw className="w-3.5 h-3.5" />
                         Restore 1-Click

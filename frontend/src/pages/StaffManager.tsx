@@ -644,7 +644,7 @@ export const StaffManager: React.FC = () => {
           {activeSubTab === 'ROLES' ? (
             <button
               onClick={() => setShowAddRoleModal(true)}
-              className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-blue-900/20"
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-[#F04B42] hover:bg-[#d93b32] text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-[#F04B42]/20"
             >
               <Plus className="w-4 h-4" />
               + Add Dynamic Role
@@ -658,7 +658,7 @@ export const StaffManager: React.FC = () => {
                 }
                 setShowAddStaffModal(true);
               }}
-              className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-emerald-900/20"
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-[#291BB0] hover:bg-[#1f138e] text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-[#291BB0]/25"
             >
               <UserPlus className="w-4 h-4" />
               + Add Staff Member
@@ -789,7 +789,7 @@ export const StaffManager: React.FC = () => {
                   }}
                   className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-colors ${
                     staffStatusFilter === 'ACTIVE'
-                      ? 'bg-emerald-600 text-white shadow-xs'
+                      ? 'bg-[#291BB0] text-white shadow-xs'
                       : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                   }`}
                 >
@@ -1098,7 +1098,7 @@ export const StaffManager: React.FC = () => {
                   }}
                   className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-colors ${
                     roleStatusFilter === 'ACTIVE'
-                      ? 'bg-emerald-600 text-white shadow-xs'
+                      ? 'bg-[#291BB0] text-white shadow-xs'
                       : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                   }`}
                 >
@@ -1167,7 +1167,7 @@ export const StaffManager: React.FC = () => {
               </div>
               <button
                 onClick={() => setShowAddRoleModal(true)}
-                className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
+                className="flex items-center gap-1 px-3 py-1.5 bg-[#F04B42] hover:bg-[#d93b32] text-white rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
                 Add Role
@@ -1614,7 +1614,7 @@ export const StaffManager: React.FC = () => {
                 <button
                   type="submit"
                   disabled={creatingStaff}
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-md transition-colors"
+                  className="px-5 py-2 bg-[#291BB0] hover:bg-[#1f138e] disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-md transition-colors"
                 >
                   {creatingStaff ? 'Creating...' : 'Create Staff Member'}
                 </button>
@@ -1775,7 +1775,7 @@ export const StaffManager: React.FC = () => {
                 <button
                   type="submit"
                   disabled={updatingStaff}
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-md transition-colors"
+                  className="px-5 py-2 bg-[#291BB0] hover:bg-[#1f138e] disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-md transition-colors cursor-pointer"
                 >
                   {updatingStaff ? 'Saving...' : 'Update Staff Member'}
                 </button>
@@ -1856,7 +1856,7 @@ export const StaffManager: React.FC = () => {
                 <button
                   type="submit"
                   disabled={creatingRole}
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-md transition-colors"
+                  className="px-5 py-2 bg-[#291BB0] hover:bg-[#1f138e] disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-md transition-colors cursor-pointer"
                 >
                   {creatingRole ? 'Creating...' : 'Create Dynamic Role'}
                 </button>
@@ -1963,7 +1963,7 @@ export const StaffManager: React.FC = () => {
                 <button
                   type="submit"
                   disabled={updatingRole}
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-md transition-colors"
+                  className="px-5 py-2 bg-[#291BB0] hover:bg-[#1f138e] disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-md transition-colors cursor-pointer"
                 >
                   {updatingRole ? 'Saving...' : 'Update Role'}
                 </button>

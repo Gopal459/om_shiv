@@ -219,7 +219,7 @@ export const AIApprovalsQueue: React.FC = () => {
                       type="button"
                       disabled={processingId === item.id}
                       onClick={() => handleDecision(item.id, 'approve')}
-                      className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      className="px-4 py-2 rounded-xl bg-[#291BB0] hover:bg-[#1f138e] text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                     >
                       <CheckCircle2 className="w-3.5 h-3.5" />
                       <span>Approve & Apply</span>
@@ -228,7 +228,7 @@ export const AIApprovalsQueue: React.FC = () => {
                       type="button"
                       disabled={processingId === item.id}
                       onClick={() => handleDecision(item.id, 'reject')}
-                      className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      className="px-4 py-2 rounded-xl bg-[#F04B42] hover:bg-[#d93b32] text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                     >
                       <XCircle className="w-3.5 h-3.5" />
                       <span>Reject</span>

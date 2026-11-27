@@ -261,7 +261,7 @@ export const ImportLeadModal: React.FC<ImportLeadModalProps> = ({
             type="button"
             onClick={handleImportSubmit}
             disabled={loading || parsedRows.length === 0}
-            className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-bold shadow-md shadow-blue-500/20 transition-all disabled:opacity-50 flex items-center gap-2"
+            className="px-6 py-2.5 rounded-xl bg-[#291BB0] hover:bg-[#1f138e] text-white text-xs font-bold shadow-md shadow-[#291BB0]/20 transition-all disabled:opacity-50 flex items-center gap-2 cursor-pointer"
           >
             {loading ? 'Importing Leads...' : `Import ${parsedRows.length} Leads`}
           </button>

@@ -108,7 +108,7 @@ export const LeadTableView: React.FC<LeadTableViewProps> = ({
               onClick={() => setSelectedType(t)}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
                 selectedType === t
-                  ? 'bg-rose-500 text-white shadow-xs'
+                  ? 'bg-[#291BB0] text-white shadow-xs'
                   : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
               }`}
             >

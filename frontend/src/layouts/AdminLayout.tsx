@@ -225,7 +225,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
       label: 'AI Agents',
       icon: Bot,
       badge: '13 AI',
-      badgeColor: 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20',
+      badgeColor: 'bg-[#291BB0]/10 text-[#291BB0] dark:text-indigo-300 border border-[#291BB0]/25',
       subItems: [
         { label: 'All Agents Control', path: '/ai-agents' },
         { label: 'HITL Approvals Queue', path: '/ai-approvals' },
@@ -404,7 +404,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
 
                   {/* Collapsed Glow Accent */}
                   {isCollapsed && !isMobileOpen && active && (
-                    <span className="absolute left-1 top-2 bottom-2 w-1 bg-rose-500 rounded-full"></span>
+                    <span className="absolute left-1 top-2 bottom-2 w-1 bg-[#F04B42] rounded-full"></span>
                   )}
                 </button>
 

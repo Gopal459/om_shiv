@@ -120,7 +120,7 @@ export const DynamicMastersEditor: React.FC = () => {
               onClick={() => setSelectedGroup(group)}
               className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-between ${
                 selectedGroup === group
-                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-900/30'
+                  ? 'bg-[#291BB0] text-white shadow-md shadow-[#291BB0]/25'
                   : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/80 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
@@ -128,7 +128,7 @@ export const DynamicMastersEditor: React.FC = () => {
               <span
                 className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold ${
                   selectedGroup === group
-                    ? 'bg-emerald-700 text-white'
+                    ? 'bg-[#F04B42] text-white'
                     : 'bg-slate-100 dark:bg-slate-950/60 text-slate-600 dark:text-slate-400'
                 }`}
               >
@@ -259,7 +259,7 @@ export const DynamicMastersEditor: React.FC = () => {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs uppercase tracking-wider rounded-lg shadow-md transition-colors"
+                  className="px-5 py-2.5 bg-[#291BB0] hover:bg-[#1f138e] disabled:opacity-50 text-white font-bold text-xs uppercase tracking-wider rounded-lg shadow-md transition-colors"
                 >
                   {submitting ? 'Saving...' : 'Save Dynamic Option'}
                 </button>
