@@ -333,9 +333,12 @@ async def test_convert_lead_to_property_rollback_on_midflight_error(auth_client_
 
 
 @pytest.mark.asyncio
-async def test_lead_assignees_endpoint_and_route_ordering(auth_client_md: AsyncClient, db_session):
+async def test_lead_assignees_endpoint_and_route_ordering(auth_client_md: AsyncClient, test_client: AsyncClient, db_session):
     from app.models.identity import Employee, Role, Department
     from sqlalchemy import select
+
+    unauth = await test_client.get("/v1/leads/assignees")
+    assert unauth.status_code == 401
 
     dept_id = (await db_session.execute(select(Department.id))).scalars().first()
     role_id = (await db_session.execute(select(Role.id))).scalars().first()
@@ -395,6 +398,8 @@ async def test_manual_lead_create_with_staff_customer_type_and_reference(auth_cl
     assert tbl_row.customer_type == "BROKER"
     assert tbl_row.dealer_have == 1
     assert tbl_row.assign_franchstaff_id > 0
+    assert tbl_row.assignfranchiseestaff_date is not None
+    assert tbl_row.assignfranchiseestaff_date.tzinfo is None
     assert tbl_row.reference_relation_by == "Relative"
     assert tbl_row.refer_by_name == "Suresh Sharma"
 

@@ -15,6 +15,7 @@ from app.models.leads import Lead, LeadActivity, LeadActionLog, TblLead, LeadSeq
 from app.models.identity import Employee
 from app.models.properties import Property
 from app.schemas.tbl_property_schemas import TblPropertyCreateRequest
+from app.api.v1.endpoints.callbacks import get_current_employee
 from app.services.callback_service import _iso_utc
 from app.services.property_service import create_tbl_property
 from app.repositories import lead_repo
@@ -367,7 +368,7 @@ async def create_manual_lead(
         customer_type=payload.customer_type,
         dealer_have=1 if payload.customer_type == "BROKER" else 2,
         assign_franchstaff_id=assigned_emp.id if assigned_emp else 0,
-        assignfranchiseestaff_date=now if assigned_emp else None,
+        assignfranchiseestaff_date=now.replace(tzinfo=None) if assigned_emp else None,
         lead_source_id=payload.lead_source_id or 1,
         rating=payload.rating or 3,
         indv_property_address=payload.indv_property_address,
@@ -948,7 +949,7 @@ def build_lead_detail_dict(lead: Optional[Lead], tbl_lead: Optional[TblLead]) ->
 )
 async def list_lead_assignees(
     db: AsyncSession = Depends(get_db),
-    actor_id: str = Depends(get_actor_from_token),
+    actor: Employee = Depends(get_current_employee),
 ) -> List[Dict[str, Any]]:
     stmt = (
         select(Employee)

@@ -96,6 +96,7 @@ export const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
   if (!isOpen) return null;
 
   const resetForm = () => {
+    setLeadType(defaultType.toUpperCase());
     setCustomerType('USER');
     setAssignedTo('');
     setReferenceType('');
@@ -110,6 +111,13 @@ export const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
     setRating(3);
     setDealPrice('');
     setLeadRemark('');
+    setError('');
+  };
+
+  const handleClose = () => {
+    if (loading) return;
+    resetForm();
+    onClose();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -187,8 +195,10 @@ export const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
             </div>
           </div>
           <button
-            onClick={onClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            type="button"
+            onClick={handleClose}
+            disabled={loading}
+            className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-50"
           >
             <X className="w-5 h-5" />
           </button>
@@ -493,7 +503,7 @@ export const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
           <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-3">
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
               disabled={loading}
               className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
             >
