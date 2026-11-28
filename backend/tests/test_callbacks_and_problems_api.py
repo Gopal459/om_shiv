@@ -885,3 +885,299 @@ async def test_convert_inquiry_blocked_when_paired_callback_closed_or_terminal(t
         await intake_service.convert_inquiry_to_lead(db_session, inquiry_id=inq_b_id, assigned_to="EMP-M030")
     assert exc_b.value.status_code == 400
     assert len((await db_session.execute(select(Lead))).scalars().all()) == leads_before
+
+
+@pytest.mark.asyncio
+async def test_callbacks_auth_dashboard_tabs_and_export(
+    test_client, auth_client_md, auth_client_sales, db_session
+):
+    from sqlalchemy import select
+    from app.core.security import create_access_token
+    from app.models.identity import Department, Role, Employee
+
+    # 1. Unauthenticated access must fail with 401
+    unauth_cb = await test_client.get("/v1/callbacks")
+    assert unauth_cb.status_code == 401
+    unauth_prob = await test_client.get("/v1/problems")
+    assert unauth_prob.status_code == 401
+
+    bad_token_resp = await test_client.get(
+        "/v1/callbacks", headers={"Authorization": "Bearer invalid.jwt.token"}
+    )
+    assert bad_token_resp.status_code == 401
+
+    # Inactive employee token must also return 401
+    dept_res = await db_session.execute(select(Department).where(Department.code == "SALES"))
+    sales_dept = dept_res.scalar_one()
+    role_res = await db_session.execute(select(Role).where(Role.code == "SALES_EXEC"))
+    sales_role = role_res.scalar_one()
+    inactive_emp = Employee(
+        employee_id="EMP-INACT-JWT",
+        name="Inactive Staff",
+        email="inact_jwt@omshiv.in",
+        mobile="9829099991",
+        department_id=sales_dept.id,
+        role_id=sales_role.id,
+        is_active=False,
+    )
+    db_session.add(inactive_emp)
+    await db_session.commit()
+    inact_token = create_access_token({"sub": "EMP-INACT-JWT", "role": "SALES_EXEC"})
+    inact_resp = await test_client.get(
+        "/v1/callbacks", headers={"Authorization": f"Bearer {inact_token}"}
+    )
+    assert inact_resp.status_code == 401
+
+    # 2. Check /v1/callbacks/assignees returns active staff
+    assignees_resp = await auth_client_md.get("/v1/callbacks/assignees")
+    assert assignees_resp.status_code == 200
+    assignees = assignees_resp.json()
+    assignee_ids = {a["employee_id"] for a in assignees}
+    assert "EMP-0001" in assignee_ids
+    assert "EMP-0002" in assignee_ids
+    assert "EMP-INACT-JWT" not in assignee_ids
+    for item in assignees:
+        assert {"employee_id", "name", "role_name", "role_code", "is_active"}.issubset(item.keys())
+
+    # 3. Authenticated MD creates two callbacks manually (one with <script> payload for XLS escaping)
+    create_1 = await auth_client_md.post(
+        "/v1/callbacks",
+        json={
+            "name": "<script>alert('xss')</script> Vikram",
+            "mobile_number": "9829033311",
+            "phone_code": "+91",
+            "message": "Interested in Neemrana plot",
+            "assigned_user_id": "EMP-0001",
+        },
+    )
+    assert create_1.status_code == 201
+    cb1 = create_1.json()
+    cb1_id = cb1["callback_id"]
+    assert cb1["lead_unique_id"] == f"WEB{cb1_id}"
+    assert cb1["assigned_user_id"] == "EMP-0001"
+
+    create_2 = await auth_client_md.post(
+        "/v1/callbacks",
+        json={
+            "name": "Priya Nair",
+            "mobile_number": "9829033322",
+            "message": "Flat inquiry",
+            "assigned_user_id": "EMP-0001",
+        },
+    )
+    assert create_2.status_code == 201
+    cb2_id = create_2.json()["callback_id"]
+
+    # 4. Dashboard counters
+    dash_resp = await auth_client_md.get("/v1/callbacks/dashboard")
+    assert dash_resp.status_code == 200
+    dash = dash_resp.json()
+    assert dash["new_calls"] >= 2
+    assert dash["open_calls"] >= 2
+
+    # 5. Log call, reschedule for today (future), verify today_calls tab, then move followup to past for missing_calls
+    log_resp = await auth_client_md.post(
+        f"/v1/callbacks/{cb1_id}/log-call", json={"remark": "Spoke briefly"}
+    )
+    assert log_resp.status_code == 200
+    assert log_resp.json()["calls_status"] == 1
+
+    future_today = datetime.now(timezone.utc) + timedelta(minutes=15)
+    resched_resp = await auth_client_md.post(
+        f"/v1/callbacks/{cb1_id}/reschedule",
+        json={
+            "current_update": "Call Back Later",
+            "remark": "Call in 15 mins",
+            "followup_datetime": future_today.isoformat(),
+        },
+    )
+    assert resched_resp.status_code == 200
+
+    today_tab = await auth_client_md.get("/v1/callbacks?tab=today")
+    assert today_tab.status_code == 200
+    today_ids = {item["callback_id"] for item in today_tab.json()["items"]}
+    assert cb1_id in today_ids
+
+    cb1_row = (
+        await db_session.execute(select(TblCallback).where(TblCallback.callback_id == cb1_id))
+    ).scalar_one()
+    cb1_row.followup_datetime = datetime.now(timezone.utc) - timedelta(minutes=20)
+    await db_session.commit()
+
+    missing_tab = await auth_client_md.get("/v1/callbacks?tab=missing")
+    assert missing_tab.status_code == 200
+    missing_ids = {item["callback_id"] for item in missing_tab.json()["items"]}
+    assert cb1_id in missing_ids
+
+    # 6. Detail endpoint includes reschedule_history & activities
+    detail_resp = await auth_client_md.get(f"/v1/callbacks/{cb1_id}")
+    assert detail_resp.status_code == 200
+    detail = detail_resp.json()
+    assert len(detail["reschedule_history"]) == 1
+    assert len(detail["activities"]) >= 3
+
+    # 7. Transfer cb1 to EMP-0002; cb2 remains with EMP-0001
+    transfer_resp = await auth_client_md.post(
+        f"/v1/callbacks/{cb1_id}/transfer",
+        json={"assigned_user_id": "EMP-0002", "remark": "Assign to Sunil"},
+    )
+    assert transfer_resp.status_code == 200
+    assert transfer_resp.json()["assigned_user_id"] == "EMP-0002"
+    assert transfer_resp.json()["lead_status"] == 0
+    assert transfer_resp.json()["calls_status"] == 0
+
+    # Scoped sales user sees cb1 but NOT cb2
+    sales_list = await auth_client_sales.get("/v1/callbacks?tab=all")
+    assert sales_list.status_code == 200
+    sales_ids = {item["callback_id"] for item in sales_list.json()["items"]}
+    assert cb1_id in sales_ids
+    assert cb2_id not in sales_ids
+
+    sales_forbidden = await auth_client_sales.get(f"/v1/callbacks/{cb2_id}")
+    assert sales_forbidden.status_code == 403
+
+    # 8. State machine via API: status -> disqualify -> locked -> reopen -> convert-to-lead
+    disq_resp = await auth_client_sales.post(
+        f"/v1/callbacks/{cb1_id}/status",
+        json={"lead_status": 2, "disqualified_reason": 2, "remark": "Not interested now"},
+    )
+    assert disq_resp.status_code == 200
+    assert disq_resp.json()["lead_open"] == 0
+
+    locked_resched = await auth_client_sales.post(
+        f"/v1/callbacks/{cb1_id}/reschedule",
+        json={
+            "current_update": "Interested",
+            "remark": "Retry",
+            "followup_datetime": (datetime.now(timezone.utc) + timedelta(days=1)).isoformat(),
+        },
+    )
+    assert locked_resched.status_code == 400
+
+    reopen_resp = await auth_client_sales.post(
+        f"/v1/callbacks/{cb1_id}/reopen", json={"remark": "Re-engaged"}
+    )
+    assert reopen_resp.status_code == 200
+    assert reopen_resp.json()["lead_open"] == 1
+
+    conv_resp = await auth_client_sales.post(
+        f"/v1/callbacks/{cb1_id}/convert-to-lead",
+        json={
+            "customer_type": "BUY",
+            "name": "<script>alert('xss')</script> Vikram",
+            "email": "vikram@example.com",
+            "mobile": "9829033311",
+            "address": "Alwar Sector 7",
+            "source": "Website Callback",
+            "assigned_to": "EMP-0002",
+        },
+    )
+    assert conv_resp.status_code == 200
+    assert conv_resp.json()["lead_id"].startswith("OB-")
+    assert conv_resp.json()["callback"]["lead_status"] == 5
+
+    # 9. Export .xls returns 200, application/vnd.ms-excel, and escapes <script>
+    export_resp = await auth_client_md.get("/v1/callbacks/export?tab=all")
+    assert export_resp.status_code == 200
+    assert export_resp.headers["content-type"].startswith("application/vnd.ms-excel")
+    assert "&lt;script&gt;" in export_resp.text
+    assert "<script>" not in export_resp.text
+
+
+@pytest.mark.asyncio
+async def test_problems_triage_and_convert_to_lead(
+    test_client, auth_client_md, auth_client_sales
+):
+    # 1. Submit two PROBLEM_REPORT inquiries publicly
+    p1_resp = await test_client.post(
+        "/v1/intake/inquiry",
+        json={
+            "inquiry_type": "PROBLEM_REPORT",
+            "full_name": "Deepak <script>bad()</script>",
+            "mobile": "9829044411",
+            "email": "deepak@example.com",
+            "details": {
+                "property_code": "OP-2026-00011",
+                "description": "Wrong price listed on portal",
+            },
+        },
+    )
+    assert p1_resp.status_code == 201
+    p1_id = p1_resp.json()["id"]
+
+    p2_resp = await test_client.post(
+        "/v1/intake/inquiry",
+        json={
+            "inquiry_type": "PROBLEM_REPORT",
+            "full_name": "Sneha Joshi",
+            "mobile": "9829044422",
+            "email": "sneha@example.com",
+            "details": {"description": "Need callback about listing issue"},
+        },
+    )
+    assert p2_resp.status_code == 201
+    p2_id = p2_resp.json()["id"]
+
+    # 2. List NEW problems as MD
+    list_resp = await auth_client_md.get("/v1/problems?status=NEW")
+    assert list_resp.status_code == 200
+    data = list_resp.json()
+    assert data["total"] >= 2
+    assert data["counts"]["new"] >= 2
+    ids = {item["id"] for item in data["items"]}
+    assert {p1_id, p2_id}.issubset(ids)
+
+    # 3. Triage p1: IN_REVIEW (assigned to EMP-0002) -> RESOLVED
+    review_resp = await auth_client_md.patch(
+        f"/v1/problems/{p1_id}",
+        json={
+            "status": "IN_REVIEW",
+            "assigned_to": "EMP-0002",
+            "resolution_remark": "Investigating price mismatch",
+        },
+    )
+    assert review_resp.status_code == 200
+    assert review_resp.json()["status"] == "IN_REVIEW"
+    assert review_resp.json()["assigned_to"] == "EMP-0002"
+
+    # Scoped sales user sees p1 (assigned) and NOT p2 (unassigned)
+    sales_probs = await auth_client_sales.get("/v1/problems?status=ALL")
+    assert sales_probs.status_code == 200
+    sales_prob_ids = {item["id"] for item in sales_probs.json()["items"]}
+    assert p1_id in sales_prob_ids
+    assert p2_id not in sales_prob_ids
+
+    sales_forbidden = await auth_client_sales.patch(
+        f"/v1/problems/{p2_id}", json={"status": "IN_REVIEW"}
+    )
+    assert sales_forbidden.status_code == 403
+
+    resolve_resp = await auth_client_sales.patch(
+        f"/v1/problems/{p1_id}",
+        json={
+            "status": "RESOLVED",
+            "resolution_remark": "Corrected listing price with owner",
+        },
+    )
+    assert resolve_resp.status_code == 200
+    resolved_data = resolve_resp.json()
+    assert resolved_data["status"] == "RESOLVED"
+    assert resolved_data["resolved_by"] == "EMP-0002"
+    assert resolved_data["resolved_at"] is not None
+
+    # 4. Convert p2 to CRM lead
+    conv_resp = await auth_client_md.post(
+        f"/v1/problems/{p2_id}/convert-to-lead",
+        json={"assigned_to": "EMP-0002", "lead_type": "BUYER"},
+    )
+    assert conv_resp.status_code == 200
+    conv_data = conv_resp.json()
+    assert conv_data["lead_id"].startswith("OB-")
+
+    # 5. Export problems .xls
+    export_resp = await auth_client_md.get("/v1/problems/export?status=ALL")
+    assert export_resp.status_code == 200
+    assert export_resp.headers["content-type"].startswith("application/vnd.ms-excel")
+    assert "&lt;script&gt;" in export_resp.text
+    assert "<script>" not in export_resp.text
+

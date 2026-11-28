@@ -28,6 +28,8 @@ from app.api.v1.endpoints import (
     ai_cron,
     ai_admin,
     franchise,
+    callbacks,
+    problems,
 )
 
 logger = logging.getLogger(__name__)
@@ -88,6 +90,8 @@ app.include_router(ai_webhooks.router, prefix="/v1/ai/webhooks", tags=["ai-webho
 app.include_router(ai_cron.router)  # prefix="/v1/ai/cron" defined in the router itself
 app.include_router(ai_admin.router)  # prefix="/v1/ai" defined in the router itself
 app.include_router(franchise.router)  # prefix="/v1/franchise" defined in the router itself
+app.include_router(callbacks.router)  # prefix="/v1/callbacks" defined in the router itself
+app.include_router(problems.router)  # prefix="/v1/problems" defined in the router itself
 
 
 @app.get("/", status_code=status.HTTP_200_OK, tags=["root"])
