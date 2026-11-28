@@ -142,6 +142,7 @@ async def create_quick_listing(
 async def create_tbl_property(
     payload: "TblPropertyCreateRequest",
     db: AsyncSession,
+    commit: bool = True,
 ) -> "TblProperty":
     """Creates a validated property in tbl_property and tbl_payingguest."""
     from app.models.properties import TblProperty, TblPayingGuest
@@ -277,8 +278,11 @@ async def create_tbl_property(
         )
         db.add(pg_row)
 
-    await db.commit()
-    await db.refresh(tbl_prop)
+    if commit:
+        await db.commit()
+        await db.refresh(tbl_prop)
+    else:
+        await db.flush()
     return tbl_prop
 
 

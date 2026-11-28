@@ -13,7 +13,9 @@ from app.core.security import decode_access_token
 from app.models.leads import Lead, LeadActivity, LeadActionLog, TblLead, LeadSequence
 from app.models.identity import Employee
 from app.models.properties import Property
+from app.schemas.tbl_property_schemas import TblPropertyCreateRequest
 from app.services.callback_service import _iso_utc
+from app.services.property_service import create_tbl_property
 from app.repositories import lead_repo
 from app.services.pipeline_service import pipeline_service
 
@@ -106,7 +108,9 @@ class LeadDetailResponse(BaseModel):
     activities: List[LeadActivityResponse] = []
 
     # Dynamic & tbl_leads integrated fields
+    property_id: Optional[int] = 0
     property_idno: Optional[str] = None
+    related_listing_id: Optional[str] = None
     indv_property_address: Optional[str] = None
     deal_final_price: Optional[float] = 0.0
     dealer_have: Optional[int] = 0
@@ -772,7 +776,9 @@ def build_lead_detail_dict(lead: Optional[Lead], tbl_lead: Optional[TblLead]) ->
         "created_at": created_at,
         "updated_at": updated_at,
         "activities": acts,
+        "property_id": tbl_lead.property_id if tbl_lead else 0,
         "property_idno": tbl_lead.property_idno if tbl_lead else None,
+        "related_listing_id": (lead.related_listing_id if lead else None) or (tbl_lead.property_idno if tbl_lead else None),
         "indv_property_address": tbl_lead.indv_property_address if (tbl_lead and tbl_lead.indv_property_address) else (lead.preferred_locality if lead else None),
         "deal_final_price": float(tbl_lead.deal_final_price) if (tbl_lead and tbl_lead.deal_final_price) else 0.0,
         "dealer_have": tbl_lead.dealer_have if tbl_lead else 0,
@@ -884,6 +890,95 @@ async def log_sales_action(
     if target_lead:
         target_lead.activities.sort(key=lambda a: (a.created_at, a.id or 0), reverse=True)
     return build_lead_detail_dict(target_lead, tbl_lead)
+
+
+@router.post(
+    "/{id}/convert-to-property",
+    status_code=status.HTTP_201_CREATED,
+    summary="Atomically create a property listing from a lead and link/convert the lead",
+)
+async def convert_lead_to_property(
+    id: str,
+    payload: TblPropertyCreateRequest,
+    db: AsyncSession = Depends(get_db),
+    actor_id: str = Depends(get_actor_from_token),
+) -> Dict[str, Any]:
+    """Create a tbl_property listing pre-populated from a lead, link both records, and mark converted."""
+    tbl_lead = await find_tbl_lead_by_id_or_unique_id(db, id)
+    lead = await find_lead_by_id_or_lead_id(db, id)
+
+    if not lead and tbl_lead and tbl_lead.lead_unique_id:
+        lead = await find_lead_by_id_or_lead_id(db, tbl_lead.lead_unique_id)
+    if not tbl_lead and lead:
+        tbl_lead = await find_tbl_lead_by_id_or_unique_id(db, lead.lead_id)
+
+    if not lead and not tbl_lead:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Lead '{id}' not found",
+        )
+
+    existing_prop_code = (tbl_lead.property_idno if tbl_lead else None) or (lead.related_listing_id if lead else None)
+    if (tbl_lead and (tbl_lead.property_id or 0) > 0) or existing_prop_code:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Lead '{id}' is already converted/linked to property {existing_prop_code or tbl_lead.property_id}.",
+        )
+
+    prop = await create_tbl_property(payload, db=db, commit=False)
+    now = datetime.now(timezone.utc)
+    actor_emp_id = actor_id if (actor_id and actor_id != "SYSTEM") else None
+    if actor_emp_id:
+        emp_exists = (
+            await db.execute(select(Employee.employee_id).where(Employee.employee_id == actor_emp_id))
+        ).scalar_one_or_none()
+        if not emp_exists:
+            actor_emp_id = None
+
+    loc_summary = (payload.sublocality_address or payload.location or "").strip()
+
+    if tbl_lead:
+        tbl_lead.property_id = prop.property_id
+        tbl_lead.property_idno = prop.propertyid_no
+        if loc_summary:
+            tbl_lead.indv_property_address = loc_summary
+        tbl_lead.deal_final_price = payload.expected_price
+        tbl_lead.lead_status = 5
+        tbl_lead.stage = 3
+        tbl_lead.lead_remark = f"Converted to Property {prop.propertyid_no}"
+        tbl_lead.last_callstatus_updatetime = now
+
+    if lead:
+        prev_stage = lead.stage
+        lead.related_listing_id = prop.propertyid_no
+        lead.stage = "WON"
+        lead.is_untouched = False
+        lead.last_contacted_at = now
+        if loc_summary:
+            lead.preferred_locality = loc_summary[:100]
+        db.add(
+            LeadActivity(
+                lead_id=lead.lead_id,
+                action_type="CONVERTED_TO_PROPERTY",
+                outcome=f"Property {prop.propertyid_no}",
+                note=f"Converted Lead to Property {prop.propertyid_no} ({loc_summary or 'Alwar'})",
+                stage_before=prev_stage,
+                stage_after="WON",
+                logged_by=actor_emp_id,
+                performed_by=actor_emp_id,
+            )
+        )
+
+    await db.commit()
+
+    return {
+        "status": "success",
+        "lead_id": lead.lead_id if lead else (tbl_lead.lead_unique_id or str(tbl_lead.leads_id)),
+        "property_id": prop.property_id,
+        "propertyid_no": prop.propertyid_no,
+        "stage": lead.stage if lead else "WON",
+        "lead_status": tbl_lead.lead_status if tbl_lead else 5,
+    }
 
 
 @router.delete(

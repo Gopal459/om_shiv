@@ -137,3 +137,67 @@ async def test_kanban_card_enrichment_fields_and_utc_dates(auth_client_md: Async
     assert paired_card["followup_datetime"] is not None
     assert paired_card["followup_datetime"].endswith("+00:00") or paired_card["followup_datetime"].endswith("Z")
 
+
+@pytest.mark.asyncio
+async def test_convert_lead_to_property_atomic_and_duplicate_guard(auth_client_md: AsyncClient, db_session):
+    from sqlalchemy import select, func
+    from app.models.properties import TblProperty
+
+    prop_payload = {
+        "property_type": 2,
+        "looking_type": 1,
+        "looking_subcat_type": 1,
+        "transaction_type": 1,
+        "source_type": 2,
+        "source_owner_name": "Ramesh Seller",
+        "source_owner_mobile": "9829055443",
+        "sublocality_address": "Sector 7, Alwar",
+        "location": "Bhagat Singh Circle, Alwar",
+        "pincode": "301001",
+        "expected_price": 5200000,
+    }
+
+    # 1. Missing lead -> 404 and zero TblProperty created
+    missing_resp = await auth_client_md.post("/v1/leads/OB-9999-999999/convert-to-property", json=prop_payload)
+    assert missing_resp.status_code == 404
+    prop_count = (await db_session.execute(select(func.count()).select_from(TblProperty))).scalar_one()
+    assert prop_count == 0
+
+    # 2. Create active lead and convert to property
+    create_resp = await auth_client_md.post("/v1/leads/create", json={
+        "contact_name": "Ramesh Seller",
+        "mobile": "9829055443",
+        "lead_type": "BUY",
+        "lead_source_id": 4,
+        "rating": 2,
+        "indv_property_address": "Sector 7, Alwar",
+    })
+    assert create_resp.status_code == 201
+    lead_id = create_resp.json()["lead_unique_id"]
+
+    conv_resp = await auth_client_md.post(f"/v1/leads/{lead_id}/convert-to-property", json=prop_payload)
+    assert conv_resp.status_code == 201
+    conv_data = conv_resp.json()
+    assert conv_data["lead_id"] == lead_id
+    assert conv_data["property_id"] > 0
+    assert conv_data["propertyid_no"].startswith("PROP-") or conv_data["propertyid_no"].startswith("OM-") or len(conv_data["propertyid_no"]) > 3
+    assert conv_data["stage"] == "WON"
+    assert conv_data["lead_status"] == 5
+
+    # 3. Duplicate conversion must be blocked (400) and leave TblProperty count at 1
+    dup_resp = await auth_client_md.post(f"/v1/leads/{lead_id}/convert-to-property", json=prop_payload)
+    assert dup_resp.status_code == 400
+    prop_count_after = (await db_session.execute(select(func.count()).select_from(TblProperty))).scalar_one()
+    assert prop_count_after == 1
+
+    # 4. Lead detail exposes linked property metadata & CONVERTED_TO_PROPERTY activity
+    detail_resp = await auth_client_md.get(f"/v1/leads/{lead_id}")
+    assert detail_resp.status_code == 200
+    detail = detail_resp.json()
+    assert detail["property_id"] == conv_data["property_id"]
+    assert detail["property_idno"] == conv_data["propertyid_no"]
+    assert detail["related_listing_id"] == conv_data["propertyid_no"]
+    assert detail["stage"] == "WON"
+    assert any(a["action_type"] == "CONVERTED_TO_PROPERTY" for a in detail["activities"])
+
+
