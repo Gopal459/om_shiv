@@ -59,3 +59,81 @@ async def test_bulk_csv_import(test_client: AsyncClient):
     assert resp.status_code == 201
     res_data = resp.json()
     assert res_data["imported_count"] == 2
+
+
+@pytest.mark.asyncio
+async def test_kanban_card_enrichment_fields_and_utc_dates(auth_client_md: AsyncClient, db_session):
+    from datetime import datetime, timezone, timedelta
+    from app.models.leads import Lead, TblLead, LeadActivity
+
+    # 1. Create a TblLead-only manual lead (no paired Lead / Employee row)
+    manual_resp = await auth_client_md.post("/v1/leads/create", json={
+        "contact_name": "Karan Singh",
+        "mobile": "9829099887",
+        "lead_type": "BUY",
+        "lead_source_id": 4,
+        "rating": 3,
+        "indv_property_address": "Bhagat Singh Circle, Sector 7, Alwar",
+        "lead_remark": "Interested For 2 BHK Flat",
+        "deal_final_price": 0,
+    })
+    assert manual_resp.status_code == 201
+    manual_uid = manual_resp.json()["lead_unique_id"]
+
+    # 2. Create a paired Lead + TblLead assigned to EMP-0001 with follow_up_date & activity
+    followup_dt = datetime.now(timezone.utc) + timedelta(days=1)
+    paired_lead = Lead(
+        lead_id="OB-2026-990001",
+        full_name="Priya Sharma",
+        mobile="919829077665",
+        lead_type="BUY",
+        source="Website Callback",
+        assigned_to="EMP-0001",
+        stage="NEW",
+        temperature="HOT",
+        follow_up_date=followup_dt,
+        preferred_locality="Tijara Road, Alwar",
+    )
+    db_session.add(paired_lead)
+    await db_session.flush()
+    db_session.add(LeadActivity(
+        lead_id="OB-2026-990001",
+        action_type="CALL",
+        outcome="Site Visit Planned",
+        note="Customer wants morning visit",
+        logged_by="EMP-0001",
+    ))
+    db_session.add(TblLead(
+        lead_unique_id="OB-2026-990001",
+        contact_name="Priya Sharma",
+        mobile="919829077665",
+        lead_table_name="BUY",
+        lead_source_id=4,
+        rating=1,
+        lead_status=0,
+        stage=1,
+        indv_property_address="Tijara Road, Alwar",
+        nextfollowup_datetime=followup_dt,
+        lead_remark="2 BHK Ready Flat",
+    ))
+    await db_session.commit()
+
+    kb_resp = await auth_client_md.get("/v1/leads/kanban")
+    assert kb_resp.status_code == 200
+    cards = kb_resp.json()["new"]
+
+    manual_card = next(c for c in cards if c["lead_unique_id"] == manual_uid)
+    assert manual_card["requirement_title"] == "Interested For 2 BHK Flat"
+    assert manual_card["source_name"] == "Request a Callback Form"
+    assert manual_card["assigned_to_name"] == "Om Shiv Properties"
+    assert manual_card["current_update"] == "General Follow-Up"
+    assert manual_card["status_label"] == "New"
+    assert manual_card["created_date"].endswith("+00:00") or manual_card["created_date"].endswith("Z")
+
+    paired_card = next(c for c in cards if c["lead_unique_id"] == "OB-2026-990001")
+    assert paired_card["assigned_to"] == "EMP-0001"
+    assert paired_card["assigned_to_name"] == "Managing Director"
+    assert paired_card["current_update"] == "Site Visit Planned"
+    assert paired_card["followup_datetime"] is not None
+    assert paired_card["followup_datetime"].endswith("+00:00") or paired_card["followup_datetime"].endswith("Z")
+

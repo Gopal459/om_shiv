@@ -11,6 +11,9 @@ from sqlalchemy import select, and_, or_, desc, asc
 from app.core.database import get_db
 from app.core.security import decode_access_token
 from app.models.leads import Lead, LeadActivity, LeadActionLog, TblLead, LeadSequence
+from app.models.identity import Employee
+from app.models.properties import Property
+from app.services.callback_service import _iso_utc
 from app.repositories import lead_repo
 from app.services.pipeline_service import pipeline_service
 
@@ -351,6 +354,48 @@ async def get_kanban_board(
     res = await db.execute(stmt.order_by(TblLead.leads_id.desc()))
     all_leads = res.scalars().all()
 
+    unique_ids = [l.lead_unique_id for l in all_leads if l.lead_unique_id]
+    modern_map: Dict[str, Lead] = {}
+    if unique_ids:
+        m_res = await db.execute(
+            select(Lead)
+            .options(selectinload(Lead.activities))
+            .where(Lead.lead_id.in_(unique_ids), Lead.deleted_at.is_(None))
+        )
+        for ml in m_res.scalars().all():
+            ml.activities.sort(key=lambda a: (a.created_at, a.id or 0), reverse=True)
+            modern_map[ml.lead_id] = ml
+
+    assignee_ids = {ml.assigned_to for ml in modern_map.values() if ml.assigned_to}
+    emp_map: Dict[str, str] = {}
+    if assignee_ids:
+        e_res = await db.execute(
+            select(Employee.employee_id, Employee.name).where(Employee.employee_id.in_(assignee_ids))
+        )
+        emp_map = {row[0]: row[1] for row in e_res.all()}
+
+    prop_int_ids = {l.property_id for l in all_leads if l.property_id and l.property_id > 0}
+    prop_codes = {
+        c
+        for c in (
+            [l.property_idno for l in all_leads if l.property_idno]
+            + [ml.related_listing_id for ml in modern_map.values() if ml.related_listing_id]
+        )
+        if c
+    }
+    prop_by_id: Dict[int, str] = {}
+    prop_by_code: Dict[str, str] = {}
+    if prop_int_ids or prop_codes:
+        conds = []
+        if prop_int_ids:
+            conds.append(Property.id.in_(prop_int_ids))
+        if prop_codes:
+            conds.append(Property.property_id.in_(prop_codes))
+        p_res = await db.execute(select(Property.id, Property.property_id, Property.title).where(or_(*conds)))
+        for pid, pcode, ptitle in p_res.all():
+            prop_by_id[pid] = ptitle
+            prop_by_code[pcode] = ptitle
+
     board: Dict[str, List[Dict[str, Any]]] = {
         "new": [],
         "in_progress": [],
@@ -360,22 +405,77 @@ async def get_kanban_board(
         "disqualified": [],
     }
 
+    def _status_label(lead_status_val: int, stage_val: int) -> str:
+        if lead_status_val == 2:
+            return "Disqualified"
+        if lead_status_val == 5:
+            return "Converted"
+        if lead_status_val == 4:
+            return "Qualified"
+        if stage_val in (2, 3):
+            return "Site Visit"
+        if lead_status_val == 1:
+            return "In Progress"
+        return "New"
+
     for l in all_leads:
+        uid = l.lead_unique_id or f"PR{l.leads_id}"
+        ml = modern_map.get(uid)
+        lead_type_upper = (l.lead_table_name or (ml.lead_type if ml else "BUY") or "BUY").upper()
+        prop_title = (
+            prop_by_id.get(l.property_id)
+            or (prop_by_code.get(l.property_idno) if l.property_idno else None)
+            or (prop_by_code.get(ml.related_listing_id) if (ml and ml.related_listing_id) else None)
+        )
+        clean_remark = l.lead_remark.strip() if l.lead_remark and l.lead_remark.strip() not in ("", "N/A") else ""
+        requirement_title = prop_title or clean_remark or f"Interested For {lead_type_upper} Property"
+
+        assigned_emp_id = (
+            ml.assigned_to
+            if (ml and ml.assigned_to)
+            else (f"Staff #{l.assign_franchstaff_id}" if l.assign_franchstaff_id else None)
+        )
+        assigned_to_name = (
+            emp_map.get(assigned_emp_id, assigned_emp_id)
+            if assigned_emp_id
+            else "Om Shiv Properties"
+        )
+        source_name = LEAD_SOURCES_MAP.get(l.lead_source_id or 1, (ml.source if ml else "Website Inbound Inquiry"))
+        followup_dt = (
+            (ml.follow_up_date if ml and ml.follow_up_date else None)
+            or l.nextfollowup_datetime
+            or l.last_callstatus_updatetime
+            or l.created_date
+        )
+        latest_outcome = (
+            ml.activities[0].outcome
+            if (ml and ml.activities and ml.activities[0].outcome)
+            else None
+        )
+        current_update = latest_outcome or "General Follow-Up"
+
         card = {
             "leads_id": l.leads_id,
-            "lead_unique_id": l.lead_unique_id or f"PR{l.leads_id}",
+            "lead_unique_id": uid,
             "contact_name": l.contact_name,
             "mobile": l.mobile,
             "email": l.email,
             "address": l.address,
-            "lead_type": l.lead_table_name or "BUY",
+            "lead_type": lead_type_upper,
             "rating": l.rating,
             "lead_status": l.lead_status,
             "stage": l.stage,
-            "property_address": l.indv_property_address or "Alwar, Rajasthan",
+            "property_address": l.indv_property_address or l.address or (ml.preferred_locality if ml else None) or "Alwar, Rajasthan",
             "deal_final_price": float(l.deal_final_price or 0.0),
             "lead_remark": l.lead_remark or "N/A",
-            "created_date": l.created_date.isoformat() if l.created_date else None,
+            "created_date": _iso_utc(l.created_date),
+            "requirement_title": requirement_title,
+            "source_name": source_name,
+            "assigned_to": assigned_emp_id,
+            "assigned_to_name": assigned_to_name,
+            "followup_datetime": _iso_utc(followup_dt),
+            "current_update": current_update,
+            "status_label": _status_label(l.lead_status, l.stage),
         }
 
         # Deterministic column grouping:
