@@ -1018,3 +1018,79 @@ async def test_opportunities_excel_export_not_shadowed(auth_client_md):
     assert code in exp.text
     assert "Export &lt;Safe&gt; Buyer" in exp.text
     assert "Malviya Nagar" in exp.text
+
+
+@pytest.mark.asyncio
+async def test_list_and_export_avoid_n_plus_one_cp_and_property_queries(
+    test_client, auth_client_md, db_session
+):
+    from sqlalchemy import event
+    from app.models.franchise import ChannelPartner
+
+    _, cp_l1_headers = await _create_employee_with_token(
+        db_session,
+        employee_id="EMP-NPLUS1",
+        name="L1 Partner",
+        mobile="9829088899",
+        role_code="CHANNEL_PARTNER",
+        role_name="Channel Partner",
+    )
+    db_session.add(
+        ChannelPartner(
+            partner_code="CP-N1",
+            employee_id="EMP-NPLUS1",
+            cp_type="ACTIVE_CP",
+            active_level="L1",
+            full_name="L1 Partner",
+            mobile="9829088899",
+            is_active=True,
+        )
+    )
+    await db_session.commit()
+
+    for idx in range(3):
+        res = await auth_client_md.post(
+            "/v1/opportunities",
+            json={
+                "contact_name": f"Batch Buyer {idx}",
+                "mobile": f"982906660{idx}",
+                "assigned_to": "EMP-NPLUS1",
+            },
+        )
+        assert res.status_code == 201
+
+    recorded_sql: list[str] = []
+
+    def _capture_sql(conn, cursor, statement, parameters, context, executemany):
+        recorded_sql.append(statement.lower())
+
+    sync_engine = db_session.get_bind()
+    event.listen(sync_engine, "before_cursor_execute", _capture_sql)
+    try:
+        # 1. List for MD: ChannelPartner resolved once (not 3 times)
+        recorded_sql.clear()
+        list_md = await auth_client_md.get("/v1/opportunities?tab=all")
+        assert list_md.status_code == 200
+        assert list_md.json()["total"] == 3
+        cp_queries_md = [s for s in recorded_sql if "from channel_partners" in s]
+        assert len(cp_queries_md) == 1
+
+        # 2. List for L1 Active CP: ChannelPartner resolved once, zero tbl_property queries
+        recorded_sql.clear()
+        list_l1 = await test_client.get("/v1/opportunities?tab=all", headers=cp_l1_headers)
+        assert list_l1.status_code == 200
+        assert list_l1.json()["total"] == 3
+        assert all(item["matching_properties_count"] == 0 for item in list_l1.json()["items"])
+        assert len([s for s in recorded_sql if "from channel_partners" in s]) == 1
+        assert len([s for s in recorded_sql if "from tbl_property" in s]) == 0
+
+        # 3. Export for MD: zero channel_partners and zero tbl_property queries
+        recorded_sql.clear()
+        exp = await auth_client_md.get("/v1/opportunities/export?tab=all")
+        assert exp.status_code == 200
+        assert "Batch Buyer 0" in exp.text
+        assert "Batch Buyer 2" in exp.text
+        assert len([s for s in recorded_sql if "from channel_partners" in s]) == 0
+        assert len([s for s in recorded_sql if "from tbl_property" in s]) == 0
+    finally:
+        event.remove(sync_engine, "before_cursor_execute", _capture_sql)

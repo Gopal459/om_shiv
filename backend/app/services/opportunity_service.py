@@ -522,10 +522,15 @@ class OpportunityService:
         *,
         now_utc: Optional[datetime] = None,
         raise_on_inactive_cp: bool = True,
+        cp_policy: Optional[Tuple[bool, Optional[str], bool]] = None,
     ) -> Dict[str, Any]:
         ref_now = _ensure_utc(now_utc or datetime.now(timezone.utc))
-        is_restricted, restricted_reason, owner_masked = await self._resolve_actor_cp_policy(
-            db, actor, raise_on_inactive=raise_on_inactive_cp
+        is_restricted, restricted_reason, owner_masked = (
+            cp_policy
+            if cp_policy is not None
+            else await self._resolve_actor_cp_policy(
+                db, actor, raise_on_inactive=raise_on_inactive_cp
+            )
         )
         if is_restricted:
             return {
@@ -710,6 +715,7 @@ class OpportunityService:
         search: Optional[str] = None,
         limit: int = 50,
         offset: int = 0,
+        include_match_counts: bool = True,
     ) -> Tuple[int, List[Dict[str, Any]]]:
         now_utc = datetime.now(timezone.utc)
         conditions = self._scope_filters(actor) + self._tab_filters(tab, now_utc)
@@ -756,16 +762,31 @@ class OpportunityService:
         rows = list((await db.execute(stmt)).scalars().all())
         name_map = await self._employee_name_map(db, [r.assigned_to for r in rows])
 
+        cp_policy: Optional[Tuple[bool, Optional[str], bool]] = None
+        if include_match_counts and rows:
+            cp_policy = await self._resolve_actor_cp_policy(
+                db, actor, raise_on_inactive=False
+            )
+
         items: List[Dict[str, Any]] = []
         for opp in rows:
-            match_res = await self._match_properties_for_opportunity(
-                db, actor, opp, now_utc=now_utc, raise_on_inactive_cp=False
-            )
+            if not include_match_counts or (cp_policy is not None and cp_policy[0]):
+                match_count = 0
+            else:
+                match_res = await self._match_properties_for_opportunity(
+                    db,
+                    actor,
+                    opp,
+                    now_utc=now_utc,
+                    raise_on_inactive_cp=False,
+                    cp_policy=cp_policy,
+                )
+                match_count = match_res["count"]
             items.append(
                 self._serialize_summary(
                     opp,
                     assigned_to_name=name_map.get(opp.assigned_to or ""),
-                    matching_properties_count=match_res["count"],
+                    matching_properties_count=match_count,
                 )
             )
         return total, items
@@ -1142,6 +1163,7 @@ class OpportunityService:
             search=search,
             limit=5000,
             offset=0,
+            include_match_counts=False,
         )
         headers = [
             "Opportunity Code",
