@@ -22,6 +22,7 @@ MIGRATION_STEPS = [
     "app.db.migrations.0012_link_cp_employee",
     "app.db.migrations.0013_website_forms_callback_schema",
     "app.db.migrations.0014_lead_customer_type",
+    "app.db.migrations.0015_opportunities_schema",
 ]
 
 

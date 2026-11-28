@@ -13,5 +13,6 @@ import app.models.property_verification  # noqa: F401
 import app.models.owner_requests  # noqa: F401
 import app.models.ai_agents  # noqa: F401
 import app.models.franchise  # noqa: F401
+import app.models.opportunities  # noqa: F401
 
 __all__ = ["Base"]
