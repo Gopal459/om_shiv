@@ -1769,7 +1769,7 @@ class OpportunityService:
         opportunity_id: int,
         *,
         assigned_to: Optional[str] = None,
-        assign_franch_id: Optional[int] = 0,
+        assign_franch_id: Optional[int] = None,
         remark: Optional[str] = None,
     ) -> Dict[str, Any]:
         opp = await self._get_scoped_opportunity(db, actor, opportunity_id)
@@ -1780,11 +1780,15 @@ class OpportunityService:
             )
 
         clean_emp_id = _clean_optional_text(assigned_to)
-        target_franch = assign_franch_id if assign_franch_id is not None else 0
-        if clean_emp_id is None and target_franch <= 0 and opp.assign_franch_id == 0:
+        if clean_emp_id is None and assign_franch_id is None:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail="Provide assigned_to or assign_franch_id to transfer this opportunity.",
+            )
+        if clean_emp_id is None and assign_franch_id == 0 and opp.assign_franch_id == 0:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="Provide assigned_to or a franchise outlet to transfer this opportunity.",
             )
 
         target_emp: Optional[Employee] = None
@@ -1792,14 +1796,15 @@ class OpportunityService:
             target_emp = await self._get_active_employee(db, clean_emp_id, label="Target assignee")
 
         target_outlet: Optional[FranchiseOutlet] = None
-        if target_franch > 0:
-            target_outlet = await self._get_active_franchise(db, target_franch)
+        if assign_franch_id is not None and assign_franch_id > 0:
+            target_outlet = await self._get_active_franchise(db, assign_franch_id)
 
+        prev_franch_id = opp.assign_franch_id
         if target_emp is not None:
             opp.assigned_to = target_emp.employee_id
             opp.assign_franchstaff_id = target_emp.id
         if assign_franch_id is not None:
-            opp.assign_franch_id = target_franch
+            opp.assign_franch_id = assign_franch_id
 
         clean_remark = _clean_optional_text(remark)
         if clean_remark:
@@ -1810,9 +1815,9 @@ class OpportunityService:
             target_parts.append(f"{target_emp.name} ({target_emp.employee_id})")
         if target_outlet is not None:
             target_parts.append(f"Franchise {target_outlet.name}")
-        elif assign_franch_id == 0:
+        elif assign_franch_id == 0 and prev_franch_id != 0:
             target_parts.append("Central Desk")
-        target_label = " / ".join(target_parts) or "Updated desk"
+        target_label = " / ".join(target_parts)
         note_text = f"Transferred to {target_label}" + (f": {clean_remark}" if clean_remark else "")
 
         db.add(

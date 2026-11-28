@@ -241,7 +241,7 @@ class OpportunityStatusChangeRequest(BaseModel):
 
 class OpportunityTransferRequest(BaseModel):
     assigned_to: Optional[str] = Field(default=None, max_length=32)
-    assign_franch_id: Optional[int] = Field(default=0, ge=0)
+    assign_franch_id: Optional[int] = Field(default=None, ge=0)
     remark: Optional[str] = Field(default=None)
 
 
@@ -463,7 +463,11 @@ async def transfer_opportunity(
         actor,
         opportunity_id,
         assigned_to=payload.assigned_to,
-        assign_franch_id=payload.assign_franch_id,
+        assign_franch_id=(
+            payload.assign_franch_id
+            if "assign_franch_id" in payload.model_fields_set
+            else None
+        ),
         remark=payload.remark,
     )
 

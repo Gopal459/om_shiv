@@ -1928,3 +1928,46 @@ async def test_opportunity_reschedule_transfer_call_log_and_scoping(
     # Ownership transferred: EMP-0002 now gets 403, EMP-0003 gets 200
     assert (await auth_client_sales.get(f"/v1/opportunities/{opp_id}")).status_code == 403
     assert (await test_client.get(f"/v1/opportunities/{opp_id}", headers=emp3_headers)).status_code == 200
+
+    # Fix Round 1 regressions:
+    # (a) Employee-only transfer on a franchised opportunity preserves assign_franch_id > 0
+    partial_staff_xfer = await test_client.post(
+        f"/v1/opportunities/{opp_id}/transfer",
+        json={"assigned_to": "EMP-0001", "remark": "Escalate to MD within branch"},
+        headers=emp3_headers,
+    )
+    assert partial_staff_xfer.status_code == 200
+    ps_data = partial_staff_xfer.json()
+    assert ps_data["assigned_to"] == "EMP-0001"
+    assert ps_data["assign_franch_id"] == outlet.id
+    assert ps_data["franchise_name"] == "Jaipur Vaishali Desk"
+    assert ps_data["activities"][0]["action_type"] == "TRANSFER"
+    assert "Central Desk" not in ps_data["activities"][0]["note"]
+    acts_before_noop = len(ps_data["activities"])
+
+    # (b) Explicit nulls / empty transfer on a franchised opportunity -> 422 with zero new TRANSFER activity
+    for noop_payload in (
+        {"assigned_to": None, "assign_franch_id": None},
+        {},
+    ):
+        noop_res = await auth_client_md.post(
+            f"/v1/opportunities/{opp_id}/transfer",
+            json=noop_payload,
+        )
+        assert noop_res.status_code == 422
+    after_noop = await auth_client_md.get(f"/v1/opportunities/{opp_id}")
+    assert after_noop.status_code == 200
+    assert len(after_noop.json()["activities"]) == acts_before_noop
+
+    # (c) Explicit assign_franch_id=0 cleanly transfers back to Central Desk
+    central_xfer = await auth_client_md.post(
+        f"/v1/opportunities/{opp_id}/transfer",
+        json={"assign_franch_id": 0, "remark": "Return to central desk"},
+    )
+    assert central_xfer.status_code == 200
+    c_xf = central_xfer.json()
+    assert c_xf["assigned_to"] == "EMP-0001"
+    assert c_xf["assign_franch_id"] == 0
+    assert c_xf["franchise_name"] is None
+    assert c_xf["activities"][0]["action_type"] == "TRANSFER"
+    assert "Central Desk" in c_xf["activities"][0]["note"]
