@@ -5,7 +5,7 @@ import math
 import re
 from datetime import datetime, timezone
 from decimal import Decimal
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from fastapi import HTTPException, status
 from sqlalchemy import and_, desc, func, or_, select
@@ -514,6 +514,17 @@ class OpportunityService:
 
         return False, None, False
 
+    def _live_property_base_conditions(self, ref_now: datetime) -> List[Any]:
+        """Shared SQL predicates for live, verified, unsold, non-recycled, non-expired inventory."""
+        return [
+            TblProperty.is_active == 1,
+            TblProperty.verified_status == 1,
+            TblProperty.sold_status == 0,
+            TblProperty.recyclebin_status == 0,
+            TblProperty.deleted_at.is_(None),
+            or_(TblProperty.expiarydate.is_(None), TblProperty.expiarydate >= ref_now),
+        ]
+
     async def _match_properties_for_opportunity(
         self,
         db: AsyncSession,
@@ -523,6 +534,7 @@ class OpportunityService:
         now_utc: Optional[datetime] = None,
         raise_on_inactive_cp: bool = True,
         cp_policy: Optional[Tuple[bool, Optional[str], bool]] = None,
+        candidate_properties: Optional[Sequence[TblProperty]] = None,
     ) -> Dict[str, Any]:
         ref_now = _ensure_utc(now_utc or datetime.now(timezone.utc))
         is_restricted, restricted_reason, owner_masked = (
@@ -541,36 +553,56 @@ class OpportunityService:
                 "items": [],
             }
 
-        conditions: List[Any] = [
-            TblProperty.is_active == 1,
-            TblProperty.verified_status == 1,
-            TblProperty.sold_status == 0,
-            TblProperty.recyclebin_status == 0,
-            TblProperty.deleted_at.is_(None),
-            or_(TblProperty.expiarydate.is_(None), TblProperty.expiarydate >= ref_now),
-            TblProperty.property_type == opp.property_type,
-            TblProperty.looking_type == opp.looking_type,
-        ]
-        if opp.looking_subcat_type and opp.looking_subcat_type > 0:
-            conditions.append(TblProperty.looking_subcat_type == opp.looking_subcat_type)
-        if opp.bhk and opp.bhk > 0:
-            conditions.append(TblProperty.noof_bhk == opp.bhk)
-
         budget_from = _to_float(opp.budget_from)
         budget_to = _to_float(opp.budget_to)
-        if budget_from > 0:
-            conditions.append(TblProperty.expected_price >= Decimal(str(budget_from)))
-        if budget_to > 0:
-            conditions.append(TblProperty.expected_price <= Decimal(str(budget_to)))
 
-        stmt = select(TblProperty).where(and_(*conditions))
-        candidates = list((await db.execute(stmt)).scalars().all())
+        if candidate_properties is None:
+            conditions: List[Any] = self._live_property_base_conditions(ref_now) + [
+                TblProperty.property_type == opp.property_type,
+                TblProperty.looking_type == opp.looking_type,
+            ]
+            if opp.looking_subcat_type and opp.looking_subcat_type > 0:
+                conditions.append(TblProperty.looking_subcat_type == opp.looking_subcat_type)
+            if opp.bhk and opp.bhk > 0:
+                conditions.append(TblProperty.noof_bhk == opp.bhk)
+            if budget_from > 0:
+                conditions.append(TblProperty.expected_price >= Decimal(str(budget_from)))
+            if budget_to > 0:
+                conditions.append(TblProperty.expected_price <= Decimal(str(budget_to)))
+
+            stmt = select(TblProperty).where(and_(*conditions))
+            candidates: Sequence[TblProperty] = list((await db.execute(stmt)).scalars().all())
+        else:
+            candidates = candidate_properties
 
         opp_locs = opp.locations or []
         scored: List[Tuple[int, float, float, int, Dict[str, Any]]] = []
 
         for prop in candidates:
+            if (
+                prop.is_active != 1
+                or prop.verified_status != 1
+                or prop.sold_status != 0
+                or prop.recyclebin_status != 0
+                or prop.deleted_at is not None
+            ):
+                continue
             if prop.expiarydate is not None and _ensure_utc(prop.expiarydate) < ref_now:
+                continue
+            if prop.property_type != opp.property_type or prop.looking_type != opp.looking_type:
+                continue
+            if (
+                opp.looking_subcat_type
+                and opp.looking_subcat_type > 0
+                and prop.looking_subcat_type != opp.looking_subcat_type
+            ):
+                continue
+            if opp.bhk and opp.bhk > 0 and prop.noof_bhk != opp.bhk:
+                continue
+            prop_price = _to_float(prop.expected_price)
+            if budget_from > 0 and prop_price < budget_from:
+                continue
+            if budget_to > 0 and prop_price > budget_to:
                 continue
 
             min_dist: Optional[float] = None
@@ -763,10 +795,22 @@ class OpportunityService:
         name_map = await self._employee_name_map(db, [r.assigned_to for r in rows])
 
         cp_policy: Optional[Tuple[bool, Optional[str], bool]] = None
+        batch_properties: Optional[List[TblProperty]] = None
         if include_match_counts and rows:
             cp_policy = await self._resolve_actor_cp_policy(
                 db, actor, raise_on_inactive=False
             )
+            if not cp_policy[0]:
+                prop_types = sorted({r.property_type for r in rows})
+                look_types = sorted({r.looking_type for r in rows})
+                prop_stmt = select(TblProperty).where(
+                    and_(
+                        *self._live_property_base_conditions(now_utc),
+                        TblProperty.property_type.in_(prop_types),
+                        TblProperty.looking_type.in_(look_types),
+                    )
+                )
+                batch_properties = list((await db.execute(prop_stmt)).scalars().all())
 
         items: List[Dict[str, Any]] = []
         for opp in rows:
@@ -780,6 +824,7 @@ class OpportunityService:
                     now_utc=now_utc,
                     raise_on_inactive_cp=False,
                     cp_policy=cp_policy,
+                    candidate_properties=batch_properties,
                 )
                 match_count = match_res["count"]
             items.append(

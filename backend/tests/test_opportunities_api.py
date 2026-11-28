@@ -1026,6 +1026,7 @@ async def test_list_and_export_avoid_n_plus_one_cp_and_property_queries(
 ):
     from sqlalchemy import event
     from app.models.franchise import ChannelPartner
+    from app.models.properties import TblProperty
 
     _, cp_l1_headers = await _create_employee_with_token(
         db_session,
@@ -1046,6 +1047,20 @@ async def test_list_and_export_avoid_n_plus_one_cp_and_property_queries(
             is_active=True,
         )
     )
+    db_session.add(
+        TblProperty(
+            propertyid_no="PR-BATCH-1",
+            property_type=2,
+            looking_type=1,
+            looking_subcat_type=1,
+            expected_price=4500000,
+            location="Vaishali Nagar",
+            is_active=1,
+            verified_status=1,
+            sold_status=0,
+            recyclebin_status=0,
+        )
+    )
     await db_session.commit()
 
     for idx in range(3):
@@ -1054,6 +1069,9 @@ async def test_list_and_export_avoid_n_plus_one_cp_and_property_queries(
             json={
                 "contact_name": f"Batch Buyer {idx}",
                 "mobile": f"982906660{idx}",
+                "property_type": 2,
+                "looking_type": 1,
+                "looking_subcat_type": 1,
                 "assigned_to": "EMP-NPLUS1",
             },
         )
@@ -1067,13 +1085,16 @@ async def test_list_and_export_avoid_n_plus_one_cp_and_property_queries(
     sync_engine = db_session.get_bind()
     event.listen(sync_engine, "before_cursor_execute", _capture_sql)
     try:
-        # 1. List for MD: ChannelPartner resolved once (not 3 times)
+        # 1. List for MD (non-restricted): ChannelPartner resolved once, tbl_property queried <= 1 time total
         recorded_sql.clear()
         list_md = await auth_client_md.get("/v1/opportunities?tab=all")
         assert list_md.status_code == 200
         assert list_md.json()["total"] == 3
+        assert all(item["matching_properties_count"] == 1 for item in list_md.json()["items"])
         cp_queries_md = [s for s in recorded_sql if "from channel_partners" in s]
+        prop_queries_md = [s for s in recorded_sql if "from tbl_property" in s]
         assert len(cp_queries_md) == 1
+        assert len(prop_queries_md) <= 1
 
         # 2. List for L1 Active CP: ChannelPartner resolved once, zero tbl_property queries
         recorded_sql.clear()
