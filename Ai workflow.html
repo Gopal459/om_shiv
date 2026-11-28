@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Omshiv CRM — All 13 AI Agents Lifecycle (Client View)</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    .fade-in { animation: fadeIn 0.2s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
+    @media print {
+      .no-print { display: none !important; }
+    }
+  </style>
+</head>
+<body class="bg-[var(--background)] text-[var(--foreground)] antialiased p-4 md:p-6">
+  <div class="max-w-7xl mx-auto space-y-5">
+
+    <!-- Header -->
+    <header class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-4 md:p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div class="space-y-1">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[var(--primary)] text-[var(--primary-foreground)]">
+            Client Presentation View
+          </span>
+          <span class="px-2.5 py-0.5 rounded-full text-xs border border-[var(--border)] text-[var(--muted-foreground)]">
+            13 Specialized AI Agents
+          </span>
+        </div>
+        <h1 class="text-xl md:text-2xl font-semibold">
+          Har AI Agent Kaise Kaam Karta Hai — Complete Lifecycle
+        </h1>
+        <p class="text-xs md:text-sm text-[var(--muted-foreground)]">
+          Simple step-by-step view of every agent's journey: Kab chalu hota hai → Kya check karta hai → Kya kaam karta hai → Result kya aata hai.
+        </p>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2 no-print shrink-0">
+        <button onclick="setViewMode('single')" id="btnSingle" class="px-3 py-1.5 rounded-lg text-xs font-medium transition">
+          1-by-1 Interactive View
+        </button>
+        <button onclick="setViewMode('all')" id="btnAll" class="px-3 py-1.5 rounded-lg text-xs font-medium transition">
+          All 13 Lifecycles (One Page)
+        </button>
+      </div>
+    </header>
+
+    <!-- SINGLE AGENT INTERACTIVE VIEW -->
+    <div id="singleView" class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+      <!-- Left Selector -->
+      <aside class="lg:col-span-4 bg-[var(--card)] border border-[var(--border)] rounded-xl p-3 space-y-2 max-h-[720px] overflow-y-auto">
+        <div class="text-xs font-semibold text-[var(--muted-foreground)] px-2 py-1 uppercase tracking-wider">
+          Select Any Agent (1 – 13)
+        </div>
+        <div id="agentList" class="space-y-1.5"></div>
+      </aside>
+
+      <!-- Right Lifecycle Canvas -->
+      <main class="lg:col-span-8 bg-[var(--card)] border border-[var(--border)] rounded-xl p-5 space-y-5 fade-in" id="agentDetail"></main>
+    </div>
+
+    <!-- ALL 13 AT A GLANCE VIEW -->
+    <div id="allView" class="hidden space-y-4 fade-in"></div>
+
+  </div>
+
+  <script>
+    const AGENTS = [
+      {
+        num: 1,
+        name: "AI Property Search Agent",
+        tag: "Instant Property Finder",
+        languages: "English • Hindi • Hinglish",
+        summary: "Jab bhi customer apni pasand batata hai, yeh Agent live database se sahi properties dhoondh kar bhejta hai — bina kisi fake ya purani listing ke.",
+        example: "\"Vaishali Nagar me 3 BHK flat chahiye 80 lakh ke andar\"",
+        steps: [
+          { title: "1. Trigger (Kab Chalu?)", desc: "Customer WhatsApp ya website chat par apni requirement likhta hai." },
+          { title: "2. Safety Check", desc: "Check karta hai ki Agent ON hai ya nahi. Sirf verified aur LIVE properties hi dekhta hai." },
+          { title: "3. Smart Extraction", desc: "Message se City, Locality, BHK aur Budget (₹ Lakh / Cr) samajhta hai." },
+          { title: "4. Matching", desc: "Database me exact matching live flats/villas/plots search karta hai." },
+          { title: "5. Output & Handoff", desc: "Customer ko clean list bhejta hai (Price + Location ke sath). Agar kuch na mile toh naya budget/area puchta hai." }
+        ],
+        rules: ["Kabhi bhi jhoothi ya sold property nahi dikhata", "Price hamesha Indian format (₹ Lakh / ₹ Cr) me deta hai"]
+      },
+      {
+        num: 2,
+        name: "AI Lead Qualification Agent",
+        tag: "Lead Scoring & Hot/Cold Tag",
+        languages: "Chat • Form • Call Transcript",
+        summary: "Har nayi inquiry ya baat-cheet ko padhkar decide karta hai ki customer kitna serious hai (HOT / WARM / COLD) aur uska budget/area CRM me save karta hai.",
+        example: "Customer: \"Agle mahine shift hona hai, 75L budget hai\" → Score: 85 (HOT)",
+        steps: [
+          { title: "1. Trigger (Kab Chalu?)", desc: "Meta/Instagram se nayi lead aaye, ya customer se chat/call baat khatam ho." },
+          { title: "2. Lead Verification", desc: "Confirm karta hai ki Lead CRM me maujood hai aur Agent ON hai." },
+          { title: "3. Conversation Analysis", desc: "Baat-cheet se Budget, BHK, Locality, Timeline nikal kar 0–100 Score deta hai." },
+          { title: "4. Safe CRM Update", desc: "Lead par HOT / WARM / COLD tag aur Budget automatically update karta hai." },
+          { title: "5. Decision / HITL", desc: "Agar customer bilkul interested na lage, toh direct LOST nahi karta — Human Manager Approval Queue me bhejta hai." }
+        ],
+        rules: ["AI khud kisi lead ko LOST mark nahi kar sakta — human approval zaroori hai", "Har score aur reason CRM history me save hota hai"]
+      },
+      {
+        num: 3,
+        name: "AI Customer Support Agent",
+        tag: "24×7 FAQ & Risk Escalation",
+        languages: "Verified Info Only",
+        summary: "Customer ke sawal (office timing, visit process, property price, documents) ka turant sahi jawab deta hai — aur agar koi jhagda/legal issue ho toh turant Human Manager ko transfer karta hai.",
+        example: "Customer: \"Mujhe manager se baat karni hai / legal notice bhejunga\" → Instant Escalation",
+        steps: [
+          { title: "1. Trigger (Kab Chalu?)", desc: "Customer kisi property, policy, ya complaint ke baare me sawal puchta hai." },
+          { title: "2. Danger / Risk Radar", desc: "Turant check karta hai: kahin Fraud, Legal, Police, RERA, ya 'Manager se baat karo' toh nahi likha?" },
+          { title: "3. Property Context Load", desc: "Agar kisi specific property ke baare me pucha hai, toh uski real verified details fetch karta hai." },
+          { title: "4. Reply Generation", desc: "Polite aur factual jawab banata hai (bina koi galat wada kiye)." },
+          { title: "5. Escalation / Close", desc: "Risk detect hone par 'Human Manager Required' flag ke sath staff ko alert karta hai." }
+        ],
+        rules: ["Legal dispute, fraud allegation ya complaint par AI khud handle nahi karta — turant human ko deta hai", "Koi fake discount ya wada nahi karta"]
+      },
+      {
+        num: 4,
+        name: "AI Site Visit Booking Agent",
+        tag: "Zero-Conflict Visit Scheduler",
+        languages: "5 Daily Slots",
+        summary: "Customer ke liye property site visit slot check karta hai, double-booking rokta hai, aur confirm karke Lead ka stage 'SITE VISIT SCHEDULED' kar deta hai.",
+        example: "Customer: \"Kal subah 11:30 baje visit kar sakte hain?\" → Slot Booked!",
+        steps: [
+          { title: "1. Trigger (Kab Chalu?)", desc: "Customer property dekhne (Site Visit) ke liye date aur time mangta hai." },
+          { title: "2. Lead & Stage Check", desc: "Check karta hai ki Lead active hai (already WON/LOST toh nahi)." },
+          { title: "3. Slot Availability Check", desc: "5 daily slots (10:00, 11:30, 14:00, 15:30, 17:00) check karta hai ki koi clash toh nahi." },
+          { title: "4. Mode Check (Shadow vs Live)", desc: "Shadow mode me sirf test log banata hai; Live mode me real slot lock karta hai." },
+          { title: "5. Booking Confirmed", desc: "Lead stage 'SITE_VISIT_SCHEDULED' set hota hai aur customer ko visit confirmation detail milti hai." }
+        ],
+        rules: ["Ek hi time slot par double booking kabhi nahi hone deta", "Closed/Lost leads par booking block rehti hai"]
+      },
+      {
+        num: 5,
+        name: "AI Sales Assistant Copilot",
+        tag: "Sales Team Ka Smart Helper",
+        languages: "Internal Staff Only",
+        summary: "Yeh customer se baat nahi karta — yeh aapki Sales Team ka personal assistant hai. Call karne se pehle poori lead history ka summary aur ready-made follow-up message deta hai.",
+        example: "Salesperson lead kholta hai → 10 sec me poora summary + WhatsApp draft ready!",
+        steps: [
+          { title: "1. Trigger (Kab Chalu?)", desc: "Salesperson kisi lead ka summary, follow-up message, ya stage change mangta hai." },
+          { title: "2. Full History Read", desc: "Lead ki saari purani calls, visits, aur chats ko ek sath padhta hai." },
+          { title: "3. Executive Briefing", desc: "Short summary deta hai: Customer kya chahta hai, abhi kahan atka hai, aur agla best step kya hai." },
+          { title: "4. Message Drafting", desc: "English/Hindi/Hinglish me personalized follow-up message likh kar deta hai." },
+          { title: "5. Sensitive Write Guard", desc: "Agar salesperson AI se stage WON/LOST ya price badalne ko kahe, toh action Human Approval Queue me jata hai." }
+        ],
+        rules: ["Sirf internal CRM team ke liye", "Koi bhi bada CRM badlav bina supervisor approval ke nahi hota"]
+      },
+      {
+        num: 6,
+        name: "AI Document Processing Agent",
+        tag: "Registry & Patta PDF Scanner (OCR)",
+        languages: "PDF • Scanned Images",
+        summary: "Property ke scanned kagaz (Registry Deed, JDA Patta, 90A, Jamabandi) ko padhkar important legal details automatic nikalta hai aur kami hone par warning deta hai.",
+        example: "10-page Registry PDF upload → 5 sec me Khasra No., Plot Size, Seller, DLC Rate & Red Flags!",
+        steps: [
+          { title: "1. Trigger (Kab Chalu?)", desc: "Property verification ke time Registry, Patta ya 90A ka PDF/Photo upload hota hai." },
+          { title: "2. OCR Text Extraction", desc: "PDF ya scanned photo ke andar likha saara text read karta hai." },
+          { title: "3. Legal Data Extraction", desc: "Khasra No., Plot No., Colony, Area, Buyer/Seller Name, Registration Date aur DLC Rate nikalta hai." },
+          { title: "4. Missing Field & Risk Check", desc: "Check karta hai kahin koi zaroori detail (jaise 90A approval ya seller signature detail) missing toh nahi." },
+          { title: "5. Verification Report", desc: "Clean structured summary aur Red-Flag alert verification team ko dikhata hai." }
+        ],
+        rules: ["Sirf verification team ki madad karta hai (final legal approval human staff deta hai)", "Missing title details ko red-flag me highlight karta hai"]
+      },
+      {
+        num: 7,
+        name: "AI WhatsApp Agent",
+        tag: "24×7 Smart Receptionist + Opt-Out Guard",
+        languages: "DoubleTick WhatsApp",
+        summary: "Customer ke WhatsApp message ka turant jawab deta hai, properties search karke dikhata hai, aur agar customer 'STOP' ya 'BAND KARO' likhe toh turant messaging rok deta hai.",
+        example: "Customer: \"BAND KARO\" → Turant Unsubscribe, aage koi message nahi jayega!",
+        steps: [
+          { title: "1. Trigger (Kab Chalu?)", desc: "Customer company ke WhatsApp number par message bhejta hai." },
+          { title: "2. Instant STOP / Opt-Out Check", desc: "Sabse pehle dekhta hai: kahin 'STOP', 'UNSUBSCRIBE', 'BAND KARO', 'ROKO' toh nahi likha? Agar haan, toh turant Consent band!" },
+          { title: "3. Mode & Rate Limit Check", desc: "Check karta hai ki Agent LIVE hai ya SHADOW, aur customer ko 1 ghante me limit se zyada message toh nahi gaye." },
+          { title: "4. Smart Reply", desc: "Property Search Agent se live properties mangwakar customer ke language me jawab banata hai." },
+          { title: "5. Delivery / Shadow Log", desc: "LIVE mode me WhatsApp par bhejta hai; SHADOW mode me sirf record karta hai (real phone par nahi jata)." }
+        ],
+        rules: ["'STOP' / 'BAND KARO' bolte hi har channel par automated message band", "Hourly spam limit cross hone par reply automatically ruk jata hai"]
+      },
+      {
+        num: 8,
+        name: "Meta Lead Ads Agent",
+        tag: "Facebook Ad Instant Capture",
+        languages: "0-Second Lead Entry",
+        summary: "Jaise hi koi Facebook / Meta Ad par form bharta hai, yeh Agent bina kisi manual Excel upload ke 1 second me CRM me Lead bana deta hai.",
+        example: "Facebook Lead Form Submit → Turant OB-2026 Lead Ready + Qualification Start!",
+        steps: [
+          { title: "1. Trigger (Kab Chalu?)", desc: "Facebook / Meta Lead Ad par koi customer apna form submit karta hai." },
+          { title: "2. Clean & Deduplicate", desc: "Phone number clean karta hai aur check karta hai ki yeh number CRM me pehle se toh nahi hai (duplicate nahi banata)." },
+          { title: "3. Consent Registration", desc: "Customer ne form bhara hai, isliye WhatsApp consent date/source ke sath record karta hai." },
+          { title: "4. CRM Lead Creation", desc: "Naya unique Lead ID (e.g., OB-2026-000142) banata hai aur city/budget save karta hai." },
+          { title: "5. Auto-Qualify Handoff", desc: "Agar form me sawal-jawab hain, toh turant Lead Qualification Agent ko score karne bhej deta hai." }
+        ],
+        rules: ["Ek hi customer ki double lead entry kabhi nahi banne deta", "Mobile number missing hone par error log karke safe exit karta hai"]
+      },
+      {
+        num: 9,
+        name: "Instagram Direct / Ads Agent",
+        tag: "Instagram DM Lead Extractor",
+        languages: "Freeform DM Text",
+        summary: "Instagram par log aksar DM me apna number likh dete hain ('98290xxxxx par call karo'). Yeh Agent us DM se mobile number nikal kar CRM Lead bana deta hai.",
+        example: "Insta DM: \"Bhaiya 2 BHK price? Mera no 9829012345\" → Lead Auto-Created!",
+        steps: [
+          { title: "1. Trigger (Kab Chalu?)", desc: "Instagram Ad ya Inbox DM me koi inquiry aati hai." },
+          { title: "2. Mobile Number Extraction", desc: "Poore message me se 10-digit ya +91 mobile number automatically dhoondh kar nikalta hai." },
+          { title: "3. Duplicate Check", desc: "Check karta hai ki yeh number pehle se CRM me hai ya nahi." },
+          { title: "4. Lead & Consent Save", desc: "Instagram source ke sath CRM me Lead banata hai aur activity log karta hai." },
+          { title: "5. Qualification Handoff", desc: "Customer ke message ko Lead Qualification Agent ko bhejkar HOT/WARM/COLD tag lagwata hai." }
+        ],
+        rules: ["Bina mobile number wale random comments/DMs ko CRM me kachra nahi banne deta", "Duplicate DMs ko existing lead par hi link karta hai"]
+      },
+      {
+        num: 10,
+        name: "Lifecycle Nurturing Agent",
+        tag: "Day 0 → Day 30 Smart Follow-Up",
+        languages: "Automated Cadence",
+        summary: "Koi bhi lead bhooli na jaye — yeh Agent Day 0, Day 1, Day 3, Day 7, Day 15 aur Day 30 par customer ko polite follow-up bhejta hai, bina spam kiye.",
+        example: "Lead ko 3 din ho gaye aur koi baat nahi hui → Day 3 check-in WhatsApp ready!",
+        steps: [
+          { title: "1. Trigger (Kab Chalu?)", desc: "Background Scheduler roz check karta hai ki kis lead ko Day 0, 1, 3, 7, 15, ya 30 ho gaya hai." },
+          { title: "2. Terminal Stage Protection", desc: "Agar lead WON, LOST, BOOKED ya JUNK ho chuki hai, toh use turant skip karta hai." },
+          { title: "3. Consent & 24-Hour Cooldown", desc: "Check karta hai ki customer opted-in hai AUR pichle 24 ghante me koi message toh nahi gaya." },
+          { title: "4. Step Message Selection", desc: "Lead ke din ke hisaab se (Day 0 Welcome, Day 3 Visit Offer, Day 15 Fresh Inventory) message tayar karta hai." },
+          { title: "5. Send / Shadow Log", desc: "LIVE mode me WhatsApp bhejta hai aur CRM activity log karta hai; SHADOW mode me sirf log banata hai." }
+        ],
+        rules: ["24 ghante me 1 se zyada follow-up kabhi nahi bhejta", "Sold/Closed/Lost customers ko pareshan nahi karta"]
+      },
+      {
+        num: 11,
+        name: "Post-Visit Feedback Agent",
+        tag: "Site Visit Ke Baad Ki Follow-Up Intelligence",
+        languages: "Intent Classifier",
+        summary: "Customer site visit karke wapas gaya, ab woh kya soch raha hai? Yeh Agent uska feedback samajhkar Lead ko HOT/COLD karta hai, agla follow-up set karta hai, ya opt-out karta hai.",
+        example: "\"Flat pasand aaya par budget 5L kam hai\" → Tag: BUDGET_MISMATCH + Follow-up scheduled",
+        steps: [
+          { title: "1. Trigger (Kab Chalu?)", desc: "Site visit complete hone ke baad customer feedback deta hai (call ya chat par)." },
+          { title: "2. Feedback Classification", desc: "Customer ke mood ko 5 category me baant-ta hai: INTERESTED, BUDGET_MISMATCH, FUTURE_PROSPECT, NOT_INTERESTED, ya ESCALATE." },
+          { title: "3. Lead Temperature Adjust", desc: "INTERESTED par lead HOT hoti hai; FUTURE_PROSPECT par 15–30 din baad ka reminder lagta hai." },
+          { title: "4. Auto Opt-Out on Rejection", desc: "Agar customer bole 'Not interested / mat call karo', toh turant consent revoke karta hai." },
+          { title: "5. CRM Timeline Update", desc: "Site visit outcome aur agla follow-up date CRM me save karta hai." }
+        ],
+        rules: ["Customer mana kare toh aage automated follow-up khud band kar deta hai", "Complaint ya escalation par manager ko alert deta hai"]
+      },
+      {
+        num: 12,
+        name: "New Property Alert Agent",
+        tag: "Smart Buyer-Property Matchmaker",
+        languages: "Anti-Spam Broadcast",
+        summary: "Jab aap CRM me koi nayi property LIVE karte hain, yeh Agent matching budget aur city wale purane active buyers ko dhoondh kar unhe alert bhejta hai.",
+        example: "Vaishali Nagar me ₹72L ka naya 3 BHK live hua → Sirf matching buyers ko alert!",
+        steps: [
+          { title: "1. Trigger (Kab Chalu?)", desc: "Koi nayi property verify hokar LIVE hoti hai (ya failed alerts ki retry queue chalti hai)." },
+          { title: "2. Buyer Matching", desc: "Sirf active buyers (non-LOST) dhoondhta hai jinki city match karti hai aur budget >= property price hai." },
+          { title: "3. 3-Layer Anti-Spam Filter", desc: "Har buyer par check: (a) Pichle 7 din me same alert toh nahi gaya? (b) Consent ON hai? (c) Hourly rate limit bachi hai?" },
+          { title: "4. Price Formatting & Alert", desc: "Property summary ₹ Lakh / ₹ Cr format me tayar karta hai." },
+          { title: "5. Dispatch & History Lock", desc: "Alert bhejta hai aur Property Alert History me entry save karta hai taki 7 din tak repeat na ho." }
+        ],
+        rules: ["7-din duplicate lock: ek customer ko same property ka alert bar-bar nahi jata", "Sirf verified & LIVE properties ka hi alert jata hai"]
+      },
+      {
+        num: 13,
+        name: "AI Voice Calling Agent (Exotel)",
+        tag: "TRAI-Safe Automated Calling + Transcript AI",
+        languages: "Exotel Telephony",
+        summary: "High-intent leads ko Exotel ke zariye outbound call karta hai (sirf din ke 9 AM – 9 PM ke beech), call recording/transcript padhta hai, aur lead ko automatically qualify karta hai.",
+        example: "Raat 9:30 PM par call trigger → Hard Blocked (TRAI Quiet Hours) • Din 2:30 PM → Call Placed!",
+        steps: [
+          { title: "1. Trigger (Kab Chalu?)", desc: "Nayi high-priority lead par call trigger ho ya missed call retry scheduler chale." },
+          { title: "2. 3 Pre-Dial Safety Gates", desc: "Call milane se pehle 3 lock check: (1) Time 09:00 AM – 09:00 PM IST ke beech ho, (2) VOICE consent ON ho, (3) Agent LIVE ho." },
+          { title: "3. Exotel Outbound Call", desc: "Teeno gate pass hone par Exotel API call dial karta hai (failed call din me max 1 baar retry hoti hai)." },
+          { title: "4. Recording & Transcript Ingest", desc: "Call khatam hone par Exotel duration, recording link aur baat-cheet ka text wapas CRM ko deta hai." },
+          { title: "5. Auto-Qualification", desc: "Transcript ko Lead Qualification Agent padhkar customer ka Budget, BHK aur HOT/WARM score update kar deta hai." }
+        ],
+        rules: ["Raat 9 PM se subah 9 AM tak ek bhi call dial nahi ho sakti (TRAI Compliance)", "DND / No-Consent number par call strictly blocked rehti hai"]
+      }
+    ];
+
+    let viewMode = "single";
+    let selectedIdx = 0;
+
+    function setViewMode(mode) {
+      viewMode = mode;
+      document.getElementById("singleView").classList.toggle("hidden", mode !== "single");
+      document.getElementById("allView").classList.toggle("hidden", mode !== "all");
+
+      document.getElementById("btnSingle").className = mode === "single"
+        ? "px-3 py-1.5 rounded-lg text-xs font-medium bg-[var(--primary)] text-[var(--primary-foreground)] transition"
+        : "px-3 py-1.5 rounded-lg text-xs font-medium bg-[var(--content)] border border-[var(--border)] text-[var(--muted-foreground)] transition";
+      document.getElementById("btnAll").className = mode === "all"
+        ? "px-3 py-1.5 rounded-lg text-xs font-medium bg-[var(--primary)] text-[var(--primary-foreground)] transition"
+        : "px-3 py-1.5 rounded-lg text-xs font-medium bg-[var(--content)] border border-[var(--border)] text-[var(--muted-foreground)] transition";
+    }
+
+    function selectAgent(idx) {
+      selectedIdx = idx;
+      renderSidebar();
+      renderDetail();
+    }
+
+    function renderSidebar() {
+      const el = document.getElementById("agentList");
+      el.innerHTML = AGENTS.map((a, i) => {
+        const active = i === selectedIdx;
+        return `
+          <button onclick="selectAgent(${i})"
+            class="w-full text-left p-2.5 rounded-lg border transition flex items-center justify-between gap-2 ${active
+              ? "bg-[var(--primary)] text-[var(--primary-foreground)] border-[var(--primary)]"
+              : "bg-[var(--content)] text-[var(--foreground)] border-[var(--border)] hover:border-[var(--primary)]"}">
+            <div class="min-w-0">
+              <div class="text-[11px] font-mono opacity-80">Agent ${a.num}</div>
+              <div class="text-xs font-semibold truncate">${a.name}</div>
+            </div>
+            <span class="text-[11px] opacity-80 shrink-0">→</span>
+          </button>
+        `;
+      }).join("");
+    }
+
+    function renderLifecycleMarkup(a, isCompact) {
+      return `
+        <div class="space-y-4">
+          <!-- Title & Summary -->
+          <div class="flex flex-wrap items-start justify-between gap-2 border-b border-[var(--border)] pb-3">
+            <div>
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="text-xs font-mono px-2 py-0.5 rounded bg-[var(--content)] border border-[var(--border)]">AGENT ${a.num}</span>
+                <span class="text-xs font-medium text-[var(--primary)]">${a.tag}</span>
+              </div>
+              <h2 class="text-lg font-semibold mt-1">${a.name}</h2>
+            </div>
+            <span class="text-xs px-2.5 py-1 rounded-full bg-[var(--content)] border border-[var(--border)] text-[var(--muted-foreground)]">
+              ${a.languages}
+            </span>
+          </div>
+
+          <p class="text-sm leading-relaxed">${a.summary}</p>
+
+          <!-- Real-life Example -->
+          <div class="bg-[var(--content)] border border-[var(--border)] rounded-lg px-3.5 py-2.5 text-xs">
+            <span class="font-semibold text-[var(--primary)]">Real Example:</span> ${a.example}
+          </div>
+
+          <!-- 5-Step Lifecycle Flowchart -->
+          <div class="space-y-2">
+            <div class="text-xs font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">Step-by-Step Lifecycle</div>
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-2.5">
+              ${a.steps.map((s, idx) => `
+                <div class="relative bg-[var(--content)] border border-[var(--border)] rounded-lg p-3 flex flex-col justify-between">
+                  <div>
+                    <div class="text-xs font-semibold text-[var(--primary)] mb-1">${s.title}</div>
+                    <p class="text-xs text-[var(--muted-foreground)] leading-relaxed">${s.desc}</p>
+                  </div>
+                  ${idx < 4 ? `<div class="hidden md:block text-[11px] font-mono text-[var(--muted-foreground)] mt-2 text-right">Next →</div>` : `<div class="text-[11px] font-mono text-[var(--success)] mt-2 text-right">✓ Done</div>`}
+                </div>
+              `).join("")}
+            </div>
+          </div>
+
+          <!-- Safety Rules -->
+          <div class="bg-[var(--content)] border border-[var(--border)] rounded-lg p-3 space-y-1.5">
+            <div class="text-xs font-semibold">Client Safety Guarantees</div>
+            <ul class="space-y-1 text-xs text-[var(--muted-foreground)]">
+              ${a.rules.map(r => `<li class="flex items-start gap-2"><span class="text-[var(--success)] font-bold">✓</span><span>${r}</span></li>`).join("")}
+            </ul>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderDetail() {
+      const a = AGENTS[selectedIdx];
+      const navButtons = `
+        <div class="flex items-center justify-between pt-3 border-t border-[var(--border)]">
+          <button onclick="selectAgent(${(selectedIdx - 1 + AGENTS.length) % AGENTS.length})" class="px-3 py-1.5 rounded-lg text-xs border border-[var(--border)] hover:bg-[var(--content)]">
+            ← Previous Agent
+          </button>
+          <span class="text-xs text-[var(--muted-foreground)]">${selectedIdx + 1} of ${AGENTS.length}</span>
+          <button onclick="selectAgent(${(selectedIdx + 1) % AGENTS.length})" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-[var(--primary)] text-[var(--primary-foreground)] hover:opacity-90">
+            Next Agent →
+          </button>
+        </div>
+      `;
+      document.getElementById("agentDetail").innerHTML = renderLifecycleMarkup(a, false) + navButtons;
+    }
+
+    function renderAllView() {
+      document.getElementById("allView").innerHTML = AGENTS.map(a => `
+        <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-5">
+          ${renderLifecycleMarkup(a, true)}
+        </div>
+      `).join("");
+    }
+
+    // Init
+    setViewMode("single");
+    renderSidebar();
+    renderDetail();
+    renderAllView();
+  </script>
+</body>
+</html>
