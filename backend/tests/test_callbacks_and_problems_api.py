@@ -1181,3 +1181,283 @@ async def test_problems_triage_and_convert_to_lead(
     assert "&lt;script&gt;" in export_resp.text
     assert "<script>" not in export_resp.text
 
+
+def _assert_utc_iso(ts: str | None) -> None:
+    assert ts is not None
+    assert ts.endswith("+00:00") or ts.endswith("Z"), f"Expected UTC ISO timestamp, got {ts!r}"
+
+
+@pytest.mark.asyncio
+async def test_utc_iso_timestamps_across_callbacks_and_problems(
+    test_client, auth_client_md, db_session
+):
+    # Create callback, reschedule twice (so old_followup_datetime is populated), and inspect list + detail
+    cb_resp = await auth_client_md.post(
+        "/v1/callbacks",
+        json={
+            "name": "UTC Check User",
+            "mobile_number": "9829088811",
+            "message": "Check UTC serialization",
+            "assigned_user_id": "EMP-0001",
+        },
+    )
+    assert cb_resp.status_code == 201
+    cb_data = cb_resp.json()
+    cb_id = cb_data["callback_id"]
+    _assert_utc_iso(cb_data["created_date"])
+    _assert_utc_iso(cb_data["modified_date"])
+
+    dt1 = (datetime.now(timezone.utc) + timedelta(hours=2)).isoformat()
+    dt2 = (datetime.now(timezone.utc) + timedelta(hours=4)).isoformat()
+    r1 = await auth_client_md.post(
+        f"/v1/callbacks/{cb_id}/reschedule",
+        json={"current_update": "Interested", "remark": "First slot", "followup_datetime": dt1},
+    )
+    assert r1.status_code == 200
+    _assert_utc_iso(r1.json()["followup_datetime"])
+
+    r2 = await auth_client_md.post(
+        f"/v1/callbacks/{cb_id}/reschedule",
+        json={"current_update": "Site Visit Planned", "remark": "Second slot", "followup_datetime": dt2},
+    )
+    assert r2.status_code == 200
+
+    # Also exercise sort_by=followup_datetime desc (nullslast parity)
+    list_resp = await auth_client_md.get(
+        "/v1/callbacks?tab=all&sort_by=followup_datetime&order_by=desc"
+    )
+    assert list_resp.status_code == 200
+    matched = next(i for i in list_resp.json()["items"] if i["callback_id"] == cb_id)
+    _assert_utc_iso(matched["followup_datetime"])
+    _assert_utc_iso(matched["created_date"])
+    _assert_utc_iso(matched["modified_date"])
+
+    detail_resp = await auth_client_md.get(f"/v1/callbacks/{cb_id}")
+    assert detail_resp.status_code == 200
+    detail = detail_resp.json()
+    _assert_utc_iso(detail["followup_datetime"])
+    _assert_utc_iso(detail["created_date"])
+    _assert_utc_iso(detail["modified_date"])
+    for rs in detail["reschedule_history"]:
+        _assert_utc_iso(rs["new_followup_datetime"])
+        _assert_utc_iso(rs["created_at"])
+        if rs["old_followup_datetime"] is not None:
+            _assert_utc_iso(rs["old_followup_datetime"])
+    for act in detail["activities"]:
+        _assert_utc_iso(act["created_at"])
+
+    # Problem timestamps (created_at, updated_at, resolved_at, converted_at)
+    p_resp = await test_client.post(
+        "/v1/intake/inquiry",
+        json={
+            "inquiry_type": "PROBLEM_REPORT",
+            "full_name": "UTC Problem Reporter",
+            "mobile": "9829088822",
+            "details": {"property_code": "OP-2026-00099", "description": "Timestamp check"},
+        },
+    )
+    assert p_resp.status_code == 201
+    p_id = p_resp.json()["id"]
+
+    res_patch = await auth_client_md.patch(
+        f"/v1/problems/{p_id}",
+        json={"status": "RESOLVED", "resolution_remark": "Fixed"},
+    )
+    assert res_patch.status_code == 200
+    patched = res_patch.json()
+    _assert_utc_iso(patched["resolved_at"])
+    _assert_utc_iso(patched["created_at"])
+    _assert_utc_iso(patched["updated_at"])
+
+    conv_resp = await auth_client_md.post(
+        f"/v1/problems/{p_id}/convert-to-lead",
+        json={"assigned_to": "EMP-0001", "lead_type": "BUYER"},
+    )
+    assert conv_resp.status_code == 200
+
+    probs_list = await auth_client_md.get("/v1/problems?status=RESOLVED&search=OP-2026-00099")
+    assert probs_list.status_code == 200
+    prob_item = next(i for i in probs_list.json()["items"] if i["id"] == p_id)
+    _assert_utc_iso(prob_item["resolved_at"])
+    _assert_utc_iso(prob_item["converted_at"])
+    _assert_utc_iso(prob_item["created_at"])
+    _assert_utc_iso(prob_item["updated_at"])
+
+
+@pytest.mark.asyncio
+async def test_problem_property_code_extraction_and_search(
+    test_client, auth_client_md, db_session
+):
+    from sqlalchemy import select
+
+    # 1. Public PROBLEM_REPORT stores related_property_code from details.property_code
+    p_resp = await test_client.post(
+        "/v1/intake/inquiry",
+        json={
+            "inquiry_type": "PROBLEM_REPORT",
+            "full_name": "Prop Search Reporter",
+            "mobile": "9829077711",
+            "details": {
+                "property_code": "  OP-2026-00011  ",
+                "description": "Broken listing photo",
+            },
+        },
+    )
+    assert p_resp.status_code == 201
+    p_id = p_resp.json()["id"]
+
+    inq_row = (
+        await db_session.execute(select(WebsiteInquiry).where(WebsiteInquiry.id == p_id))
+    ).scalar_one()
+    assert inq_row.related_property_code == "OP-2026-00011"
+
+    search_resp = await auth_client_md.get("/v1/problems?search=OP-2026-00011")
+    assert search_resp.status_code == 200
+    assert any(item["id"] == p_id for item in search_resp.json()["items"])
+
+    # 2. Legacy PROBLEM_REPORT without related_property_code backfilled still matches via JSON text cast
+    legacy_inq = WebsiteInquiry(
+        inquiry_type="PROBLEM_REPORT",
+        full_name="Legacy Reporter",
+        mobile="919829077712",
+        details={"property_code": "OP-2026-LEGACY", "description": "Old report"},
+        related_property_code=None,
+    )
+    db_session.add(legacy_inq)
+    await db_session.commit()
+    await db_session.refresh(legacy_inq)
+
+    legacy_search = await auth_client_md.get("/v1/problems?search=OP-2026-LEGACY")
+    assert legacy_search.status_code == 200
+    assert any(item["id"] == legacy_inq.id for item in legacy_search.json()["items"])
+
+
+@pytest.mark.asyncio
+async def test_validation_bounds_and_scoped_permissions(
+    test_client, auth_client_md, auth_client_sales, db_session
+):
+    from fastapi import HTTPException
+    from sqlalchemy import select
+    from app.core.security import create_access_token
+    from app.models.identity import Department, Role, Employee
+    from app.services.callback_service import _clean_mobile_digits
+
+    # 1. _clean_mobile_digits enforces 7..15 digits with HTTP 400
+    for bad_digits in ("1", "123456", "1234567890123456"):
+        with pytest.raises(HTTPException) as exc_mob:
+            _clean_mobile_digits(bad_digits)
+        assert exc_mob.value.status_code == 400
+
+    # 2. Public intake validation rejects short/oversized phones and oversized phone_code -> 422
+    r_short = await test_client.post(
+        "/v1/intake/callback",
+        json={"name": "Valid User", "mobile_number": "1"},
+    )
+    assert r_short.status_code == 422
+
+    r_long_phone = await test_client.post(
+        "/v1/intake/callback",
+        json={"name": "Valid User", "mobile_number": "9876543210123456"},
+    )
+    assert r_long_phone.status_code == 422
+
+    r_long_code = await test_client.post(
+        "/v1/intake/callback",
+        json={"name": "Valid User", "mobile_number": "9829012345", "phone_code": "+" + "1" * 20},
+    )
+    assert r_long_code.status_code == 422
+
+    # 3. Create valid callback & test ConvertCallbackRequest / Reschedule / Status validators -> 422
+    cb_resp = await auth_client_md.post(
+        "/v1/callbacks",
+        json={"name": "Convert Validation User", "mobile_number": "9829065432"},
+    )
+    assert cb_resp.status_code == 201
+    cb_id = cb_resp.json()["callback_id"]
+
+    bad_resched = await auth_client_md.post(
+        f"/v1/callbacks/{cb_id}/reschedule",
+        json={
+            "current_update": "   ",
+            "remark": "Valid remark",
+            "followup_datetime": (datetime.now(timezone.utc) + timedelta(hours=2)).isoformat(),
+        },
+    )
+    assert bad_resched.status_code == 422
+
+    bad_calls_status = await auth_client_md.post(
+        f"/v1/callbacks/{cb_id}/status",
+        json={"lead_status": 1, "remark": "Trying invalid calls_status", "calls_status": 2},
+    )
+    assert bad_calls_status.status_code == 422
+
+    for bad_conv_payload in [
+        {"name": "   ", "mobile": "9829065432", "address": "Alwar"},
+        {"name": "Valid Name", "mobile": "9829065432", "address": "   "},
+        {"name": "Valid Name", "mobile": "1", "address": "Alwar"},
+        {"name": "Valid Name", "mobile": "9829065432", "address": "Alwar", "source": "X" * 65},
+    ]:
+        bad_conv = await auth_client_md.post(
+            f"/v1/callbacks/{cb_id}/convert-to-lead",
+            json=bad_conv_payload,
+        )
+        assert bad_conv.status_code == 422
+
+    # 4. Scoped TELECALLER POST /v1/callbacks self-assigns despite explicit assigned_user_id
+    dept = (await db_session.execute(select(Department).where(Department.code == "SALES"))).scalar_one()
+    tc_role = (await db_session.execute(select(Role).where(Role.code == "TELECALLER"))).scalar_one_or_none()
+    if not tc_role:
+        tc_role = Role(
+            department_id=dept.id,
+            name="Telecaller",
+            code="TELECALLER",
+            permissions={"leads": ["view_assigned"]},
+        )
+        db_session.add(tc_role)
+        await db_session.flush()
+
+    tc_emp = Employee(
+        employee_id="EMP-TC-SELF",
+        name="Scoped Telecaller",
+        email="tc_self@omshiv.in",
+        mobile="9829055599",
+        department_id=dept.id,
+        role_id=tc_role.id,
+        is_active=True,
+    )
+    db_session.add(tc_emp)
+    await db_session.commit()
+
+    tc_token = create_access_token({"sub": "EMP-TC-SELF", "role": "TELECALLER"})
+    tc_create = await test_client.post(
+        "/v1/callbacks",
+        headers={"Authorization": f"Bearer {tc_token}"},
+        json={
+            "name": "Self Assigned Customer",
+            "mobile_number": "9829055500",
+            "assigned_user_id": "EMP-0001",
+        },
+    )
+    assert tc_create.status_code == 201
+    assert tc_create.json()["assigned_user_id"] == "EMP-TC-SELF"
+
+    # 5. Non-assignee receives 403 on POST /v1/problems/{id}/convert-to-lead
+    prob_resp = await test_client.post(
+        "/v1/intake/inquiry",
+        json={
+            "inquiry_type": "PROBLEM_REPORT",
+            "full_name": "Scoped Problem Reporter",
+            "mobile": "9829055501",
+            "details": {"description": "Permission test"},
+        },
+    )
+    assert prob_resp.status_code == 201
+    prob_id = prob_resp.json()["id"]
+
+    forbidden_conv = await auth_client_sales.post(
+        f"/v1/problems/{prob_id}/convert-to-lead",
+        json={"lead_type": "BUYER"},
+    )
+    assert forbidden_conv.status_code == 403
+
+

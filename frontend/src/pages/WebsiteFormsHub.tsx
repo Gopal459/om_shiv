@@ -890,7 +890,7 @@ export const WebsiteFormsHub: React.FC = () => {
                   className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#291BB0] hover:bg-[#1f138e] text-white text-xs font-semibold shadow-sm transition-colors cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  + New Callback
+                  New Callback
                 </button>
                 <button
                   type="button"

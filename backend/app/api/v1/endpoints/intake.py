@@ -1,5 +1,4 @@
 from __future__ import annotations
-import re
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, Depends, Query, Request, Response, status, HTTPException
@@ -9,7 +8,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.security import decode_access_token
-from app.services.callback_service import callback_service
+from app.services.callback_service import (
+    callback_service,
+    validate_mobile_input,
+    validate_non_blank_input,
+)
 from app.services.intake_service import intake_service
 
 router = APIRouter()
@@ -59,32 +62,27 @@ class WebsiteInquiryCreateRequest(BaseModel):
 
 
 class CallbackIntakeRequest(BaseModel):
-    name: str = Field(..., description="Customer name")
+    name: str = Field(..., max_length=255, description="Customer name")
     mobile_number: str = Field(
         ...,
+        max_length=32,
         validation_alias=AliasChoices("mobile_number", "phone"),
         description="Customer mobile number",
     )
-    phone_code: str = Field(default="+91", description="Country calling code")
+    phone_code: str = Field(default="+91", max_length=16, description="Country calling code")
     message: Optional[str] = Field(default=None, description="Optional callback note")
     property_id: Optional[int] = Field(default=None, description="Optional numeric property ID")
-    property_code: Optional[str] = Field(default=None, description="Optional property code OP-YYYY-NNNNN")
+    property_code: Optional[str] = Field(default=None, max_length=32, description="Optional property code OP-YYYY-NNNNN")
 
     @field_validator("name")
     @classmethod
     def validate_name_non_blank(cls, v: str) -> str:
-        cleaned = (v or "").strip()
-        if not cleaned:
-            raise ValueError("Name must not be blank")
-        return cleaned
+        return validate_non_blank_input(v, "Name")
 
     @field_validator("mobile_number")
     @classmethod
-    def validate_mobile_non_blank(cls, v: str) -> str:
-        cleaned = (v or "").strip()
-        if not cleaned or not re.search(r"\d", cleaned):
-            raise ValueError("Valid mobile number is required")
-        return cleaned
+    def validate_mobile_digits(cls, v: str) -> str:
+        return validate_mobile_input(v)
 
 
 class CallbackIntakeResponse(BaseModel):

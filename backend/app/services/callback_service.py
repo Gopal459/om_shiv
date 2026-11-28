@@ -35,6 +35,13 @@ def _ensure_utc(dt: datetime) -> datetime:
     return dt.astimezone(timezone.utc)
 
 
+def _iso_utc(dt: Optional[datetime]) -> Optional[str]:
+    """Serialize an optional datetime as a UTC-aware ISO-8601 string."""
+    if dt is None:
+        return None
+    return _ensure_utc(dt).isoformat()
+
+
 def _parse_agg_datetime(value: Any) -> Optional[datetime]:
     """Normalize aggregate datetime values returned by SQLite or PostgreSQL."""
     if value is None:
@@ -56,14 +63,37 @@ def _ist_today_bounds_utc(now_utc: Optional[datetime] = None) -> Tuple[datetime,
     return start_ist.astimezone(timezone.utc), end_ist.astimezone(timezone.utc)
 
 
-def _clean_mobile_digits(raw_mobile: str) -> str:
+def _extract_mobile_digits(raw_mobile: str) -> str:
+    """Extract digits from a mobile string and enforce 7..15 digit bounds."""
     digits = re.sub(r"\D", "", (raw_mobile or "").strip())
-    if not digits:
+    if not (7 <= len(digits) <= 15):
+        raise ValueError("Mobile number must contain between 7 and 15 digits.")
+    return digits
+
+
+def validate_mobile_input(value: str) -> str:
+    """Validate incoming mobile strings in request schemas (7..15 digits)."""
+    cleaned = (value or "").strip()
+    _extract_mobile_digits(cleaned)
+    return cleaned
+
+
+def validate_non_blank_input(value: str, label: str) -> str:
+    """Validate that a required string field is non-blank after stripping."""
+    cleaned = (value or "").strip()
+    if not cleaned:
+        raise ValueError(f"{label} must not be blank.")
+    return cleaned
+
+
+def _clean_mobile_digits(raw_mobile: str) -> str:
+    try:
+        return _extract_mobile_digits(raw_mobile)
+    except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Valid mobile number is required.",
-        )
-    return digits
+            detail=str(exc),
+        ) from exc
 
 
 class CallbackService:
@@ -162,13 +192,13 @@ class CallbackService:
             "disqualified_reason_label": DISQUALIFIED_REASONS.get(cb.disqualified_reason),
             "current_update": cb.current_update,
             "last_remark": cb.last_remark,
-            "followup_datetime": cb.followup_datetime.isoformat() if cb.followup_datetime else None,
+            "followup_datetime": _iso_utc(cb.followup_datetime),
             "opportunity_converted": cb.opportunity_converted,
             "lead_converted": cb.lead_converted,
             "converted_lead_id": cb.converted_lead_id,
             "website_inquiry_id": cb.website_inquiry_id,
-            "created_date": cb.created_date.isoformat() if cb.created_date else None,
-            "modified_date": cb.modified_date.isoformat() if cb.modified_date else None,
+            "created_date": _iso_utc(cb.created_date),
+            "modified_date": _iso_utc(cb.modified_date),
         }
 
     def _scope_filters(self, actor: Employee) -> List[Any]:
@@ -389,6 +419,9 @@ class CallbackService:
         }
         sort_col = sort_map.get(sort_by, TblCallback.created_date)
         order_fn = asc if (order_by or "desc").lower() == "asc" else desc
+        order_expr = order_fn(sort_col)
+        if sort_by == "followup_datetime":
+            order_expr = order_expr.nullslast()
 
         where_clause = and_(*conditions)
         total_stmt = select(func.count(TblCallback.callback_id)).where(where_clause)
@@ -397,7 +430,7 @@ class CallbackService:
         rows_stmt = (
             select(TblCallback)
             .where(where_clause)
-            .order_by(order_fn(sort_col), desc(TblCallback.callback_id))
+            .order_by(order_expr, desc(TblCallback.callback_id))
             .offset(offset)
             .limit(limit)
         )
@@ -457,15 +490,13 @@ class CallbackService:
             {
                 "id": r.id,
                 "callback_id": r.callback_id,
-                "old_followup_datetime": r.old_followup_datetime.isoformat()
-                if r.old_followup_datetime
-                else None,
-                "new_followup_datetime": r.new_followup_datetime.isoformat(),
+                "old_followup_datetime": _iso_utc(r.old_followup_datetime),
+                "new_followup_datetime": _iso_utc(r.new_followup_datetime),
                 "current_update": r.current_update,
                 "remark": r.remark,
                 "rescheduled_by": r.rescheduled_by,
                 "rescheduled_by_name": name_map.get(r.rescheduled_by or "") or r.rescheduled_by,
-                "created_at": r.created_at.isoformat(),
+                "created_at": _iso_utc(r.created_at),
             }
             for r in resched_rows
         ]
@@ -480,7 +511,7 @@ class CallbackService:
                 "remark": a.remark,
                 "performed_by": a.performed_by,
                 "performed_by_name": name_map.get(a.performed_by or "") or a.performed_by,
-                "created_at": a.created_at.isoformat(),
+                "created_at": _iso_utc(a.created_at),
             }
             for a in act_rows
         ]
@@ -781,17 +812,24 @@ class CallbackService:
             final_assignee = cb.assigned_user_id or actor.employee_id
 
         lead_id = await get_next_lead_id(db)
-        norm_mobile = normalize_phone(mobile or cb.mobile_number)
-        clean_name = (name or cb.name).strip()
-        lead_type = (customer_type or "BUY").strip().upper()
-        clean_source = (source or "Website Callback").strip()
+        clean_digits = _clean_mobile_digits(mobile or cb.mobile_number)
+        norm_mobile = normalize_phone(clean_digits)[:15]
+        clean_name = (name or cb.name).strip()[:255]
+        if not clean_name:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Customer name is required.",
+            )
+        lead_type = ((customer_type or "BUY").strip().upper() or "BUY")[:32]
+        clean_source = ((source or "Website Callback").strip() or "Website Callback")[:64]
         clean_address = address.strip() if isinstance(address, str) and address.strip() else None
+        clean_email = email.strip()[:255] if isinstance(email, str) and email.strip() else None
 
         new_lead = Lead(
             lead_id=lead_id,
             full_name=clean_name,
             mobile=norm_mobile,
-            email=email.strip() if isinstance(email, str) and email.strip() else None,
+            email=clean_email,
             lead_type=lead_type,
             source=clean_source,
             related_listing_id=cb.property_code,

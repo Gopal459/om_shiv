@@ -257,12 +257,20 @@ class IntakeService:
     ) -> WebsiteInquiry:
         """Create a raw website inquiry from public web forms."""
         normalized_mobile = normalize_phone(mobile)
+        raw_details = details if isinstance(details, dict) else {}
+        raw_prop_code = raw_details.get("property_code") or raw_details.get("related_property_code")
+        if isinstance(raw_prop_code, str) and raw_prop_code.strip():
+            related_property_code: Optional[str] = raw_prop_code.strip()[:32]
+        else:
+            related_property_code = None
+
         inquiry = WebsiteInquiry(
             inquiry_type=inquiry_type,
             full_name=full_name,
             mobile=normalized_mobile,
             email=email,
             details=details,
+            related_property_code=related_property_code,
             is_converted=False,
         )
         db.add(inquiry)
@@ -271,7 +279,6 @@ class IntakeService:
             from app.services.callback_service import callback_service
 
             await db.flush()
-            raw_details = details if isinstance(details, dict) else {}
             raw_prop_id = raw_details.get("property_id")
             try:
                 prop_id_int = int(raw_prop_id) if raw_prop_id is not None else None
@@ -297,8 +304,7 @@ class IntakeService:
                 phone_code=str(raw_details.get("phone_code") or "+91"),
                 message=msg,
                 property_id=prop_id_int,
-                property_code=raw_details.get("property_code")
-                or raw_details.get("related_property_code"),
+                property_code=related_property_code,
                 website_inquiry_id=inquiry.id,
             )
             await db.refresh(inquiry)

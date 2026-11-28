@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import HTTPException, status
-from sqlalchemy import and_, desc, func, or_, select
+from sqlalchemy import String, and_, cast, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.callbacks import PROBLEM_STATUSES
@@ -14,6 +14,7 @@ from app.models.identity import Employee
 from app.models.inquiries import WebsiteInquiry
 from app.models.leads import Lead
 from app.models.properties import Property
+from app.services.callback_service import _iso_utc
 from app.services.intake_service import intake_service
 
 PROBLEM_VIEW_ALL_ROLES = {"SUPER_ADMIN", "MD", "SALES_MANAGER", "VERIFICATION_OFFICER"}
@@ -161,13 +162,13 @@ class ProblemService:
             "resolution_remark": inq.resolution_remark,
             "resolved_by": inq.resolved_by,
             "resolved_by_name": emp_names.get(inq.resolved_by or ""),
-            "resolved_at": inq.resolved_at.isoformat() if inq.resolved_at else None,
+            "resolved_at": _iso_utc(inq.resolved_at),
             "is_converted": inq.is_converted,
             "converted_lead_id": inq.converted_lead_id,
             "converted_by_emp_id": inq.converted_by_emp_id,
-            "converted_at": inq.converted_at.isoformat() if inq.converted_at else None,
-            "created_at": inq.created_at.isoformat() if inq.created_at else None,
-            "updated_at": inq.updated_at.isoformat() if inq.updated_at else None,
+            "converted_at": _iso_utc(inq.converted_at),
+            "created_at": _iso_utc(inq.created_at),
+            "updated_at": _iso_utc(inq.updated_at),
         }
 
     async def list_problems(
@@ -216,6 +217,7 @@ class ProblemService:
                     WebsiteInquiry.email.ilike(term),
                     WebsiteInquiry.related_property_code.ilike(term),
                     WebsiteInquiry.resolution_remark.ilike(term),
+                    cast(WebsiteInquiry.details, String).ilike(term),
                 )
             )
 

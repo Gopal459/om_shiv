@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -14,7 +13,11 @@ from sqlalchemy.orm import selectinload
 from app.core.database import get_db
 from app.core.security import decode_access_token
 from app.models.identity import Employee
-from app.services.callback_service import callback_service
+from app.services.callback_service import (
+    callback_service,
+    validate_mobile_input,
+    validate_non_blank_input,
+)
 
 router = APIRouter(prefix="/v1/callbacks", tags=["callbacks"])
 security = HTTPBearer(auto_error=False)
@@ -76,33 +79,28 @@ async def get_current_employee(
 
 
 class CallbackCreateRequest(BaseModel):
-    name: str = Field(..., description="Customer name")
+    name: str = Field(..., max_length=255, description="Customer name")
     mobile_number: str = Field(
         ...,
+        max_length=32,
         validation_alias=AliasChoices("mobile_number", "phone"),
         description="Customer mobile number",
     )
-    phone_code: str = Field(default="+91", description="Country calling code")
+    phone_code: str = Field(default="+91", max_length=16, description="Country calling code")
     message: Optional[str] = Field(default=None, description="Optional callback note")
     property_id: Optional[int] = Field(default=None, description="Optional numeric property ID")
-    property_code: Optional[str] = Field(default=None, description="Optional property code")
-    assigned_user_id: Optional[str] = Field(default=None, description="Optional target employee_id")
+    property_code: Optional[str] = Field(default=None, max_length=32, description="Optional property code")
+    assigned_user_id: Optional[str] = Field(default=None, max_length=32, description="Optional target employee_id")
 
     @field_validator("name")
     @classmethod
     def validate_name_non_blank(cls, v: str) -> str:
-        cleaned = (v or "").strip()
-        if not cleaned:
-            raise ValueError("Name must not be blank")
-        return cleaned
+        return validate_non_blank_input(v, "Name")
 
     @field_validator("mobile_number")
     @classmethod
-    def validate_mobile_non_blank(cls, v: str) -> str:
-        cleaned = (v or "").strip()
-        if not cleaned or not re.search(r"\d", cleaned):
-            raise ValueError("Valid mobile number is required")
-        return cleaned
+    def validate_mobile_digits(cls, v: str) -> str:
+        return validate_mobile_input(v)
 
 
 class LogCallRequest(BaseModel):
@@ -110,16 +108,21 @@ class LogCallRequest(BaseModel):
 
 
 class RescheduleCallbackRequest(BaseModel):
-    current_update: str = Field(..., description="Current follow-up status/category")
+    current_update: str = Field(..., max_length=120, description="Current follow-up status/category")
     remark: str = Field(..., description="Mandatory reschedule remark")
     followup_datetime: datetime = Field(..., description="Strictly future follow-up datetime")
+
+    @field_validator("current_update")
+    @classmethod
+    def validate_current_update_non_blank(cls, v: str) -> str:
+        return validate_non_blank_input(v, "Current update")
 
 
 class ChangeStatusRequest(BaseModel):
     lead_status: int = Field(..., ge=0, le=6, description="Callback status code 0..4 or 6")
     remark: str = Field(..., description="Mandatory status change remark")
     disqualified_reason: Optional[int] = Field(default=None, description="Required (1..7) when status=2")
-    calls_status: Optional[int] = Field(default=None, description="Optional calls_status flag (0 or 1)")
+    calls_status: Optional[int] = Field(default=None, ge=0, le=1, description="Optional calls_status flag (0 or 1)")
 
 
 class TransferCallbackRequest(BaseModel):
@@ -132,17 +135,32 @@ class ReopenCallbackRequest(BaseModel):
 
 
 class ConvertCallbackRequest(BaseModel):
-    customer_type: str = Field(default="BUY", description="Customer type e.g. BUY, RENT, PG")
-    name: str = Field(..., description="Customer name")
-    email: Optional[str] = Field(default=None, description="Customer email")
-    mobile: str = Field(..., description="Primary mobile number")
-    alternate_mobile: Optional[str] = Field(default=None, description="Alternate mobile number")
+    customer_type: str = Field(default="BUY", max_length=32, description="Customer type e.g. BUY, RENT, PG")
+    name: str = Field(..., max_length=255, description="Customer name")
+    email: Optional[str] = Field(default=None, max_length=255, description="Customer email")
+    mobile: str = Field(..., max_length=32, description="Primary mobile number")
+    alternate_mobile: Optional[str] = Field(default=None, max_length=255, description="Alternate mobile number")
     address: str = Field(default="", description="Customer address / preferred locality")
-    refer_by_relation: Optional[str] = Field(default=None, description="Referral relation")
-    refer_by_name: Optional[str] = Field(default=None, description="Referral name")
-    refer_by_mobile: Optional[str] = Field(default=None, description="Referral mobile")
-    source: str = Field(default="Website Callback", description="Lead source")
-    assigned_to: Optional[str] = Field(default=None, description="Assignee employee_id")
+    refer_by_relation: Optional[str] = Field(default=None, max_length=255, description="Referral relation")
+    refer_by_name: Optional[str] = Field(default=None, max_length=255, description="Referral name")
+    refer_by_mobile: Optional[str] = Field(default=None, max_length=255, description="Referral mobile")
+    source: str = Field(default="Website Callback", max_length=64, description="Lead source")
+    assigned_to: Optional[str] = Field(default=None, max_length=32, description="Assignee employee_id")
+
+    @field_validator("name")
+    @classmethod
+    def validate_name_non_blank(cls, v: str) -> str:
+        return validate_non_blank_input(v, "Name")
+
+    @field_validator("address")
+    @classmethod
+    def validate_address_non_blank(cls, v: str) -> str:
+        return validate_non_blank_input(v, "Address")
+
+    @field_validator("mobile")
+    @classmethod
+    def validate_mobile_digits(cls, v: str) -> str:
+        return validate_mobile_input(v)
 
 
 class AssigneeResponse(BaseModel):

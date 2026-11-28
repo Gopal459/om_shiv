@@ -8,6 +8,7 @@ import app.models.leads  # noqa: F401
 import app.models.properties  # noqa: F401
 import app.models.property_master  # noqa: F401
 import app.models.inquiries  # noqa: F401
+import app.models.callbacks  # noqa: F401
 import app.models.property_verification  # noqa: F401
 import app.models.owner_requests  # noqa: F401
 import app.models.ai_agents  # noqa: F401
