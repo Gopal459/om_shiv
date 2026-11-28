@@ -30,6 +30,7 @@ from app.api.v1.endpoints import (
     franchise,
     callbacks,
     problems,
+    opportunities,
 )
 
 logger = logging.getLogger(__name__)
@@ -92,6 +93,7 @@ app.include_router(ai_admin.router)  # prefix="/v1/ai" defined in the router its
 app.include_router(franchise.router)  # prefix="/v1/franchise" defined in the router itself
 app.include_router(callbacks.router)  # prefix="/v1/callbacks" defined in the router itself
 app.include_router(problems.router)  # prefix="/v1/problems" defined in the router itself
+app.include_router(opportunities.router, prefix="/v1/opportunities", tags=["opportunities"])
 
 
 @app.get("/", status_code=status.HTTP_200_OK, tags=["root"])
