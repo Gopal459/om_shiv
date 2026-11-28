@@ -413,6 +413,13 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
   const dealPrice = Number(lead.deal_final_price || 0);
   const formattedDealPrice = dealPrice > 0 ? `₹ ${dealPrice.toLocaleString('en-IN')}` : 'Negotiable / Open';
   const leadType = (lead.lead_type || 'BUY').toUpperCase();
+  const rawCustomerType = (lead.customer_type || '').toUpperCase();
+  const customerTypeLabel =
+    rawCustomerType === 'BROKER' || lead.dealer_have === 1
+      ? 'Broker / Dealer'
+      : rawCustomerType === 'INVESTOR'
+      ? 'Investor'
+      : 'Direct User';
   const sourceName = lead.lead_source_name || lead.source || 'Website Inbound';
   const assignedDesk = lead.assigned_to ? `Staff (${lead.assigned_to})` : 'Om Shiv Central Desk';
   const supervisorRemark = lead.lead_remark || (lead.activities && lead.activities[0]?.note) || '';
@@ -557,9 +564,9 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
                   <span>{sourceName}</span>
                 </span>
 
-                {/* Dealer Status */}
+                {/* Customer Type Status */}
                 <span className="px-2.5 py-0.5 rounded-lg text-[11px] font-medium bg-white/10 border border-white/10 text-slate-300">
-                  {lead.dealer_have === 1 ? 'Channel Dealer' : 'Direct Customer'}
+                  {customerTypeLabel}
                 </span>
               </div>
             </div>
@@ -735,7 +742,7 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
               </div>
 
               <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                {lead.dealer_have === 1 ? 'Dealer' : 'Customer'}
+                {customerTypeLabel}
               </span>
             </div>
 
@@ -799,14 +806,19 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
 
               <div>
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Referral Info</span>
-                <p className="font-medium text-slate-700 dark:text-slate-300 mt-0.5">
-                  {lead.refer_by_name ? (
-                    <span>
-                      {lead.refer_by_name} {lead.refer_by_mobile ? `(${lead.refer_by_mobile})` : ''}
+                <p className="font-medium text-slate-700 dark:text-slate-300 mt-0.5 flex flex-wrap items-center gap-1.5">
+                  {lead.reference_relation_by && (
+                    <span className="px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 text-[10px] font-bold">
+                      {lead.reference_relation_by}
                     </span>
-                  ) : (
-                    <span className="text-slate-400 italic">Direct Organic Inbound</span>
                   )}
+                  {lead.refer_by_name || lead.refer_by_mobile ? (
+                    <span>
+                      {lead.refer_by_name || 'Reference'} {lead.refer_by_mobile ? `(${lead.refer_by_mobile})` : ''}
+                    </span>
+                  ) : !lead.reference_relation_by ? (
+                    <span className="text-slate-400 italic">Direct Organic Inbound</span>
+                  ) : null}
                 </p>
               </div>
             </div>

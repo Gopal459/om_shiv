@@ -1,5 +1,11 @@
-import React, { useState } from 'react';
-import { X, UserPlus, Flame, Phone, Mail, MapPin, Tag, DollarSign, FileText, CheckCircle2, AlertCircle } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { X, UserPlus, Flame, AlertCircle, UserCheck, Users } from 'lucide-react';
+
+interface AssigneeOption {
+  employee_id: string;
+  name: string;
+  role_name?: string | null;
+}
 
 interface CreateLeadModalProps {
   isOpen: boolean;
@@ -42,6 +48,12 @@ export const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
   defaultType = 'BUY',
 }) => {
   const [leadType, setLeadType] = useState<string>(defaultType.toUpperCase());
+  const [customerType, setCustomerType] = useState<'USER' | 'INVESTOR' | 'BROKER'>('USER');
+  const [assignedTo, setAssignedTo] = useState<string>('');
+  const [assignees, setAssignees] = useState<AssigneeOption[]>([]);
+  const [referenceType, setReferenceType] = useState<'' | 'Client' | 'Relative' | 'Employee'>('');
+  const [referByName, setReferByName] = useState('');
+  const [referByMobile, setReferByMobile] = useState('');
   const [contactName, setContactName] = useState('');
   const [mobile, setMobile] = useState('');
   const [email, setEmail] = useState('');
@@ -54,7 +66,51 @@ export const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  useEffect(() => {
+    setLeadType(defaultType.toUpperCase());
+  }, [defaultType]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    const loadAssignees = async () => {
+      try {
+        const token = localStorage.getItem('access_token');
+        const res = await fetch('/v1/leads/assignees', {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (res.ok && !cancelled) {
+          const rows = await res.json();
+          if (Array.isArray(rows)) setAssignees(rows);
+        }
+      } catch {
+        // Non-blocking fallback to Unassigned desk option
+      }
+    };
+    loadAssignees();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen]);
+
   if (!isOpen) return null;
+
+  const resetForm = () => {
+    setCustomerType('USER');
+    setAssignedTo('');
+    setReferenceType('');
+    setReferByName('');
+    setReferByMobile('');
+    setContactName('');
+    setMobile('');
+    setEmail('');
+    setAddress('');
+    setPropertyAddress('');
+    setLeadSourceId(1);
+    setRating(3);
+    setDealPrice('');
+    setLeadRemark('');
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,11 +140,16 @@ export const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
           email: email.trim() || null,
           address: address.trim() || null,
           lead_type: leadType,
+          customer_type: customerType,
+          assigned_to: assignedTo || null,
           lead_source_id: leadSourceId,
           rating,
           indv_property_address: propertyAddress.trim() || null,
           lead_remark: leadRemark.trim() || null,
           deal_final_price: dealPrice ? parseFloat(dealPrice) : 0.0,
+          reference_type: referenceType || null,
+          refer_by_name: referByName.trim() || null,
+          refer_by_mobile: referByMobile.trim() || null,
         }),
       });
 
@@ -97,6 +158,7 @@ export const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
         throw new Error(data.detail || 'Failed to create lead');
       }
 
+      resetForm();
       onCreated();
       onClose();
     } catch (err: any) {
@@ -161,6 +223,51 @@ export const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
                   {type === 'BUY' ? 'Buy Property' : type === 'RENT' ? 'Rent Property' : 'Paying Guest (PG)'}
                 </button>
               ))}
+            </div>
+          </div>
+
+          {/* Customer Type & Assign Staff */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                Customer Type *
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {(['USER', 'INVESTOR', 'BROKER'] as const).map((ctype) => (
+                  <button
+                    key={ctype}
+                    type="button"
+                    onClick={() => setCustomerType(ctype)}
+                    className={`py-2.5 rounded-xl text-xs font-bold transition-all border ${
+                      customerType === ctype
+                        ? 'bg-[#291BB0] text-white border-[#291BB0] shadow-sm'
+                        : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    {ctype === 'USER' ? 'User' : ctype === 'INVESTOR' ? 'Investor' : 'Broker'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="flex items-center gap-1.5 text-xs font-extrabold text-slate-900 dark:text-white mb-1.5">
+                <UserCheck className="w-3.5 h-3.5 text-[#291BB0] dark:text-indigo-400" />
+                <span>Assign Staff</span>
+                <span className="text-[10px] font-semibold text-slate-400">(Optional)</span>
+              </label>
+              <select
+                value={assignedTo}
+                onChange={(e) => setAssignedTo(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl border-2 border-[#291BB0]/30 dark:border-indigo-500/40 bg-indigo-50/40 dark:bg-slate-800 text-xs font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#291BB0]/30 focus:border-[#291BB0]"
+              >
+                <option value="">Om Shiv Central Desk (Unassigned)</option>
+                {assignees.map((emp) => (
+                  <option key={emp.employee_id} value={emp.employee_id}>
+                    {emp.name} ({emp.role_name || emp.employee_id})
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
@@ -314,6 +421,57 @@ export const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
                 placeholder="e.g. 4500000"
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
               />
+            </div>
+          </div>
+
+          {/* Reference Details (Optional) */}
+          <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/80 space-y-2.5">
+            <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+              <Users className="w-3.5 h-3.5 text-[#291BB0] dark:text-indigo-400" />
+              <span>Reference Details (Optional)</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
+                  Reference Type
+                </label>
+                <select
+                  value={referenceType}
+                  onChange={(e) =>
+                    setReferenceType(e.target.value as '' | 'Client' | 'Relative' | 'Employee')
+                  }
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#291BB0]/20 focus:border-[#291BB0]"
+                >
+                  <option value="">Select Type...</option>
+                  <option value="Client">Client</option>
+                  <option value="Relative">Relative</option>
+                  <option value="Employee">Employee</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
+                  Reference Name
+                </label>
+                <input
+                  type="text"
+                  value={referByName}
+                  onChange={(e) => setReferByName(e.target.value)}
+                  placeholder="e.g. Suresh Sharma"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#291BB0]/20 focus:border-[#291BB0]"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
+                  Reference Mobile
+                </label>
+                <input
+                  type="tel"
+                  value={referByMobile}
+                  onChange={(e) => setReferByMobile(e.target.value)}
+                  placeholder="e.g. 9829012345"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#291BB0]/20 focus:border-[#291BB0]"
+                />
+              </div>
             </div>
           </div>
 
