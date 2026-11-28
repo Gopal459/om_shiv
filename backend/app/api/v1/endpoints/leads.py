@@ -4,7 +4,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Dict, Any, Tuple
 from fastapi import APIRouter, Depends, Query, Request, status, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy import select, and_, or_, desc, asc
@@ -115,12 +115,14 @@ class LeadDetailResponse(BaseModel):
     indv_property_address: Optional[str] = None
     deal_final_price: Optional[float] = 0.0
     dealer_have: Optional[int] = 0
+    customer_type: Optional[str] = "USER"
     lead_status_num: Optional[int] = 0
     stage_num: Optional[int] = 1
     rating_num: Optional[int] = 3
     lead_source_id: Optional[int] = 1
     lead_source_name: Optional[str] = None
     alternate_contact_mobile: Optional[str] = None
+    reference_relation_by: Optional[str] = None
     refer_by_name: Optional[str] = None
     refer_by_mobile: Optional[str] = None
     assign_franch_id: Optional[int] = 0
@@ -154,17 +156,61 @@ async def find_lead_by_id_or_lead_id(db: AsyncSession, lead_identifier: str) -> 
     return await lead_repo.get_by_id_or_lead_id(db, lead_identifier)
 
 
+ALLOWED_CUSTOMER_TYPES = {"USER", "INVESTOR", "BROKER"}
+ALLOWED_REFERENCE_TYPES = {
+    "CLIENT": "Client",
+    "RELATIVE": "Relative",
+    "EMPLOYEE": "Employee",
+}
+
+
 class LeadCreateManual(BaseModel):
     contact_name: str = Field(..., description="Lead contact name")
     mobile: str = Field(..., description="Mobile number")
     email: Optional[str] = None
     address: Optional[str] = None
     lead_type: Optional[str] = "BUY"
+    customer_type: str = Field(default="USER", description="USER, INVESTOR, or BROKER")
+    assigned_to: Optional[str] = Field(default=None, description="Optional Employee ID to assign lead")
     lead_source_id: Optional[int] = 1
     rating: Optional[int] = 3
     indv_property_address: Optional[str] = None
     lead_remark: Optional[str] = None
     deal_final_price: Optional[float] = 0.0
+    reference_type: Optional[str] = Field(default=None, description="Client, Relative, or Employee")
+    refer_by_name: Optional[str] = None
+    refer_by_mobile: Optional[str] = None
+
+    @field_validator("customer_type", mode="before")
+    @classmethod
+    def validate_customer_type(cls, v: Any) -> str:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return "USER"
+        norm = str(v).strip().upper()
+        if norm not in ALLOWED_CUSTOMER_TYPES:
+            raise ValueError("customer_type must be USER, INVESTOR, or BROKER")
+        return norm
+
+    @field_validator("reference_type", mode="before")
+    @classmethod
+    def validate_reference_type(cls, v: Any) -> Optional[str]:
+        if v is None:
+            return None
+        s = str(v).strip()
+        if not s:
+            return None
+        norm = ALLOWED_REFERENCE_TYPES.get(s.upper())
+        if not norm:
+            raise ValueError("reference_type must be Client, Relative, or Employee")
+        return norm
+
+    @field_validator("assigned_to", "refer_by_name", "refer_by_mobile", mode="before")
+    @classmethod
+    def clean_optional_strings(cls, v: Any) -> Optional[str]:
+        if v is None:
+            return None
+        s = str(v).strip()
+        return s or None
 
 
 class LeadImportBulk(BaseModel):
@@ -290,9 +336,26 @@ async def create_manual_lead(
     db: AsyncSession = Depends(get_db),
     actor_id: str = Depends(get_actor_from_token),
 ) -> Dict[str, Any]:
+    assigned_emp: Optional[Employee] = None
+    if payload.assigned_to:
+        emp_res = await db.execute(
+            select(Employee).where(
+                Employee.employee_id == payload.assigned_to,
+                Employee.is_active.is_(True),
+                Employee.deleted_at.is_(None),
+            )
+        )
+        assigned_emp = emp_res.scalar_one_or_none()
+        if not assigned_emp:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Assignee '{payload.assigned_to}' is invalid or inactive",
+            )
+
     norm_mobile = normalize_phone(payload.mobile)
     lead_uid = await generate_lead_id(db)
     lead_type = (payload.lead_type or "BUY").upper()
+    now = datetime.now(timezone.utc)
 
     tbl_lead = TblLead(
         lead_unique_id=lead_uid,
@@ -301,11 +364,18 @@ async def create_manual_lead(
         email=payload.email,
         address=payload.address,
         lead_table_name=lead_type,
+        customer_type=payload.customer_type,
+        dealer_have=1 if payload.customer_type == "BROKER" else 2,
+        assign_franchstaff_id=assigned_emp.id if assigned_emp else 0,
+        assignfranchiseestaff_date=now if assigned_emp else None,
         lead_source_id=payload.lead_source_id or 1,
         rating=payload.rating or 3,
         indv_property_address=payload.indv_property_address,
         lead_remark=payload.lead_remark,
         deal_final_price=payload.deal_final_price or 0.0,
+        reference_relation_by=payload.reference_type,
+        refer_by_name=payload.refer_by_name,
+        refer_by_mobile=payload.refer_by_mobile,
         lead_status=0,
         stage=1,
         lead_open=1,
@@ -320,6 +390,8 @@ async def create_manual_lead(
         mobile=norm_mobile,
         email=payload.email,
         lead_type=lead_type,
+        customer_type=payload.customer_type,
+        assigned_to=assigned_emp.employee_id if assigned_emp else None,
         source=f"SOURCE_{payload.lead_source_id or 1}",
         stage="NEW",
         temperature="HOT" if payload.rating == 1 else "WARM" if payload.rating == 2 else "COLD",
@@ -336,6 +408,11 @@ async def create_manual_lead(
         "contact_name": tbl_lead.contact_name,
         "mobile": tbl_lead.mobile,
         "lead_type": tbl_lead.lead_table_name,
+        "customer_type": tbl_lead.customer_type,
+        "assigned_to": lead_entity.assigned_to,
+        "reference_relation_by": tbl_lead.reference_relation_by,
+        "refer_by_name": tbl_lead.refer_by_name,
+        "refer_by_mobile": tbl_lead.refer_by_mobile,
         "lead_status": tbl_lead.lead_status,
         "stage": tbl_lead.stage,
         "rating": tbl_lead.rating,
@@ -840,12 +917,18 @@ def build_lead_detail_dict(lead: Optional[Lead], tbl_lead: Optional[TblLead]) ->
         "indv_property_address": tbl_lead.indv_property_address if (tbl_lead and tbl_lead.indv_property_address) else (lead.preferred_locality if lead else None),
         "deal_final_price": float(tbl_lead.deal_final_price) if (tbl_lead and tbl_lead.deal_final_price) else 0.0,
         "dealer_have": tbl_lead.dealer_have if tbl_lead else 0,
+        "customer_type": (
+            (lead.customer_type if (lead and getattr(lead, "customer_type", None)) else None)
+            or (tbl_lead.customer_type if (tbl_lead and getattr(tbl_lead, "customer_type", None)) else None)
+            or ("BROKER" if (tbl_lead and tbl_lead.dealer_have == 1) else "USER")
+        ),
         "lead_status_num": tbl_lead.lead_status if tbl_lead else 0,
         "stage_num": stage_num,
         "rating_num": rating_num,
         "lead_source_id": source_id,
         "lead_source_name": source_name,
         "alternate_contact_mobile": tbl_lead.alternate_contact_mobile if tbl_lead else None,
+        "reference_relation_by": tbl_lead.reference_relation_by if tbl_lead else None,
         "refer_by_name": tbl_lead.refer_by_name if tbl_lead else None,
         "refer_by_mobile": tbl_lead.refer_by_mobile if tbl_lead else None,
         "assign_franch_id": tbl_lead.assign_franch_id if tbl_lead else 0,
@@ -856,6 +939,37 @@ def build_lead_detail_dict(lead: Optional[Lead], tbl_lead: Optional[TblLead]) ->
         "opportunity_converted": tbl_lead.opportunity_converted if tbl_lead else 0,
         "opportunity_id": tbl_lead.opportunity_id if tbl_lead else 0,
     }
+
+
+@router.get(
+    "/assignees",
+    status_code=status.HTTP_200_OK,
+    summary="List active staff available for lead assignment",
+)
+async def list_lead_assignees(
+    db: AsyncSession = Depends(get_db),
+    actor_id: str = Depends(get_actor_from_token),
+) -> List[Dict[str, Any]]:
+    stmt = (
+        select(Employee)
+        .options(selectinload(Employee.role))
+        .where(
+            Employee.is_active.is_(True),
+            Employee.deleted_at.is_(None),
+        )
+        .order_by(Employee.name.asc())
+    )
+    employees = list((await db.execute(stmt)).scalars().all())
+    return [
+        {
+            "employee_id": emp.employee_id,
+            "name": emp.name,
+            "role_name": emp.role.name if emp.role else None,
+            "role_code": emp.role.code if emp.role else None,
+            "is_active": emp.is_active,
+        }
+        for emp in employees
+    ]
 
 
 @router.get(

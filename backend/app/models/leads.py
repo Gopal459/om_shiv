@@ -34,6 +34,7 @@ class Lead(Base):
     mobile: Mapped[str] = mapped_column(String(15), index=True, nullable=False)  # Normalized 91XXXXXXXXXX
     email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     lead_type: Mapped[str] = mapped_column(String(32), default="BUYER", nullable=False)  # BUYER, SELLER, TENANT, OWNER
+    customer_type: Mapped[str] = mapped_column(String(32), default="USER", nullable=False)  # USER, INVESTOR, BROKER
     source: Mapped[str] = mapped_column(String(64), default="MANUAL", nullable=False)
 
     related_listing_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
@@ -163,6 +164,7 @@ class TblLead(Base):
     assignfranchiseestaff_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     property_id: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     lead_table_name: Mapped[Optional[str]] = mapped_column(String(264), default="BUY", nullable=True)
+    customer_type: Mapped[str] = mapped_column(String(32), default="USER", nullable=False)  # USER, INVESTOR, BROKER
     dealer_have: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     lead_status_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     lead_source_id: Mapped[Optional[int]] = mapped_column(Integer, default=1, nullable=True)

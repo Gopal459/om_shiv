@@ -332,3 +332,149 @@ async def test_convert_lead_to_property_rollback_on_midflight_error(auth_client_
     assert prop_count == 0
 
 
+@pytest.mark.asyncio
+async def test_lead_assignees_endpoint_and_route_ordering(auth_client_md: AsyncClient, db_session):
+    from app.models.identity import Employee, Role, Department
+    from sqlalchemy import select
+
+    dept_id = (await db_session.execute(select(Department.id))).scalars().first()
+    role_id = (await db_session.execute(select(Role.id))).scalars().first()
+
+    inactive_emp = Employee(
+        employee_id="EMP-9999",
+        name="Inactive Staff",
+        email="inactive@omshiv.com",
+        mobile="9829099999",
+        department_id=dept_id,
+        role_id=role_id,
+        is_active=False,
+    )
+    db_session.add(inactive_emp)
+    await db_session.commit()
+
+    resp = await auth_client_md.get("/v1/leads/assignees")
+    assert resp.status_code == 200
+    items = resp.json()
+    assert isinstance(items, list)
+    ids = [i["employee_id"] for i in items]
+    assert "EMP-0001" in ids
+    assert "EMP-9999" not in ids
+
+
+@pytest.mark.asyncio
+async def test_manual_lead_create_with_staff_customer_type_and_reference(auth_client_md: AsyncClient, db_session):
+    from sqlalchemy import select
+    from app.models.leads import Lead, TblLead
+
+    # 1. Broker lead assigned to EMP-0001 with Relative reference (and whitespace/hyphenated mobile)
+    resp = await auth_client_md.post("/v1/leads/create", json={
+        "contact_name": "Ramesh Broker",
+        "mobile": "9829012345",
+        "lead_type": "BUY",
+        "lead_source_id": 12,
+        "rating": 1,
+        "assigned_to": "EMP-0001",
+        "customer_type": "broker",
+        "reference_type": "relative",
+        "refer_by_name": "  Suresh Sharma  ",
+        "refer_by_mobile": "+91 98290-55555",
+    })
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["customer_type"] == "BROKER"
+    assert data["assigned_to"] == "EMP-0001"
+    assert data["reference_relation_by"] == "Relative"
+    assert data["refer_by_name"] == "Suresh Sharma"
+    assert data["refer_by_mobile"] == "+91 98290-55555"
+
+    uid = data["lead_unique_id"]
+    lead_row = (await db_session.execute(select(Lead).where(Lead.lead_id == uid))).scalar_one()
+    tbl_row = (await db_session.execute(select(TblLead).where(TblLead.lead_unique_id == uid))).scalar_one()
+    assert lead_row.assigned_to == "EMP-0001"
+    assert lead_row.customer_type == "BROKER"
+    assert tbl_row.customer_type == "BROKER"
+    assert tbl_row.dealer_have == 1
+    assert tbl_row.assign_franchstaff_id > 0
+    assert tbl_row.reference_relation_by == "Relative"
+    assert tbl_row.refer_by_name == "Suresh Sharma"
+
+    # Detail endpoint exposes customer_type + reference_relation_by
+    detail = (await auth_client_md.get(f"/v1/leads/{uid}")).json()
+    assert detail["customer_type"] == "BROKER"
+    assert detail["reference_relation_by"] == "Relative"
+    assert detail["refer_by_name"] == "Suresh Sharma"
+
+    # 2. Optional empty assigned_to creates unassigned Investor lead cleanly
+    resp2 = await auth_client_md.post("/v1/leads/create", json={
+        "contact_name": "Anita Investor",
+        "mobile": "9829022334",
+        "lead_type": "BUY",
+        "assigned_to": "",
+        "customer_type": "INVESTOR",
+        "reference_type": "  ",
+        "refer_by_name": "   ",
+    })
+    assert resp2.status_code == 201
+    data2 = resp2.json()
+    assert data2["assigned_to"] is None
+    assert data2["customer_type"] == "INVESTOR"
+    assert data2["reference_relation_by"] is None
+    uid2 = data2["lead_unique_id"]
+    tbl_row2 = (await db_session.execute(select(TblLead).where(TblLead.lead_unique_id == uid2))).scalar_one()
+    assert tbl_row2.dealer_have == 2
+    assert tbl_row2.assign_franchstaff_id == 0
+
+
+@pytest.mark.asyncio
+async def test_manual_lead_create_validation_and_invalid_assignee(auth_client_md: AsyncClient, db_session):
+    from sqlalchemy import select, func
+    from app.models.leads import Lead, TblLead
+    from app.models.identity import Employee, Role, Department
+
+    dept_id = (await db_session.execute(select(Department.id))).scalars().first()
+    role_id = (await db_session.execute(select(Role.id))).scalars().first()
+    db_session.add(Employee(
+        employee_id="EMP-8888",
+        name="Inactive Assignee",
+        email="inactive8888@omshiv.com",
+        mobile="9829088888",
+        department_id=dept_id,
+        role_id=role_id,
+        is_active=False,
+    ))
+    await db_session.commit()
+
+    # Unknown assignee returns 400 and inserts zero rows
+    bad_assign = await auth_client_md.post("/v1/leads/create", json={
+        "contact_name": "Bad Assignee Lead",
+        "mobile": "9829088776",
+        "assigned_to": "EMP-DOES-NOT-EXIST",
+    })
+    assert bad_assign.status_code == 400
+    inactive_assign = await auth_client_md.post("/v1/leads/create", json={
+        "contact_name": "Inactive Assignee Lead",
+        "mobile": "9829088779",
+        "assigned_to": "EMP-8888",
+    })
+    assert inactive_assign.status_code == 400
+    assert (await db_session.execute(select(func.count()).select_from(Lead))).scalar_one() == 0
+    assert (await db_session.execute(select(func.count()).select_from(TblLead))).scalar_one() == 0
+
+    # Invalid customer_type returns 422
+    bad_cust = await auth_client_md.post("/v1/leads/create", json={
+        "contact_name": "Bad Cust Type",
+        "mobile": "9829088777",
+        "customer_type": "ALIEN",
+    })
+    assert bad_cust.status_code == 422
+
+    # Invalid reference_type returns 422
+    bad_ref = await auth_client_md.post("/v1/leads/create", json={
+        "contact_name": "Bad Ref Type",
+        "mobile": "9829088778",
+        "reference_type": "STRANGER",
+    })
+    assert bad_ref.status_code == 422
+
+
+
