@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.v1.endpoints.callbacks import get_current_employee
 from app.core.database import get_db
 from app.models.identity import Employee
+from app.models.opportunities import OPPORTUNITY_STATUSES
 from app.services.callback_service import validate_mobile_input, validate_non_blank_input
 from app.services.opportunity_service import (
     ALLOWED_CUSTOMER_TYPES,
@@ -205,6 +206,53 @@ class OpportunityUpdateRequest(BaseModel):
         return self
 
 
+class OpportunityRescheduleRequest(BaseModel):
+    followup_datetime: datetime
+    remark: str = Field(...)
+    current_update: Optional[str] = Field(default=None, max_length=120)
+
+    @field_validator("remark")
+    @classmethod
+    def validate_remark(cls, v: str) -> str:
+        return validate_non_blank_input(v, "Remark")
+
+
+class OpportunityStatusChangeRequest(BaseModel):
+    lead_status: int
+    remark: Optional[str] = Field(default=None)
+    disqualified_reason: Optional[int] = Field(default=None)
+    deal_date: Optional[datetime] = Field(default=None)
+    registry_date: Optional[datetime] = Field(default=None)
+    is_propira_property: bool = Field(default=False)
+    matched_property_id: Optional[int] = Field(default=None)
+    deal_property_category: Optional[int] = Field(default=None)
+    deal_property_subcategory: Optional[int] = Field(default=None)
+    deal_property_address: Optional[str] = Field(default=None)
+    deal_location_lat: Optional[str] = Field(default=None, max_length=64)
+    deal_location_long: Optional[str] = Field(default=None, max_length=64)
+
+    @field_validator("lead_status")
+    @classmethod
+    def validate_lead_status(cls, v: int) -> int:
+        if v not in OPPORTUNITY_STATUSES:
+            raise ValueError(f"lead_status must be one of {sorted(OPPORTUNITY_STATUSES)}")
+        return v
+
+
+class OpportunityTransferRequest(BaseModel):
+    assigned_to: Optional[str] = Field(default=None, max_length=32)
+    assign_franch_id: Optional[int] = Field(default=0, ge=0)
+    remark: Optional[str] = Field(default=None)
+
+
+class OpportunityReopenRequest(BaseModel):
+    remark: Optional[str] = Field(default=None)
+
+
+class OpportunityCallLogRequest(BaseModel):
+    remark: Optional[str] = Field(default=None)
+
+
 # --- Static endpoints MUST precede /{opportunity_id} ---
 
 
@@ -346,3 +394,113 @@ async def get_related_properties(
     actor: Employee = Depends(get_current_employee),
 ) -> Dict[str, Any]:
     return await opportunity_service.get_related_properties(db, actor, opportunity_id)
+
+
+@router.post(
+    "/{opportunity_id}/reschedule",
+    status_code=status.HTTP_200_OK,
+    summary="Reschedule opportunity follow-up datetime with mandatory remark",
+)
+async def reschedule_opportunity(
+    opportunity_id: int,
+    payload: OpportunityRescheduleRequest,
+    db: AsyncSession = Depends(get_db),
+    actor: Employee = Depends(get_current_employee),
+) -> Dict[str, Any]:
+    return await opportunity_service.reschedule_opportunity(
+        db,
+        actor,
+        opportunity_id,
+        followup_datetime=payload.followup_datetime,
+        remark=payload.remark,
+        current_update=payload.current_update,
+    )
+
+
+@router.post(
+    "/{opportunity_id}/status",
+    status_code=status.HTTP_200_OK,
+    summary="Transition opportunity lifecycle status (In Progress, Disqualified, Deal Scheduled, Closed)",
+)
+async def change_opportunity_status(
+    opportunity_id: int,
+    payload: OpportunityStatusChangeRequest,
+    db: AsyncSession = Depends(get_db),
+    actor: Employee = Depends(get_current_employee),
+) -> Dict[str, Any]:
+    return await opportunity_service.change_opportunity_status(
+        db,
+        actor,
+        opportunity_id,
+        lead_status=payload.lead_status,
+        remark=payload.remark,
+        disqualified_reason=payload.disqualified_reason,
+        deal_date=payload.deal_date,
+        registry_date=payload.registry_date,
+        is_propira_property=payload.is_propira_property,
+        matched_property_id=payload.matched_property_id,
+        deal_property_category=payload.deal_property_category,
+        deal_property_subcategory=payload.deal_property_subcategory,
+        deal_property_address=payload.deal_property_address,
+        deal_location_lat=payload.deal_location_lat,
+        deal_location_long=payload.deal_location_long,
+    )
+
+
+@router.post(
+    "/{opportunity_id}/transfer",
+    status_code=status.HTTP_200_OK,
+    summary="Transfer an open opportunity to another active employee and/or franchise outlet",
+)
+async def transfer_opportunity(
+    opportunity_id: int,
+    payload: OpportunityTransferRequest,
+    db: AsyncSession = Depends(get_db),
+    actor: Employee = Depends(get_current_employee),
+) -> Dict[str, Any]:
+    return await opportunity_service.transfer_opportunity(
+        db,
+        actor,
+        opportunity_id,
+        assigned_to=payload.assigned_to,
+        assign_franch_id=payload.assign_franch_id,
+        remark=payload.remark,
+    )
+
+
+@router.post(
+    "/{opportunity_id}/reopen",
+    status_code=status.HTTP_200_OK,
+    summary="Reopen a Disqualified opportunity back to In Progress",
+)
+async def reopen_opportunity(
+    opportunity_id: int,
+    payload: Optional[OpportunityReopenRequest] = None,
+    db: AsyncSession = Depends(get_db),
+    actor: Employee = Depends(get_current_employee),
+) -> Dict[str, Any]:
+    return await opportunity_service.reopen_opportunity(
+        db,
+        actor,
+        opportunity_id,
+        remark=payload.remark if payload else None,
+    )
+
+
+@router.post(
+    "/{opportunity_id}/call-log",
+    status_code=status.HTTP_200_OK,
+    summary="Log a connected call on an opportunity",
+)
+async def log_opportunity_call(
+    opportunity_id: int,
+    payload: Optional[OpportunityCallLogRequest] = None,
+    db: AsyncSession = Depends(get_db),
+    actor: Employee = Depends(get_current_employee),
+) -> Dict[str, Any]:
+    return await opportunity_service.log_opportunity_call(
+        db,
+        actor,
+        opportunity_id,
+        remark=payload.remark if payload else None,
+    )

@@ -1115,3 +1115,816 @@ async def test_list_and_export_avoid_n_plus_one_cp_and_property_queries(
         assert len([s for s in recorded_sql if "from tbl_property" in s]) == 0
     finally:
         event.remove(sync_engine, "before_cursor_execute", _capture_sql)
+
+
+# ---------------------------------------------------------------------------
+# Task 3 Deal Pipeline, Reschedule, Transfer, Reopen & Call Log Tests (TDD)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_opportunity_status_direct_close_blocked_and_deal_registry_validation(
+    auth_client_md,
+):
+    now_utc = datetime.now(timezone.utc)
+
+    # 1. Create a Buy/Sell (property_type=2) opportunity
+    buy_resp = await auth_client_md.post(
+        "/v1/opportunities",
+        json={
+            "contact_name": "Direct Close Guard Buyer",
+            "mobile": "9829044401",
+            "property_type": 2,
+            "looking_type": 1,
+            "looking_subcat_type": 1,
+            "budget_from": 4000000,
+            "budget_to": 6000000,
+        },
+    )
+    assert buy_resp.status_code == 201
+    buy_id = buy_resp.json()["opportunity_id"]
+
+    # Direct close (status=5) without Option 1 deal_date must fail with exact HTTP 400 detail
+    direct_close = await auth_client_md.post(
+        f"/v1/opportunities/{buy_id}/status",
+        json={"lead_status": 5, "remark": "Try direct close"},
+    )
+    assert direct_close.status_code == 400
+    assert (
+        direct_close.json()["detail"]
+        == "You cannot close this lead because the client has not yet Buy any property."
+    )
+
+    # Confirm opportunity was NOT locked
+    check_open = await auth_client_md.get(f"/v1/opportunities/{buy_id}")
+    assert check_open.status_code == 200
+    assert check_open.json()["lead_status"] == 1
+    assert check_open.json()["lead_open"] == 1
+
+    # Disqualified without valid reason (1..7) -> 422
+    bad_disq_missing = await auth_client_md.post(
+        f"/v1/opportunities/{buy_id}/status",
+        json={"lead_status": 2, "remark": "No reason"},
+    )
+    assert bad_disq_missing.status_code == 422
+    bad_disq_range = await auth_client_md.post(
+        f"/v1/opportunities/{buy_id}/status",
+        json={"lead_status": 2, "disqualified_reason": 9, "remark": "Invalid reason"},
+    )
+    assert bad_disq_range.status_code == 422
+
+    # Buy Option 1 validations: missing deal_date, future deal_date, missing registry_date, past registry_date -> 422
+    no_deal_dt = await auth_client_md.post(
+        f"/v1/opportunities/{buy_id}/status",
+        json={
+            "lead_status": 4,
+            "registry_date": (now_utc + timedelta(days=5)).isoformat(),
+        },
+    )
+    assert no_deal_dt.status_code == 422
+
+    future_deal_dt = await auth_client_md.post(
+        f"/v1/opportunities/{buy_id}/status",
+        json={
+            "lead_status": 4,
+            "deal_date": (now_utc + timedelta(hours=2)).isoformat(),
+            "registry_date": (now_utc + timedelta(days=5)).isoformat(),
+        },
+    )
+    assert future_deal_dt.status_code == 422
+
+    no_reg_dt = await auth_client_md.post(
+        f"/v1/opportunities/{buy_id}/status",
+        json={
+            "lead_status": 4,
+            "deal_date": (now_utc - timedelta(hours=2)).isoformat(),
+        },
+    )
+    assert no_reg_dt.status_code == 422
+
+    past_reg_dt = await auth_client_md.post(
+        f"/v1/opportunities/{buy_id}/status",
+        json={
+            "lead_status": 4,
+            "deal_date": (now_utc - timedelta(days=2)).isoformat(),
+            "registry_date": (now_utc - timedelta(hours=1)).isoformat(),
+        },
+    )
+    assert past_reg_dt.status_code == 422
+
+    # Valid Buy Option 1 with External property & registry_date +5d -> auto followup ~ +3d
+    deal_dt = now_utc - timedelta(days=1)
+    reg_dt = now_utc + timedelta(days=5)
+    ok_buy_opt1 = await auth_client_md.post(
+        f"/v1/opportunities/{buy_id}/status",
+        json={
+            "lead_status": 4,
+            "deal_date": deal_dt.isoformat(),
+            "registry_date": reg_dt.isoformat(),
+            "is_propira_property": False,
+            "deal_property_category": 1,
+            "deal_property_subcategory": 1,
+            "deal_property_address": "Plot 12, Jagatpura",
+            "deal_location_lat": "26.8200",
+            "deal_location_long": "75.8600",
+            "remark": "Token paid on external flat",
+        },
+    )
+    assert ok_buy_opt1.status_code == 200
+    buy_data = ok_buy_opt1.json()
+    assert buy_data["lead_status"] == 4
+    assert buy_data["lead_open"] == 1
+    assert buy_data["is_propira_property"] is False
+    assert buy_data["matched_property_id"] is None
+    assert buy_data["deal_property_address"] == "Plot 12, Jagatpura"
+    assert buy_data["activities"][0]["action_type"] == "DEAL_SCHEDULED"
+
+    auto_fu = datetime.fromisoformat(buy_data["followup_datetime"])
+    expected_fu = reg_dt - timedelta(days=2)
+    assert abs((auto_fu - expected_fu).total_seconds()) < 10
+    assert (
+        buy_data["reschedules"][0]["remark"]
+        == "Auto-scheduled pre-registry follow-up (registry - 2 days)"
+    )
+
+    dash = await auth_client_md.get("/v1/opportunities/dashboard")
+    assert dash.status_code == 200
+    assert dash.json()["chart_breakdown"]["qualified_other"] == 1
+
+    # Clamped auto-followup when registry_date is only 6 hours in the future -> >= now + 1h
+    near_reg = now_utc + timedelta(hours=6)
+    clamped_resp = await auth_client_md.post(
+        f"/v1/opportunities/{buy_id}/status",
+        json={
+            "lead_status": 4,
+            "deal_date": deal_dt.isoformat(),
+            "registry_date": near_reg.isoformat(),
+            "is_propira_property": False,
+        },
+    )
+    assert clamped_resp.status_code == 200
+    clamped_fu = datetime.fromisoformat(clamped_resp.json()["followup_datetime"])
+    assert clamped_fu >= now_utc + timedelta(minutes=59)
+    assert clamped_fu <= datetime.now(timezone.utc) + timedelta(hours=1, minutes=2)
+
+    # 2. Rent (property_type=1): registry_date (Agreement Date) is optional
+    rent_resp = await auth_client_md.post(
+        "/v1/opportunities",
+        json={
+            "contact_name": "Rent Tenant",
+            "mobile": "9829044402",
+            "property_type": 1,
+        },
+    )
+    assert rent_resp.status_code == 201
+    rent_id = rent_resp.json()["opportunity_id"]
+
+    rent_opt1 = await auth_client_md.post(
+        f"/v1/opportunities/{rent_id}/status",
+        json={
+            "lead_status": 4,
+            "deal_date": (now_utc - timedelta(hours=3)).isoformat(),
+            "is_propira_property": False,
+            "deal_property_address": "Flat 4B, Malviya Nagar",
+        },
+    )
+    assert rent_opt1.status_code == 200
+    assert rent_opt1.json()["lead_status"] == 4
+    assert rent_opt1.json()["registry_date"] is None
+    assert rent_opt1.json()["reschedules"] == []
+
+    # 3. PG (property_type=3): Agreement Date < deal_date rejected; future Agreement Date schedules auto-followup
+    pg_resp = await auth_client_md.post(
+        "/v1/opportunities",
+        json={
+            "contact_name": "PG Student",
+            "mobile": "9829044403",
+            "property_type": 3,
+        },
+    )
+    assert pg_resp.status_code == 201
+    pg_id = pg_resp.json()["opportunity_id"]
+
+    pg_deal = now_utc - timedelta(days=1)
+    bad_pg = await auth_client_md.post(
+        f"/v1/opportunities/{pg_id}/status",
+        json={
+            "lead_status": 4,
+            "deal_date": pg_deal.isoformat(),
+            "registry_date": (pg_deal - timedelta(days=1)).isoformat(),
+        },
+    )
+    assert bad_pg.status_code == 422
+
+    pg_future_agr = now_utc + timedelta(days=4)
+    ok_pg = await auth_client_md.post(
+        f"/v1/opportunities/{pg_id}/status",
+        json={
+            "lead_status": 4,
+            "deal_date": pg_deal.isoformat(),
+            "registry_date": pg_future_agr.isoformat(),
+        },
+    )
+    assert ok_pg.status_code == 200
+    pg_fu = datetime.fromisoformat(ok_pg.json()["followup_datetime"])
+    assert abs((pg_fu - (pg_future_agr - timedelta(days=2))).total_seconds()) < 10
+
+
+@pytest.mark.asyncio
+async def test_opportunity_propira_sold_lock_switch_and_cancellation_rollback(
+    auth_client_md, db_session
+):
+    from app.models.properties import TblProperty
+
+    now_utc = datetime.now(timezone.utc)
+    p1 = TblProperty(
+        propertyid_no="PR-DEAL-1",
+        property_type=2,
+        looking_type=1,
+        looking_subcat_type=1,
+        expected_price=5000000,
+        location="Vaishali Nagar",
+        is_active=1,
+        verified_status=1,
+        sold_status=0,
+        recyclebin_status=0,
+    )
+    p2 = TblProperty(
+        propertyid_no="PR-DEAL-2",
+        property_type=2,
+        looking_type=1,
+        looking_subcat_type=1,
+        expected_price=5500000,
+        location="Vaishali Nagar",
+        is_active=1,
+        verified_status=1,
+        sold_status=0,
+        recyclebin_status=0,
+    )
+    p_sold = TblProperty(
+        propertyid_no="PR-ALREADY-SOLD",
+        property_type=2,
+        looking_type=1,
+        looking_subcat_type=1,
+        expected_price=5000000,
+        location="Vaishali Nagar",
+        is_active=1,
+        verified_status=1,
+        sold_status=1,
+        recyclebin_status=0,
+    )
+    p_unverified = TblProperty(
+        propertyid_no="PR-NOT-VERIFIED",
+        property_type=2,
+        looking_type=1,
+        looking_subcat_type=1,
+        expected_price=5000000,
+        location="Vaishali Nagar",
+        is_active=1,
+        verified_status=0,
+        sold_status=0,
+        recyclebin_status=0,
+    )
+    p_inactive = TblProperty(
+        propertyid_no="PR-INACTIVE",
+        property_type=2,
+        looking_type=1,
+        looking_subcat_type=1,
+        expected_price=5000000,
+        location="Vaishali Nagar",
+        is_active=0,
+        verified_status=1,
+        sold_status=0,
+        recyclebin_status=0,
+    )
+    p_recycled = TblProperty(
+        propertyid_no="PR-RECYCLED",
+        property_type=2,
+        looking_type=1,
+        looking_subcat_type=1,
+        expected_price=5000000,
+        location="Vaishali Nagar",
+        is_active=1,
+        verified_status=1,
+        sold_status=0,
+        recyclebin_status=1,
+    )
+    p_expired = TblProperty(
+        propertyid_no="PR-EXPIRED",
+        property_type=2,
+        looking_type=1,
+        looking_subcat_type=1,
+        expected_price=5000000,
+        location="Vaishali Nagar",
+        is_active=1,
+        verified_status=1,
+        sold_status=0,
+        recyclebin_status=0,
+        expiarydate=now_utc - timedelta(days=1),
+    )
+    db_session.add_all([p1, p2, p_sold, p_unverified, p_inactive, p_recycled, p_expired])
+    await db_session.commit()
+    for p in (p1, p2, p_sold, p_unverified, p_inactive, p_recycled, p_expired):
+        await db_session.refresh(p)
+
+    r1 = await auth_client_md.post(
+        "/v1/opportunities",
+        json={"contact_name": "Propira Buyer 1", "mobile": "9829044501", "property_type": 2},
+    )
+    r2 = await auth_client_md.post(
+        "/v1/opportunities",
+        json={"contact_name": "Propira Buyer 2", "mobile": "9829044502", "property_type": 2},
+    )
+    opp1_id = r1.json()["opportunity_id"]
+    opp2_id = r2.json()["opportunity_id"]
+
+    deal_iso = (now_utc - timedelta(hours=4)).isoformat()
+    reg_iso = (now_utc + timedelta(days=6)).isoformat()
+
+    # Missing matched_property_id when is_propira_property=True -> 422
+    missing_pid = await auth_client_md.post(
+        f"/v1/opportunities/{opp1_id}/status",
+        json={
+            "lead_status": 4,
+            "deal_date": deal_iso,
+            "registry_date": reg_iso,
+            "is_propira_property": True,
+        },
+    )
+    assert missing_pid.status_code == 422
+
+    # Non-existent property -> 404
+    not_found_pid = await auth_client_md.post(
+        f"/v1/opportunities/{opp1_id}/status",
+        json={
+            "lead_status": 4,
+            "deal_date": deal_iso,
+            "registry_date": reg_iso,
+            "is_propira_property": True,
+            "matched_property_id": 999999,
+        },
+    )
+    assert not_found_pid.status_code == 404
+
+    # Unavailable/unverified/inactive/recycled/expired properties -> 400
+    for bad_prop in (p_sold, p_unverified, p_inactive, p_recycled, p_expired):
+        bad_res = await auth_client_md.post(
+            f"/v1/opportunities/{opp1_id}/status",
+            json={
+                "lead_status": 4,
+                "deal_date": deal_iso,
+                "registry_date": reg_iso,
+                "is_propira_property": True,
+                "matched_property_id": bad_prop.property_id,
+            },
+        )
+        assert bad_res.status_code == 400, f"Expected 400 for {bad_prop.propertyid_no}"
+
+    # Link P1 to opp1 -> P1.sold_status becomes 1
+    link_p1 = await auth_client_md.post(
+        f"/v1/opportunities/{opp1_id}/status",
+        json={
+            "lead_status": 4,
+            "deal_date": deal_iso,
+            "registry_date": reg_iso,
+            "is_propira_property": True,
+            "matched_property_id": p1.property_id,
+            "remark": "Matched PR-DEAL-1",
+        },
+    )
+    assert link_p1.status_code == 200
+    assert link_p1.json()["is_propira_property"] is True
+    assert link_p1.json()["matched_property_id"] == p1.property_id
+    assert link_p1.json()["matched_property_code"] == "PR-DEAL-1"
+
+    await db_session.refresh(p1)
+    assert p1.sold_status == 1
+
+    # P1 is now excluded from opp2's related-properties and cannot be double-sold
+    rel_while_sold = await auth_client_md.get(f"/v1/opportunities/{opp2_id}/related-properties")
+    assert rel_while_sold.status_code == 200
+    assert "PR-DEAL-1" not in [i["propertyid_no"] for i in rel_while_sold.json()["items"]]
+
+    # opp2 cannot double-sell P1 -> 400
+    double_sell = await auth_client_md.post(
+        f"/v1/opportunities/{opp2_id}/status",
+        json={
+            "lead_status": 4,
+            "deal_date": deal_iso,
+            "registry_date": reg_iso,
+            "is_propira_property": True,
+            "matched_property_id": p1.property_id,
+        },
+    )
+    assert double_sell.status_code == 400
+
+    # Switch opp1 from P1 -> P2: P1 rolls back to 0, P2 becomes 1
+    switch_p2 = await auth_client_md.post(
+        f"/v1/opportunities/{opp1_id}/status",
+        json={
+            "lead_status": 4,
+            "deal_date": deal_iso,
+            "registry_date": reg_iso,
+            "is_propira_property": True,
+            "matched_property_id": p2.property_id,
+            "remark": "Switched to PR-DEAL-2",
+        },
+    )
+    assert switch_p2.status_code == 200
+    assert switch_p2.json()["matched_property_id"] == p2.property_id
+    assert switch_p2.json()["matched_property_code"] == "PR-DEAL-2"
+
+    await db_session.refresh(p1)
+    await db_session.refresh(p2)
+    assert p1.sold_status == 0
+    assert p2.sold_status == 1
+
+    rel_after_switch = await auth_client_md.get(f"/v1/opportunities/{opp2_id}/related-properties")
+    assert rel_after_switch.status_code == 200
+    switched_codes = [i["propertyid_no"] for i in rel_after_switch.json()["items"]]
+    assert "PR-DEAL-1" in switched_codes
+    assert "PR-DEAL-2" not in switched_codes
+
+    # Switch opp1 from P2 -> External (is_propira_property=False): P2 rolls back to 0
+    switch_ext = await auth_client_md.post(
+        f"/v1/opportunities/{opp1_id}/status",
+        json={
+            "lead_status": 4,
+            "deal_date": deal_iso,
+            "registry_date": reg_iso,
+            "is_propira_property": False,
+            "deal_property_address": "External Villa",
+        },
+    )
+    assert switch_ext.status_code == 200
+    assert switch_ext.json()["is_propira_property"] is False
+    assert switch_ext.json()["matched_property_id"] is None
+    await db_session.refresh(p2)
+    assert p2.sold_status == 0
+
+    # Re-link P1 then cancel 4 -> 1 (In Progress): P1 rolls back to 0 & deal fields cleared
+    await auth_client_md.post(
+        f"/v1/opportunities/{opp1_id}/status",
+        json={
+            "lead_status": 4,
+            "deal_date": deal_iso,
+            "registry_date": reg_iso,
+            "is_propira_property": True,
+            "matched_property_id": p1.property_id,
+        },
+    )
+    await db_session.refresh(p1)
+    assert p1.sold_status == 1
+
+    cancel_to_1 = await auth_client_md.post(
+        f"/v1/opportunities/{opp1_id}/status",
+        json={"lead_status": 1, "remark": "Client postponed deal"},
+    )
+    assert cancel_to_1.status_code == 200
+    c1 = cancel_to_1.json()
+    assert c1["lead_status"] == 1
+    assert c1["lead_open"] == 1
+    assert c1["deal_date"] is None
+    assert c1["registry_date"] is None
+    assert c1["is_propira_property"] is False
+    assert c1["matched_property_id"] is None
+    assert c1["matched_property_code"] is None
+    assert c1["deal_property_address"] is None
+    await db_session.refresh(p1)
+    assert p1.sold_status == 0
+
+    # After cancellation 4 -> 1, closing directly must again be blocked
+    close_after_cancel = await auth_client_md.post(
+        f"/v1/opportunities/{opp1_id}/status",
+        json={"lead_status": 5},
+    )
+    assert close_after_cancel.status_code == 400
+    assert (
+        close_after_cancel.json()["detail"]
+        == "You cannot close this lead because the client has not yet Buy any property."
+    )
+
+    # Re-link P1 then disqualify 4 -> 2: P1 rolls back to 0, deal fields cleared, opp locked
+    await auth_client_md.post(
+        f"/v1/opportunities/{opp1_id}/status",
+        json={
+            "lead_status": 4,
+            "deal_date": deal_iso,
+            "registry_date": reg_iso,
+            "is_propira_property": True,
+            "matched_property_id": p1.property_id,
+        },
+    )
+    disq_from_4 = await auth_client_md.post(
+        f"/v1/opportunities/{opp1_id}/status",
+        json={"lead_status": 2, "disqualified_reason": 5, "remark": "Backed out"},
+    )
+    assert disq_from_4.status_code == 200
+    d4 = disq_from_4.json()
+    assert d4["lead_status"] == 2
+    assert d4["lead_open"] == 0
+    assert d4["disqualified_reason"] == 5
+    assert d4["deal_date"] is None
+    assert d4["matched_property_id"] is None
+    assert d4["activities"][0]["action_type"] == "DISQUALIFIED"
+    await db_session.refresh(p1)
+    assert p1.sold_status == 0
+
+
+@pytest.mark.asyncio
+async def test_opportunity_close_and_parent_lead_won_lost_reopen_sync(
+    auth_client_md, db_session
+):
+    from sqlalchemy import select
+    from app.models.leads import Lead, LeadActivity, TblLead
+    from app.models.properties import TblProperty
+
+    now_utc = datetime.now(timezone.utc)
+    lead = Lead(
+        lead_id="OB-2026-000501",
+        full_name="Synced Buyer",
+        mobile="919829055510",
+        stage="CONNECTED",
+    )
+    tbl_lead = TblLead(
+        lead_unique_id="OB-2026-000501",
+        contact_name="Synced Buyer",
+        mobile="919829055510",
+        lead_status=1,
+        lead_open=1,
+    )
+    prop = TblProperty(
+        propertyid_no="PR-SYNC-1",
+        property_type=2,
+        looking_type=1,
+        looking_subcat_type=1,
+        expected_price=6000000,
+        location="Mansarovar",
+        is_active=1,
+        verified_status=1,
+        sold_status=0,
+        recyclebin_status=0,
+    )
+    db_session.add_all([lead, tbl_lead, prop])
+    await db_session.commit()
+    await db_session.refresh(prop)
+
+    conv = await auth_client_md.post(
+        "/v1/opportunities",
+        json={
+            "source_lead_id": "OB-2026-000501",
+            "contact_name": "Synced Buyer",
+            "mobile": "9829055510",
+            "property_type": 2,
+        },
+    )
+    assert conv.status_code == 201
+    opp_id = conv.json()["opportunity_id"]
+
+    # 1. Disqualify -> parent Lead.stage = LOST, TblLead.lead_status = 2, lead_open = 0
+    disq = await auth_client_md.post(
+        f"/v1/opportunities/{opp_id}/status",
+        json={"lead_status": 2, "disqualified_reason": 3, "remark": "Not picking calls"},
+    )
+    assert disq.status_code == 200
+    await db_session.refresh(lead)
+    await db_session.refresh(tbl_lead)
+    assert lead.stage == "LOST"
+    assert tbl_lead.lead_status == 2
+    assert tbl_lead.lead_open == 0
+
+    # Locked Disqualified blocks /status, /reschedule, /transfer
+    for path, body in (
+        (f"/v1/opportunities/{opp_id}/status", {"lead_status": 1}),
+        (f"/v1/opportunities/{opp_id}/status", {"lead_status": 4, "deal_date": now_utc.isoformat(), "registry_date": (now_utc + timedelta(days=3)).isoformat()}),
+        (
+            f"/v1/opportunities/{opp_id}/reschedule",
+            {"followup_datetime": (now_utc + timedelta(days=1)).isoformat(), "remark": "Locked"},
+        ),
+        (f"/v1/opportunities/{opp_id}/transfer", {"assigned_to": "EMP-0001", "remark": "Locked"}),
+    ):
+        blocked = await auth_client_md.post(path, json=body)
+        assert blocked.status_code == 400, f"Expected 400 when locked on {path}"
+
+    # 2. Reopen Disqualified -> status=1, lead_open=1, Lead.stage=QUALIFIED, TblLead.lead_status=4, lead_open=1
+    reopen = await auth_client_md.post(
+        f"/v1/opportunities/{opp_id}/reopen",
+        json={"remark": "Client returned call"},
+    )
+    assert reopen.status_code == 200
+    r_data = reopen.json()
+    assert r_data["lead_status"] == 1
+    assert r_data["lead_open"] == 1
+    assert r_data["disqualified_reason"] == 0
+    assert r_data["activities"][0]["action_type"] == "REOPEN"
+
+    await db_session.refresh(lead)
+    await db_session.refresh(tbl_lead)
+    assert lead.stage == "QUALIFIED"
+    assert tbl_lead.lead_status == 4
+    assert tbl_lead.lead_open == 1
+
+    # Reopening an already-open opportunity -> 400
+    reopen_open = await auth_client_md.post(f"/v1/opportunities/{opp_id}/reopen")
+    assert reopen_open.status_code == 400
+
+    # 3. Schedule Option 1 then Close Option 2 -> Lead.stage = WON, TblLead.lead_status = 5, lead_open = 0
+    deal_dt = now_utc - timedelta(days=1)
+    reg_dt = now_utc + timedelta(days=5)
+    opt1 = await auth_client_md.post(
+        f"/v1/opportunities/{opp_id}/status",
+        json={
+            "lead_status": 4,
+            "deal_date": deal_dt.isoformat(),
+            "registry_date": reg_dt.isoformat(),
+            "is_propira_property": True,
+            "matched_property_id": prop.property_id,
+        },
+    )
+    assert opt1.status_code == 200
+
+    closed = await auth_client_md.post(
+        f"/v1/opportunities/{opp_id}/status",
+        json={"lead_status": 5, "remark": "Registry completed successfully"},
+    )
+    assert closed.status_code == 200
+    c_data = closed.json()
+    assert c_data["lead_status"] == 5
+    assert c_data["lead_open"] == 0
+    assert c_data["closed_at"] is not None
+    assert c_data["calls_status"] == 1
+    assert c_data["activities"][0]["action_type"] == "CLOSED"
+
+    await db_session.refresh(prop)
+    await db_session.refresh(lead)
+    await db_session.refresh(tbl_lead)
+    assert prop.sold_status == 1
+    assert lead.stage == "WON"
+    assert tbl_lead.lead_status == 5
+    assert tbl_lead.lead_open == 0
+    assert tbl_lead.deal_date is not None
+    assert tbl_lead.registry_date is not None
+    assert tbl_lead.dealclose_date is not None
+
+    won_act = (
+        await db_session.execute(
+            select(LeadActivity).where(
+                LeadActivity.lead_id == "OB-2026-000501",
+                LeadActivity.action_type == "OPPORTUNITY_WON",
+            )
+        )
+    ).scalar_one_or_none()
+    assert won_act is not None
+
+    # Closed opportunity is permanently terminal (blocks reopen, status, reschedule, transfer)
+    assert (await auth_client_md.post(f"/v1/opportunities/{opp_id}/reopen")).status_code == 400
+    assert (
+        await auth_client_md.post(f"/v1/opportunities/{opp_id}/status", json={"lead_status": 1})
+    ).status_code == 400
+    assert (
+        await auth_client_md.post(
+            f"/v1/opportunities/{opp_id}/reschedule",
+            json={"followup_datetime": (now_utc + timedelta(days=1)).isoformat(), "remark": "Try"},
+        )
+    ).status_code == 400
+    assert (
+        await auth_client_md.post(
+            f"/v1/opportunities/{opp_id}/transfer",
+            json={"assigned_to": "EMP-0001"},
+        )
+    ).status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_opportunity_reschedule_transfer_call_log_and_scoping(
+    test_client, auth_client_md, auth_client_sales, db_session
+):
+    from app.models.franchise import FranchiseOutlet
+
+    now_utc = datetime.now(timezone.utc)
+    emp3, emp3_headers = await _create_employee_with_token(
+        db_session,
+        employee_id="EMP-0003",
+        name="Priya Verma",
+        mobile="9829099903",
+        role_code="SALES_EXEC",
+        role_name="Sales Executive",
+    )
+    outlet = FranchiseOutlet(
+        outlet_code="OUT-JPR-01",
+        name="Jaipur Vaishali Desk",
+        city="Jaipur",
+        is_active=True,
+    )
+    db_session.add(outlet)
+    await db_session.commit()
+    await db_session.refresh(outlet)
+
+    # Create opportunity owned by EMP-0002 (auth_client_sales)
+    create_resp = await auth_client_sales.post(
+        "/v1/opportunities",
+        json={"contact_name": "Scoped Pipeline Buyer", "mobile": "9829066701"},
+    )
+    assert create_resp.status_code == 201
+    opp_id = create_resp.json()["opportunity_id"]
+
+    # Unauthenticated calls -> 401; out-of-scope actor (EMP-0003) -> 403
+    for endpoint, payload in (
+        ("call-log", {"remark": "Unauth"}),
+        ("reschedule", {"followup_datetime": (now_utc + timedelta(days=1)).isoformat(), "remark": "Unauth"}),
+        ("status", {"lead_status": 2, "disqualified_reason": 2}),
+        ("transfer", {"assigned_to": "EMP-0001"}),
+        ("reopen", {"remark": "Unauth"}),
+    ):
+        assert (await test_client.post(f"/v1/opportunities/{opp_id}/{endpoint}", json=payload)).status_code == 401
+        assert (
+            await test_client.post(
+                f"/v1/opportunities/{opp_id}/{endpoint}",
+                json=payload,
+                headers=emp3_headers,
+            )
+        ).status_code == 403
+
+    # Call log updates calls_status = 1 and appends CALL activity
+    call_res = await auth_client_sales.post(
+        f"/v1/opportunities/{opp_id}/call-log",
+        json={"remark": "Client wants 3BHK near metro"},
+    )
+    assert call_res.status_code == 200
+    call_data = call_res.json()
+    assert call_data["calls_status"] == 1
+    assert call_data["last_remark"] == "Client wants 3BHK near metro"
+    assert call_data["activities"][0]["action_type"] == "CALL"
+
+    # Reschedule rejects past datetime and blank remark (422)
+    assert (
+        await auth_client_sales.post(
+            f"/v1/opportunities/{opp_id}/reschedule",
+            json={
+                "followup_datetime": (now_utc - timedelta(hours=1)).isoformat(),
+                "remark": "Past",
+            },
+        )
+    ).status_code == 422
+    assert (
+        await auth_client_sales.post(
+            f"/v1/opportunities/{opp_id}/reschedule",
+            json={
+                "followup_datetime": (now_utc + timedelta(days=2)).isoformat(),
+                "remark": "   ",
+            },
+        )
+    ).status_code == 422
+
+    next_fu = now_utc + timedelta(days=2)
+    resched_res = await auth_client_sales.post(
+        f"/v1/opportunities/{opp_id}/reschedule",
+        json={
+            "followup_datetime": next_fu.isoformat(),
+            "current_update": "Site Visit Scheduled",
+            "remark": "Visit Saturday 11 AM",
+        },
+    )
+    assert resched_res.status_code == 200
+    rs_data = resched_res.json()
+    assert rs_data["current_update"] == "Site Visit Scheduled"
+    assert rs_data["last_remark"] == "Visit Saturday 11 AM"
+    assert rs_data["calls_status"] == 1
+    assert rs_data["activities"][0]["action_type"] == "RESCHEDULE"
+    assert len(rs_data["reschedules"]) == 1
+    assert rs_data["reschedules"][0]["remark"] == "Visit Saturday 11 AM"
+
+    # Transfer validates Employee / FranchiseOutlet (404 for unknown)
+    assert (
+        await auth_client_sales.post(
+            f"/v1/opportunities/{opp_id}/transfer",
+            json={"assigned_to": "EMP-NOPE", "remark": "Bad emp"},
+        )
+    ).status_code == 404
+    assert (
+        await auth_client_sales.post(
+            f"/v1/opportunities/{opp_id}/transfer",
+            json={"assigned_to": "EMP-0003", "assign_franch_id": 999999, "remark": "Bad branch"},
+        )
+    ).status_code == 404
+
+    # EMP-0002 transfers own opportunity to EMP-0003 + Jaipur Vaishali Desk -> 200 (even though ownership changed!)
+    xfer_res = await auth_client_sales.post(
+        f"/v1/opportunities/{opp_id}/transfer",
+        json={
+            "assigned_to": "EMP-0003",
+            "assign_franch_id": outlet.id,
+            "remark": "Handover to Vaishali specialist",
+        },
+    )
+    assert xfer_res.status_code == 200
+    xf_data = xfer_res.json()
+    assert xf_data["assigned_to"] == "EMP-0003"
+    assert xf_data["assign_franchstaff_id"] == emp3.id
+    assert xf_data["assign_franch_id"] == outlet.id
+    assert xf_data["franchise_name"] == "Jaipur Vaishali Desk"
+    assert xf_data["activities"][0]["action_type"] == "TRANSFER"
+
+    # Ownership transferred: EMP-0002 now gets 403, EMP-0003 gets 200
+    assert (await auth_client_sales.get(f"/v1/opportunities/{opp_id}")).status_code == 403
+    assert (await test_client.get(f"/v1/opportunities/{opp_id}", headers=emp3_headers)).status_code == 200

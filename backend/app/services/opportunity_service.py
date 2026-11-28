@@ -3,7 +3,7 @@ from __future__ import annotations
 import html
 import math
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -40,6 +40,20 @@ ALLOWED_LOOKING_TYPES = {1, 2, 3, 4}
 
 PROPERTY_TYPE_LABELS = {1: "Rent", 2: "Buy/Sell", 3: "PG"}
 LOOKING_TYPE_LABELS = {1: "Residential", 2: "Commercial", 3: "Agricultural", 4: "Industrial"}
+
+
+def _to_naive_utc(dt: Optional[datetime]) -> Optional[datetime]:
+    """Convert an aware or naive datetime to naive UTC for legacy DateTime columns."""
+    if dt is None:
+        return None
+    return _ensure_utc(dt).replace(tzinfo=None)
+
+
+def _clean_optional_text(val: Optional[str]) -> Optional[str]:
+    if isinstance(val, str):
+        cleaned = val.strip()
+        return cleaned or None
+    return None
 
 
 def _to_float(val: Any) -> float:
@@ -183,6 +197,24 @@ class OpportunityService:
             return [TblOpportunity.lead_open == 0]
         return []
 
+    async def _load_opportunity_with_relations(
+        self, db: AsyncSession, opportunity_id: int
+    ) -> Optional[TblOpportunity]:
+        stmt = (
+            select(TblOpportunity)
+            .where(
+                TblOpportunity.opportunity_id == opportunity_id,
+                TblOpportunity.deleted_at.is_(None),
+            )
+            .options(
+                selectinload(TblOpportunity.locations),
+                selectinload(TblOpportunity.activities),
+                selectinload(TblOpportunity.reschedules),
+            )
+            .execution_options(populate_existing=True)
+        )
+        return (await db.execute(stmt)).scalar_one_or_none()
+
     async def _get_scoped_opportunity(
         self,
         db: AsyncSession,
@@ -191,17 +223,14 @@ class OpportunityService:
         *,
         with_relations: bool = False,
     ) -> TblOpportunity:
-        stmt = select(TblOpportunity).where(
-            TblOpportunity.opportunity_id == opportunity_id,
-            TblOpportunity.deleted_at.is_(None),
-        )
         if with_relations:
-            stmt = stmt.options(
-                selectinload(TblOpportunity.locations),
-                selectinload(TblOpportunity.activities),
-                selectinload(TblOpportunity.reschedules),
-            ).execution_options(populate_existing=True)
-        opp = (await db.execute(stmt)).scalar_one_or_none()
+            opp = await self._load_opportunity_with_relations(db, opportunity_id)
+        else:
+            stmt = select(TblOpportunity).where(
+                TblOpportunity.opportunity_id == opportunity_id,
+                TblOpportunity.deleted_at.is_(None),
+            )
+            opp = (await db.execute(stmt)).scalar_one_or_none()
         if not opp:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -514,16 +543,20 @@ class OpportunityService:
 
         return False, None, False
 
-    def _live_property_base_conditions(self, ref_now: datetime) -> List[Any]:
+    def _live_property_base_conditions(
+        self, ref_now: datetime, *, include_unsold: bool = True
+    ) -> List[Any]:
         """Shared SQL predicates for live, verified, unsold, non-recycled, non-expired inventory."""
-        return [
+        conditions: List[Any] = [
             TblProperty.is_active == 1,
             TblProperty.verified_status == 1,
-            TblProperty.sold_status == 0,
             TblProperty.recyclebin_status == 0,
             TblProperty.deleted_at.is_(None),
             or_(TblProperty.expiarydate.is_(None), TblProperty.expiarydate >= ref_now),
         ]
+        if include_unsold:
+            conditions.append(TblProperty.sold_status == 0)
+        return conditions
 
     async def _match_properties_for_opportunity(
         self,
@@ -1040,12 +1073,9 @@ class OpportunityService:
         await db.commit()
         return await self.get_opportunity_detail(db, actor, opp.opportunity_id)
 
-    async def get_opportunity_detail(
-        self, db: AsyncSession, actor: Employee, opportunity_id: int
+    async def _serialize_opp_detail(
+        self, db: AsyncSession, actor: Employee, opp: TblOpportunity
     ) -> Dict[str, Any]:
-        opp = await self._get_scoped_opportunity(
-            db, actor, opportunity_id, with_relations=True
-        )
         emp_ids = (
             [opp.assigned_to, opp.created_by]
             + [a.performed_by for a in (opp.activities or [])]
@@ -1062,6 +1092,25 @@ class OpportunityService:
             franchise_name=franchise_map.get(opp.assign_franch_id),
             matching_properties_count=match_res["count"],
         )
+
+    async def _build_detail_response(
+        self, db: AsyncSession, actor: Employee, opportunity_id: int
+    ) -> Dict[str, Any]:
+        opp = await self._load_opportunity_with_relations(db, opportunity_id)
+        if not opp:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Opportunity #{opportunity_id} not found",
+            )
+        return await self._serialize_opp_detail(db, actor, opp)
+
+    async def get_opportunity_detail(
+        self, db: AsyncSession, actor: Employee, opportunity_id: int
+    ) -> Dict[str, Any]:
+        opp = await self._get_scoped_opportunity(
+            db, actor, opportunity_id, with_relations=True
+        )
+        return await self._serialize_opp_detail(db, actor, opp)
 
     async def update_opportunity(
         self,
@@ -1182,6 +1231,684 @@ class OpportunityService:
         )
         await db.commit()
         return await self.get_opportunity_detail(db, actor, opp.opportunity_id)
+
+    async def _revert_propira_property_sold(
+        self, db: AsyncSession, opp: TblOpportunity
+    ) -> None:
+        """Atomically revert an earlier linked Propira property's sold_status back to 0."""
+        if opp.is_propira_property and opp.matched_property_id:
+            prior_prop = (
+                await db.execute(
+                    select(TblProperty).where(
+                        TblProperty.property_id == opp.matched_property_id
+                    )
+                )
+            ).scalar_one_or_none()
+            if prior_prop and prior_prop.sold_status == 1:
+                prior_prop.sold_status = 0
+
+    def _clear_deal_fields(self, opp: TblOpportunity) -> None:
+        """Clear Option 1 deal/registry/property snapshot fields when cancelling a deal."""
+        opp.deal_date = None
+        opp.registry_date = None
+        opp.is_propira_property = False
+        opp.matched_property_id = None
+        opp.matched_property_code = None
+        opp.deal_property_category = None
+        opp.deal_property_subcategory = None
+        opp.deal_property_address = None
+        opp.deal_location_lat = None
+        opp.deal_location_long = None
+
+    async def _validate_propira_property_for_deal(
+        self,
+        db: AsyncSession,
+        opp: TblOpportunity,
+        matched_property_id: int,
+        now_utc: datetime,
+    ) -> TblProperty:
+        """Validate a Propira property using shared live inventory predicates."""
+        is_same_linked = (
+            opp.lead_status == 4
+            and bool(opp.is_propira_property)
+            and opp.matched_property_id == matched_property_id
+        )
+        live_prop = (
+            await db.execute(
+                select(TblProperty).where(
+                    TblProperty.property_id == matched_property_id,
+                    *self._live_property_base_conditions(
+                        now_utc, include_unsold=not is_same_linked
+                    ),
+                )
+            )
+        ).scalar_one_or_none()
+        if live_prop and is_same_linked and live_prop.sold_status not in (0, 1):
+            live_prop = None
+        if live_prop:
+            return live_prop
+
+        raw_prop = (
+            await db.execute(
+                select(TblProperty).where(
+                    TblProperty.property_id == matched_property_id,
+                    TblProperty.deleted_at.is_(None),
+                )
+            )
+        ).scalar_one_or_none()
+        if not raw_prop:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Property #{matched_property_id} not found.",
+            )
+        if raw_prop.sold_status != 0 and not is_same_linked:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Property {raw_prop.propertyid_no} is already sold or unavailable.",
+            )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Property {raw_prop.propertyid_no} is not live, verified, and available.",
+        )
+
+    async def _sync_linked_lead_lifecycle(
+        self,
+        db: AsyncSession,
+        opp: TblOpportunity,
+        actor: Employee,
+        *,
+        lead_stage: str,
+        tbl_lead_status: int,
+        tbl_lead_open: int,
+        action_type: str,
+        outcome: str,
+        note: str,
+        disqualified_reason: Optional[int] = None,
+        lost_reason: Optional[str] = None,
+        clear_lost_reason: bool = False,
+        sync_deal_dates: bool = False,
+        closed_now: Optional[datetime] = None,
+    ) -> None:
+        """Synchronize linked Lead and TblLead records with Opportunity lifecycle transitions."""
+        if not opp.source_lead_id:
+            return
+        lead, tbl_lead = await self._resolve_lead_pair(db, opp.source_lead_id)
+        if tbl_lead:
+            tbl_lead.lead_status = tbl_lead_status
+            tbl_lead.lead_open = tbl_lead_open
+            if disqualified_reason is not None:
+                tbl_lead.disqualified_reason = disqualified_reason
+            if sync_deal_dates:
+                tbl_lead.deal_date = _to_naive_utc(opp.deal_date)
+                tbl_lead.registry_date = _to_naive_utc(opp.registry_date)
+                tbl_lead.dealclose_date = _to_naive_utc(closed_now)
+        if lead:
+            prev_stage = lead.stage
+            lead.stage = lead_stage
+            if clear_lost_reason:
+                lead.lost_reason = None
+            elif lost_reason is not None:
+                lead.lost_reason = lost_reason
+            if closed_now is not None:
+                lead.last_contacted_at = closed_now
+            db.add(
+                LeadActivity(
+                    lead_id=lead.lead_id,
+                    action_type=action_type,
+                    outcome=outcome,
+                    note=note,
+                    stage_before=prev_stage,
+                    stage_after=lead_stage,
+                    logged_by=actor.employee_id,
+                    performed_by=actor.employee_id,
+                )
+            )
+
+    async def reschedule_opportunity(
+        self,
+        db: AsyncSession,
+        actor: Employee,
+        opportunity_id: int,
+        *,
+        followup_datetime: datetime,
+        remark: str,
+        current_update: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        opp = await self._get_scoped_opportunity(db, actor, opportunity_id)
+        if opp.lead_open == 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This Opportunity is locked/closed and cannot be rescheduled.",
+            )
+        clean_remark = _clean_optional_text(remark)
+        if not clean_remark:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="Remark must not be blank.",
+            )
+        now_utc = datetime.now(timezone.utc)
+        new_dt = _ensure_utc(followup_datetime)
+        if new_dt <= now_utc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="followup_datetime must be strictly in the future.",
+            )
+
+        old_dt = _ensure_utc(opp.followup_datetime) if opp.followup_datetime else None
+        clean_update = _clean_optional_text(current_update)
+
+        db.add(
+            OpportunityRescheduleLog(
+                opportunity_id=opp.opportunity_id,
+                old_followup_datetime=old_dt,
+                new_followup_datetime=new_dt,
+                current_update=clean_update,
+                remark=clean_remark,
+                rescheduled_by=actor.employee_id,
+            )
+        )
+        db.add(
+            OpportunityActivity(
+                opportunity_id=opp.opportunity_id,
+                action_type="RESCHEDULE",
+                note=f"{clean_update}: {clean_remark}" if clean_update else clean_remark,
+                status_before=opp.lead_status,
+                status_after=opp.lead_status,
+                performed_by=actor.employee_id,
+            )
+        )
+        opp.followup_datetime = new_dt
+        opp.current_update = clean_update
+        opp.last_remark = clean_remark
+        opp.calls_status = 1
+
+        await db.commit()
+        return await self._build_detail_response(db, actor, opp.opportunity_id)
+
+    async def _transition_to_in_progress(
+        self,
+        db: AsyncSession,
+        opp: TblOpportunity,
+        actor: Employee,
+        prev_status: int,
+        clean_remark: Optional[str],
+    ) -> None:
+        if prev_status == 4:
+            await self._revert_propira_property_sold(db, opp)
+            self._clear_deal_fields(opp)
+        opp.lead_status = 1
+        opp.lead_open = 1
+        opp.disqualified_reason = 0
+        if clean_remark:
+            opp.last_remark = clean_remark
+        note_text = clean_remark or (
+            "Deal cancelled and reverted to In Progress"
+            if prev_status == 4
+            else "Status changed to In Progress"
+        )
+        db.add(
+            OpportunityActivity(
+                opportunity_id=opp.opportunity_id,
+                action_type="STATUS_CHANGE",
+                note=note_text,
+                status_before=prev_status,
+                status_after=1,
+                performed_by=actor.employee_id,
+            )
+        )
+
+    async def _transition_to_disqualified(
+        self,
+        db: AsyncSession,
+        opp: TblOpportunity,
+        actor: Employee,
+        prev_status: int,
+        disqualified_reason: Optional[int],
+        clean_remark: Optional[str],
+    ) -> None:
+        if disqualified_reason is None or disqualified_reason not in DISQUALIFIED_REASONS:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="A valid disqualified_reason (1..7) is required when marking Disqualified.",
+            )
+        if prev_status == 4:
+            await self._revert_propira_property_sold(db, opp)
+            self._clear_deal_fields(opp)
+        opp.lead_status = 2
+        opp.lead_open = 0
+        opp.disqualified_reason = disqualified_reason
+        if clean_remark:
+            opp.last_remark = clean_remark
+        reason_label = DISQUALIFIED_REASONS[disqualified_reason]
+        note_text = f"{reason_label}: {clean_remark}" if clean_remark else reason_label
+        db.add(
+            OpportunityActivity(
+                opportunity_id=opp.opportunity_id,
+                action_type="DISQUALIFIED",
+                note=note_text,
+                status_before=prev_status,
+                status_after=2,
+                performed_by=actor.employee_id,
+            )
+        )
+        await self._sync_linked_lead_lifecycle(
+            db,
+            opp,
+            actor,
+            lead_stage="LOST",
+            tbl_lead_status=2,
+            tbl_lead_open=0,
+            action_type="OPPORTUNITY_DISQUALIFIED",
+            outcome=reason_label,
+            note=note_text,
+            disqualified_reason=disqualified_reason,
+            lost_reason=note_text,
+        )
+
+    async def _transition_to_deal_scheduled(
+        self,
+        db: AsyncSession,
+        opp: TblOpportunity,
+        actor: Employee,
+        prev_status: int,
+        now_utc: datetime,
+        clean_remark: Optional[str],
+        *,
+        deal_date: Optional[datetime],
+        registry_date: Optional[datetime],
+        is_propira_property: bool,
+        matched_property_id: Optional[int],
+        deal_property_category: Optional[int],
+        deal_property_subcategory: Optional[int],
+        deal_property_address: Optional[str],
+        deal_location_lat: Optional[str],
+        deal_location_long: Optional[str],
+    ) -> None:
+        if deal_date is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="deal_date is required when scheduling a deal.",
+            )
+        deal_dt = _ensure_utc(deal_date)
+        if deal_dt > now_utc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="deal_date cannot be in the future.",
+            )
+
+        reg_dt = _ensure_utc(registry_date) if registry_date is not None else None
+        if opp.property_type == 2:
+            if reg_dt is None:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                    detail="registry_date is required for Buy/Sell opportunities.",
+                )
+            if reg_dt <= now_utc:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                    detail="registry_date must be strictly in the future for Buy/Sell opportunities.",
+                )
+        elif reg_dt is not None and reg_dt < deal_dt:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="Agreement/Move-in date (registry_date) cannot be earlier than deal_date.",
+            )
+
+        new_prop: Optional[TblProperty] = None
+        if is_propira_property:
+            if not matched_property_id:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                    detail="matched_property_id is required when is_propira_property is True.",
+                )
+            new_prop = await self._validate_propira_property_for_deal(
+                db, opp, matched_property_id, now_utc
+            )
+
+        if (
+            opp.is_propira_property
+            and opp.matched_property_id
+            and (not is_propira_property or matched_property_id != opp.matched_property_id)
+        ):
+            await self._revert_propira_property_sold(db, opp)
+
+        clean_addr = _clean_optional_text(deal_property_address)
+        clean_lat = _clean_optional_text(deal_location_lat)
+        clean_long = _clean_optional_text(deal_location_long)
+
+        if is_propira_property and new_prop is not None:
+            new_prop.sold_status = 1
+            opp.is_propira_property = True
+            opp.matched_property_id = new_prop.property_id
+            opp.matched_property_code = new_prop.propertyid_no
+            opp.deal_property_category = (
+                deal_property_category
+                if deal_property_category is not None
+                else new_prop.looking_type
+            )
+            opp.deal_property_subcategory = (
+                deal_property_subcategory
+                if deal_property_subcategory is not None
+                else new_prop.looking_subcat_type
+            )
+            opp.deal_property_address = (
+                clean_addr
+                or _clean_optional_text(new_prop.sublocality_address)
+                or _clean_optional_text(new_prop.location)
+            )
+            opp.deal_location_lat = clean_lat or _clean_optional_text(new_prop.location_lat)
+            opp.deal_location_long = clean_long or _clean_optional_text(new_prop.location_long)
+        else:
+            opp.is_propira_property = False
+            opp.matched_property_id = None
+            opp.matched_property_code = None
+            opp.deal_property_category = deal_property_category
+            opp.deal_property_subcategory = deal_property_subcategory
+            opp.deal_property_address = clean_addr
+            opp.deal_location_lat = clean_lat
+            opp.deal_location_long = clean_long
+
+        opp.lead_status = 4
+        opp.lead_open = 1
+        opp.disqualified_reason = 0
+        opp.deal_date = deal_dt
+        opp.registry_date = reg_dt
+        if clean_remark:
+            opp.last_remark = clean_remark
+
+        if reg_dt is not None and reg_dt > now_utc:
+            old_fu = _ensure_utc(opp.followup_datetime) if opp.followup_datetime else None
+            auto_followup = max(reg_dt - timedelta(days=2), now_utc + timedelta(hours=1))
+            opp.followup_datetime = auto_followup
+            db.add(
+                OpportunityRescheduleLog(
+                    opportunity_id=opp.opportunity_id,
+                    old_followup_datetime=old_fu,
+                    new_followup_datetime=auto_followup,
+                    current_update="Pre-Registry Follow-up",
+                    remark="Auto-scheduled pre-registry follow-up (registry - 2 days)",
+                    rescheduled_by=actor.employee_id,
+                )
+            )
+
+        note_text = clean_remark or (
+            f"Deal scheduled with Propira property {opp.matched_property_code}"
+            if opp.is_propira_property
+            else "Deal scheduled with external property"
+        )
+        db.add(
+            OpportunityActivity(
+                opportunity_id=opp.opportunity_id,
+                action_type="DEAL_SCHEDULED",
+                note=note_text,
+                status_before=prev_status,
+                status_after=4,
+                performed_by=actor.employee_id,
+            )
+        )
+
+    async def _transition_to_closed(
+        self,
+        db: AsyncSession,
+        opp: TblOpportunity,
+        actor: Employee,
+        prev_status: int,
+        now_utc: datetime,
+        clean_remark: Optional[str],
+    ) -> None:
+        if opp.deal_date is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="You cannot close this lead because the client has not yet Buy any property.",
+            )
+        opp.lead_status = 5
+        opp.lead_open = 0
+        opp.closed_at = now_utc
+        opp.calls_status = 1
+        if clean_remark:
+            opp.last_remark = clean_remark
+        note_text = clean_remark or "Deal closed and marked Deal Done"
+        db.add(
+            OpportunityActivity(
+                opportunity_id=opp.opportunity_id,
+                action_type="CLOSED",
+                note=note_text,
+                status_before=prev_status,
+                status_after=5,
+                performed_by=actor.employee_id,
+            )
+        )
+        await self._sync_linked_lead_lifecycle(
+            db,
+            opp,
+            actor,
+            lead_stage="WON",
+            tbl_lead_status=5,
+            tbl_lead_open=0,
+            action_type="OPPORTUNITY_WON",
+            outcome=f"Opportunity {opp.opportunity_code} Closed",
+            note=note_text,
+            sync_deal_dates=True,
+            closed_now=now_utc,
+        )
+
+    async def change_opportunity_status(
+        self,
+        db: AsyncSession,
+        actor: Employee,
+        opportunity_id: int,
+        *,
+        lead_status: int,
+        remark: Optional[str] = None,
+        disqualified_reason: Optional[int] = None,
+        deal_date: Optional[datetime] = None,
+        registry_date: Optional[datetime] = None,
+        is_propira_property: bool = False,
+        matched_property_id: Optional[int] = None,
+        deal_property_category: Optional[int] = None,
+        deal_property_subcategory: Optional[int] = None,
+        deal_property_address: Optional[str] = None,
+        deal_location_lat: Optional[str] = None,
+        deal_location_long: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        opp = await self._get_scoped_opportunity(db, actor, opportunity_id)
+        if opp.lead_status == 5:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Closed Deal Done opportunities are permanent and cannot change status.",
+            )
+        if opp.lead_open == 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Opportunity is locked; reopen it first.",
+            )
+        if lead_status not in OPPORTUNITY_STATUSES:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail=f"Invalid opportunity status: {lead_status}. Must be one of {sorted(OPPORTUNITY_STATUSES)}.",
+            )
+
+        now_utc = datetime.now(timezone.utc)
+        clean_remark = _clean_optional_text(remark)
+        prev_status = opp.lead_status
+
+        if lead_status == 1:
+            await self._transition_to_in_progress(db, opp, actor, prev_status, clean_remark)
+        elif lead_status == 2:
+            await self._transition_to_disqualified(
+                db, opp, actor, prev_status, disqualified_reason, clean_remark
+            )
+        elif lead_status == 4:
+            await self._transition_to_deal_scheduled(
+                db,
+                opp,
+                actor,
+                prev_status,
+                now_utc,
+                clean_remark,
+                deal_date=deal_date,
+                registry_date=registry_date,
+                is_propira_property=is_propira_property,
+                matched_property_id=matched_property_id,
+                deal_property_category=deal_property_category,
+                deal_property_subcategory=deal_property_subcategory,
+                deal_property_address=deal_property_address,
+                deal_location_lat=deal_location_lat,
+                deal_location_long=deal_location_long,
+            )
+        elif lead_status == 5:
+            await self._transition_to_closed(db, opp, actor, prev_status, now_utc, clean_remark)
+
+        await db.commit()
+        return await self._build_detail_response(db, actor, opp.opportunity_id)
+
+    async def transfer_opportunity(
+        self,
+        db: AsyncSession,
+        actor: Employee,
+        opportunity_id: int,
+        *,
+        assigned_to: Optional[str] = None,
+        assign_franch_id: Optional[int] = 0,
+        remark: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        opp = await self._get_scoped_opportunity(db, actor, opportunity_id)
+        if opp.lead_open == 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Locked/closed opportunities cannot be transferred.",
+            )
+
+        clean_emp_id = _clean_optional_text(assigned_to)
+        target_franch = assign_franch_id if assign_franch_id is not None else 0
+        if clean_emp_id is None and target_franch <= 0 and opp.assign_franch_id == 0:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="Provide assigned_to or assign_franch_id to transfer this opportunity.",
+            )
+
+        target_emp: Optional[Employee] = None
+        if clean_emp_id is not None:
+            target_emp = await self._get_active_employee(db, clean_emp_id, label="Target assignee")
+
+        target_outlet: Optional[FranchiseOutlet] = None
+        if target_franch > 0:
+            target_outlet = await self._get_active_franchise(db, target_franch)
+
+        if target_emp is not None:
+            opp.assigned_to = target_emp.employee_id
+            opp.assign_franchstaff_id = target_emp.id
+        if assign_franch_id is not None:
+            opp.assign_franch_id = target_franch
+
+        clean_remark = _clean_optional_text(remark)
+        if clean_remark:
+            opp.last_remark = clean_remark
+
+        target_parts: List[str] = []
+        if target_emp is not None:
+            target_parts.append(f"{target_emp.name} ({target_emp.employee_id})")
+        if target_outlet is not None:
+            target_parts.append(f"Franchise {target_outlet.name}")
+        elif assign_franch_id == 0:
+            target_parts.append("Central Desk")
+        target_label = " / ".join(target_parts) or "Updated desk"
+        note_text = f"Transferred to {target_label}" + (f": {clean_remark}" if clean_remark else "")
+
+        db.add(
+            OpportunityActivity(
+                opportunity_id=opp.opportunity_id,
+                action_type="TRANSFER",
+                note=note_text,
+                status_before=opp.lead_status,
+                status_after=opp.lead_status,
+                performed_by=actor.employee_id,
+            )
+        )
+        await db.commit()
+        return await self._build_detail_response(db, actor, opp.opportunity_id)
+
+    async def reopen_opportunity(
+        self,
+        db: AsyncSession,
+        actor: Employee,
+        opportunity_id: int,
+        *,
+        remark: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        opp = await self._get_scoped_opportunity(db, actor, opportunity_id)
+        if opp.lead_status == 5:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Closed Deal Done opportunities cannot be reopened.",
+            )
+        if opp.lead_open == 1 or opp.lead_status != 2:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Only Disqualified opportunities can be reopened.",
+            )
+
+        prev_status = opp.lead_status
+        opp.lead_open = 1
+        opp.lead_status = 1
+        opp.disqualified_reason = 0
+        clean_remark = _clean_optional_text(remark)
+        if clean_remark:
+            opp.last_remark = clean_remark
+        note_text = clean_remark or "Opportunity reopened"
+
+        db.add(
+            OpportunityActivity(
+                opportunity_id=opp.opportunity_id,
+                action_type="REOPEN",
+                note=note_text,
+                status_before=prev_status,
+                status_after=1,
+                performed_by=actor.employee_id,
+            )
+        )
+        await self._sync_linked_lead_lifecycle(
+            db,
+            opp,
+            actor,
+            lead_stage="QUALIFIED",
+            tbl_lead_status=4,
+            tbl_lead_open=1,
+            action_type="OPPORTUNITY_REOPENED",
+            outcome="Opportunity Reopened",
+            note=note_text,
+            disqualified_reason=0,
+            clear_lost_reason=True,
+        )
+        await db.commit()
+        return await self._build_detail_response(db, actor, opp.opportunity_id)
+
+    async def log_opportunity_call(
+        self,
+        db: AsyncSession,
+        actor: Employee,
+        opportunity_id: int,
+        *,
+        remark: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        opp = await self._get_scoped_opportunity(db, actor, opportunity_id)
+        opp.calls_status = 1
+        clean_remark = _clean_optional_text(remark)
+        if clean_remark:
+            opp.last_remark = clean_remark
+
+        db.add(
+            OpportunityActivity(
+                opportunity_id=opp.opportunity_id,
+                action_type="CALL",
+                note=clean_remark or "Call connected",
+                status_before=opp.lead_status,
+                status_after=opp.lead_status,
+                performed_by=actor.employee_id,
+            )
+        )
+        await db.commit()
+        return await self._build_detail_response(db, actor, opp.opportunity_id)
 
     async def get_related_properties(
         self, db: AsyncSession, actor: Employee, opportunity_id: int
