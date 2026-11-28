@@ -388,7 +388,7 @@ async def test_opportunities_create_dashboard_tabs_and_search(auth_client_md, db
     # Create additional opportunities for today, missing, qualified_propira, disqualified, closed
     now_utc = datetime.now(timezone.utc)
     ist_start, ist_end = _ist_today_bounds_utc(now_utc)
-    today_dt = ist_start + timedelta(hours=12)
+    today_dt = ist_start + timedelta(hours=23, minutes=0)  # 11 PM IST – always future today
 
     opp_today = TblOpportunity(
         opportunity_code=f"OPP-{year}-000090",
