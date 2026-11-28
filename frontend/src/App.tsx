@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Routes, Route, Navigate, useNavigate, useParams, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate, useParams, useLocation, useSearchParams } from 'react-router-dom';
 import Login from './pages/Login';
 import AdminLayout, { AdminTab } from './layouts/AdminLayout';
 import AdminDashboard from './pages/AdminDashboard';
@@ -27,6 +27,20 @@ const LeadDetailPage: React.FC = () => {
     return <Navigate to="/leads" replace />;
   }
   return <LeadDetail leadId={leadId} onBack={() => navigate('/leads')} />;
+};
+
+const PropertyCreatePage: React.FC = () => {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const fromLead = searchParams.get('fromLead');
+  const targetBack = fromLead ? `/leads/${encodeURIComponent(fromLead)}` : '/properties';
+  return (
+    <PropertyForm
+      fromLeadId={fromLead}
+      onBack={() => navigate(targetBack)}
+      onSuccess={() => navigate(targetBack)}
+    />
+  );
 };
 
 const AppContent: React.FC = () => {
@@ -131,15 +145,7 @@ const AppContent: React.FC = () => {
           }
         />
         <Route path="/properties" element={<PropertyHub />} />
-        <Route
-          path="/properties/create"
-          element={
-            <PropertyForm
-              onBack={() => navigate('/properties')}
-              onSuccess={() => navigate('/properties')}
-            />
-          }
-        />
+        <Route path="/properties/create" element={<PropertyCreatePage />} />
         <Route
           path="/homepage"
           element={

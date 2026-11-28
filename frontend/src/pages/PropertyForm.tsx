@@ -46,6 +46,7 @@ import { useTheme } from '../context/ThemeContext';
 interface PropertyFormProps {
   propertyId?: number | null;
   initialType?: number; // 1=Rent, 2=Sale, 3=PG
+  fromLeadId?: string | null;
   onBack: () => void;
   onSuccess: (savedProperty: any) => void;
 }
@@ -117,6 +118,7 @@ function numberToIndianWords(num: number): string {
 export const PropertyForm: React.FC<PropertyFormProps> = ({
   propertyId,
   initialType = 2,
+  fromLeadId = null,
   onBack,
   onSuccess,
 }) => {
@@ -252,6 +254,50 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
 
     fetchMasterSchema();
   }, []);
+
+  // Pre-fill property form when converting from a Lead
+  useEffect(() => {
+    if (!fromLeadId || propertyId) return;
+    let active = true;
+    const prefillFromLead = async () => {
+      try {
+        const token = localStorage.getItem('access_token');
+        const res = await fetch(`/v1/leads/${encodeURIComponent(fromLeadId)}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (!res.ok || !active) return;
+        const data = await res.json();
+        const leadTypeStr = String(data.lead_type || 'BUY').toUpperCase();
+        setPropertyType(leadTypeStr === 'RENT' ? 1 : leadTypeStr === 'PG' ? 3 : 2);
+        setOwnerName(data.full_name || data.contact_name || '');
+        setOwnerEmail(data.email || '');
+        const cleanDigits = String(data.mobile || '').replace(/\D/g, '');
+        if (cleanDigits.length >= 10) {
+          setOwnerMobile(cleanDigits.slice(-10));
+        } else if (cleanDigits) {
+          setOwnerMobile(cleanDigits);
+        }
+        const addr = data.indv_property_address || data.preferred_locality || data.preferred_city || '';
+        if (addr) {
+          setLocationText(addr);
+          setSublocality(addr);
+        }
+        const priceCandidate = Number(data.deal_final_price || data.budget_max || 0);
+        if (priceCandidate > 0) {
+          setExpectedPrice(String(priceCandidate));
+        }
+        if (data.lead_remark && data.lead_remark !== 'N/A') {
+          setDescription(data.lead_remark);
+        }
+      } catch {
+        // Non-blocking fallback to form defaults
+      }
+    };
+    prefillFromLead();
+    return () => {
+      active = false;
+    };
+  }, [fromLeadId, propertyId]);
 
   // Computed Amount In Words
   const amountInWords = useMemo(() => {
@@ -685,7 +731,11 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
 
     try {
       const token = localStorage.getItem('access_token');
-      const url = propertyId ? `/v1/properties/tbl/${propertyId}` : '/v1/properties/create';
+      const url = propertyId
+        ? `/v1/properties/tbl/${propertyId}`
+        : fromLeadId
+        ? `/v1/leads/${encodeURIComponent(fromLeadId)}/convert-to-property`
+        : '/v1/properties/create';
       const method = propertyId ? 'PUT' : 'POST';
 
       const res = await fetch(url, {
@@ -702,7 +752,11 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
         throw new Error(data.detail || 'Failed to save property listing');
       }
 
-      setSuccess(`Property ${data.propertyid_no || 'listing'} successfully saved to inventory!`);
+      setSuccess(
+        fromLeadId
+          ? `Lead ${fromLeadId} converted to Property ${data.propertyid_no || ''} successfully!`
+          : `Property ${data.propertyid_no || 'listing'} successfully saved to inventory!`
+      );
       setTimeout(() => {
         onSuccess(data);
       }, 1200);
@@ -752,11 +806,20 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
               <span>/</span>
               <span className="text-white font-bold">124-Attribute Schema</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white flex items-center gap-3">
-              {propertyId ? 'Edit Property Listing' : 'Register New Property'}
-              <span className="text-xs px-3 py-1 rounded-full font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white flex flex-wrap items-center gap-3">
+              {propertyId
+                ? 'Edit Property Listing'
+                : fromLeadId
+                ? `Convert Lead ${fromLeadId} → Property`
+                : 'Register New Property'}
+              <span className="text-xs px-3 py-1 rounded-full font-bold bg-[#F04B42]/20 text-rose-200 border border-[#F04B42]/40">
                 {propertyType === 2 ? 'For Sale' : propertyType === 1 ? 'For Rent' : 'PG Stay'}
               </span>
+              {fromLeadId && !propertyId && (
+                <span className="text-xs px-3 py-1 rounded-full font-bold bg-[#291BB0]/40 text-indigo-100 border border-indigo-400/40">
+                  Pre-filled from Lead {fromLeadId}
+                </span>
+              )}
             </h1>
             <p className="text-xs sm:text-sm text-slate-400 max-w-xl">
               Enterprise property ingestion engine with real-time statutory validation, automatic Indian rupee conversion, and dual-layer database mapping.
@@ -2077,7 +2140,11 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
               ) : (
                 <>
                   <Save className="w-4 h-4" />
-                  {propertyId ? 'Update Property Dossier' : 'Save & Publish Property Listing'}
+                  {propertyId
+                    ? 'Update Property Dossier'
+                    : fromLeadId
+                    ? 'Convert Lead & Publish Property'
+                    : 'Save & Publish Property Listing'}
                 </>
               )}
             </button>

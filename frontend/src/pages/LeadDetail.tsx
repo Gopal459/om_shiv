@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
   Phone,
@@ -50,6 +51,7 @@ const STAGE_OPTIONS = [
 ];
 
 export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
+  const navigate = useNavigate();
   const [lead, setLead] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -406,7 +408,8 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
   const email = lead.email || '';
   const clientAddress = lead.preferred_city || lead.address || '';
   const propertyAddress = lead.indv_property_address || lead.preferred_locality || '';
-  const propertyCode = lead.property_idno || (lead.property_id > 0 ? `PROP-${lead.property_id}` : '');
+  const propertyCode = lead.property_idno || lead.related_listing_id || (lead.property_id > 0 ? `PROP-${lead.property_id}` : '');
+  const isPropertyLinked = Boolean(propertyCode);
   const dealPrice = Number(lead.deal_final_price || 0);
   const formattedDealPrice = dealPrice > 0 ? `₹ ${dealPrice.toLocaleString('en-IN')}` : 'Negotiable / Open';
   const leadType = (lead.lead_type || 'BUY').toUpperCase();
@@ -616,7 +619,7 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
             <span className="text-emerald-400 lowercase text-[11px] font-normal font-mono">1-click interactions</span>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5">
+          <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-2.5">
             {/* 1. Call */}
             <button
               type="button"
@@ -677,7 +680,29 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
               <span>Property</span>
             </button>
 
-            {/* 7. History */}
+            {/* 7. Convert to Property */}
+            {isPropertyLinked ? (
+              <button
+                type="button"
+                onClick={() => navigate('/properties')}
+                className="group flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-950/40 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                title={`Linked Property: ${propertyCode}`}
+              >
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span className="truncate">{propertyCode}</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => navigate(`/properties/create?fromLead=${encodeURIComponent(leadUid)}`)}
+                className="group flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl bg-[#291BB0] hover:bg-[#1f138e] text-white font-bold text-xs shadow-md shadow-[#291BB0]/40 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+              >
+                <Building className="w-4 h-4 shrink-0 transition-transform group-hover:scale-110" />
+                <span className="truncate">Convert Property</span>
+              </button>
+            )}
+
+            {/* 8. History */}
             <button
               type="button"
               onClick={() => openActionModal('HISTORY')}
@@ -887,14 +912,31 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
             </div>
           </div>
 
-          <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
+          <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center gap-2">
             <button
               onClick={() => openActionModal('PROPERTY')}
-              className="w-full py-2 rounded-xl bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+              className="flex-1 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <Home className="w-3.5 h-3.5 text-sky-500" />
-              <span>View Property Dossier</span>
+              <span>Property Dossier</span>
             </button>
+            {isPropertyLinked ? (
+              <button
+                onClick={() => navigate('/properties')}
+                className="flex-1 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span>View Property</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => navigate(`/properties/create?fromLead=${encodeURIComponent(leadUid)}`)}
+                className="flex-1 py-2 rounded-xl bg-[#291BB0] hover:bg-[#1f138e] text-white text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+              >
+                <Building className="w-3.5 h-3.5" />
+                <span>Convert to Property</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -1269,7 +1311,7 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-end pt-2">
+                <div className="flex items-center justify-end gap-2 pt-2">
                   <button
                     type="button"
                     onClick={() => setActiveModal(null)}
@@ -1277,6 +1319,31 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
                   >
                     Close
                   </button>
+                  {isPropertyLinked ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveModal(null);
+                        navigate('/properties');
+                      }}
+                      className="px-4 py-2 rounded-xl bg-[#291BB0] hover:bg-[#1f138e] text-white font-bold flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span>Open Property Hub</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveModal(null);
+                        navigate(`/properties/create?fromLead=${encodeURIComponent(leadUid)}`);
+                      }}
+                      className="px-4 py-2 rounded-xl bg-[#291BB0] hover:bg-[#1f138e] text-white font-bold flex items-center gap-1.5 cursor-pointer shadow-sm"
+                    >
+                      <Building className="w-3.5 h-3.5" />
+                      <span>Convert Lead → New Property</span>
+                    </button>
+                  )}
                 </div>
               </div>
             ) : activeModal === 'ASSIGN' ? (
