@@ -17,6 +17,7 @@ import BlogManager from './pages/BlogManager';
 import AIAgentHub from './pages/AIAgentHub';
 import AIApprovalsQueue from './pages/AIApprovalsQueue';
 import FranchiseHub from './pages/FranchiseHub';
+import WebsiteFormsHub from './pages/WebsiteFormsHub';
 import { ThemeProvider } from './context/ThemeContext';
 
 const LeadDetailPage: React.FC = () => {
@@ -108,26 +109,7 @@ const AppContent: React.FC = () => {
         <Route path="/ai-approvals" element={<AIApprovalsQueue />} />
 
         {/* 11 Enterprise Module Hub Routes */}
-        <Route
-          path="/website-forms"
-          element={
-            <ModuleHub
-              title="Website Inbound Forms & Submissions"
-              subtitle="Real-time intake stream from buyer inquiries, contact requests, and property valuation calculators."
-              badge="Inbound Intake Hub"
-              stats={[
-                { label: 'Inbound Inquiries', value: 142, change: '+18% this week' },
-                { label: 'Contact Requests', value: 48, change: '100% processed' },
-                { label: 'Valuation Calculator', value: 29, change: 'Automated estimate' },
-                { label: 'Pending Conversion', value: 17, change: '1-Click Convert ready' },
-              ]}
-              shortcuts={[
-                { label: '1-Click Inquiry Conversion Queue', desc: 'Promote website visitors to active pipeline leads in 1 click', path: '/leads' },
-                { label: 'Manage Form Fields & Notifications', desc: 'Configure WhatsApp & SMS notifications for incoming forms', path: '/settings' },
-              ]}
-            />
-          }
-        />
+        <Route path="/website-forms" element={<WebsiteFormsHub />} />
         <Route
           path="/opportunities"
           element={

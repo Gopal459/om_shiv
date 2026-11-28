@@ -96,6 +96,14 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
     localStorage.setItem('omshiv_sidebar_collapsed', String(isCollapsed));
   }, [isCollapsed]);
 
+  useEffect(() => {
+    if (location.pathname.startsWith('/website-forms')) {
+      setOpenSubmenus((prev) =>
+        prev.WEBSITE_FORMS === true ? prev : { ...prev, WEBSITE_FORMS: true }
+      );
+    }
+  }, [location.pathname]);
+
   // 11 Core Modules Matching Screenshot 3
   const navItems: NavItem[] = useMemo(() => [
     {
@@ -110,9 +118,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
       label: 'Website Forms',
       icon: FileText,
       subItems: [
-        { label: 'Inbound Inquiries', path: '/website-forms?type=inquiries' },
-        { label: 'Contact Us Forms', path: '/website-forms?type=contact' },
-        { label: 'Property Valuations', path: '/website-forms?type=valuation' },
+        { label: 'Request A Callback', path: '/website-forms?tab=callbacks' },
+        { label: 'Report A Problem', path: '/website-forms?tab=problems' },
       ],
     },
     {
@@ -412,7 +419,24 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                 {hasSub && isSubOpen && (!isCollapsed || isMobileOpen) && (
                   <div className="pl-7 pr-2 py-1 space-y-1 animate-slide-down border-l border-slate-200 dark:border-slate-800 ml-4 my-1">
                     {item.subItems!.map((sub) => {
-                      const isSubActive = location.pathname + location.search === sub.path || (location.pathname === sub.path && !location.search);
+                      const [subBase, subQuery] = sub.path.split('?');
+                      let isSubActive = false;
+                      if (location.pathname === subBase) {
+                        if (subQuery) {
+                          const subParams = new URLSearchParams(subQuery);
+                          const curParams = new URLSearchParams(location.search);
+                          const allMatch = Array.from(subParams.entries()).every(
+                            ([k, v]) => curParams.get(k) === v
+                          );
+                          const isDefaultWebsiteFormsCallback =
+                            subBase === '/website-forms' &&
+                            subParams.get('tab') === 'callbacks' &&
+                            !curParams.get('tab');
+                          isSubActive = allMatch || isDefaultWebsiteFormsCallback;
+                        } else {
+                          isSubActive = !location.search;
+                        }
+                      }
                       return (
                         <button
                           key={sub.path}

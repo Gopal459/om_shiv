@@ -39,6 +39,7 @@ import {
   DashboardCounts,
   authHeaders,
 } from '../types/websiteForms';
+import ReportProblemPanel from '../components/website-forms/ReportProblemPanel';
 
 type ModalKind =
   | 'reschedule'
@@ -988,17 +989,7 @@ export const WebsiteFormsHub: React.FC = () => {
 
       {/* Mode Content */}
       {activeMode === 'problems' ? (
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-8 text-center shadow-sm">
-          <div className="w-12 h-12 rounded-2xl bg-[#291BB0]/10 text-[#291BB0] dark:text-indigo-300 flex items-center justify-center mx-auto mb-3">
-            <AlertTriangle className="w-6 h-6" />
-          </div>
-          <h2 className="text-base font-bold text-slate-900 dark:text-white">
-            Report A Problem Triage Panel
-          </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-md mx-auto">
-            Problem reports workspace slot ready for Task 5 integration (`ReportProblemPanel`).
-          </p>
-        </div>
+        <ReportProblemPanel assignees={assignees} />
       ) : (
         <div className="flex flex-col lg:flex-row gap-4 items-start">
           {/* LEFT PANEL (~360px): Search, Sort, Order, Callback Cards */}
