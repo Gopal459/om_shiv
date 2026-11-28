@@ -201,3 +201,134 @@ async def test_convert_lead_to_property_atomic_and_duplicate_guard(auth_client_m
     assert any(a["action_type"] == "CONVERTED_TO_PROPERTY" for a in detail["activities"])
 
 
+@pytest.mark.asyncio
+async def test_convert_single_table_leads_synthetic_prefix_and_no_pk_collision(auth_client_md: AsyncClient, db_session):
+    from sqlalchemy import select
+    from app.models.leads import Lead, TblLead
+
+    prop_payload = {
+        "property_type": 2,
+        "looking_type": 1,
+        "looking_subcat_type": 1,
+        "transaction_type": 1,
+        "source_type": 2,
+        "source_owner_name": "Legacy Owner",
+        "source_owner_mobile": "9829011223",
+        "sublocality_address": "Moti Doongri, Alwar",
+        "location": "Alwar",
+        "pincode": "301001",
+        "expected_price": 3800000,
+    }
+
+    # 1. TblLead-only with lead_unique_id=None + unrelated Lead sharing same numeric PK (999)
+    tbl_only = TblLead(
+        leads_id=999,
+        lead_unique_id=None,
+        contact_name="Legacy TblOnly",
+        mobile="9829011223",
+        lead_table_name="BUY",
+        rating=2,
+        lead_status=0,
+        stage=1,
+    )
+    unrelated_lead = Lead(
+        id=999,
+        lead_id="OB-2026-888999",
+        full_name="Unrelated Modern Lead",
+        mobile="919999888777",
+        lead_type="BUY",
+        source="MANUAL",
+        stage="NEW",
+    )
+    db_session.add_all([tbl_only, unrelated_lead])
+    await db_session.commit()
+
+    # Access & convert via synthetic LEAD-999 identifier
+    get_resp = await auth_client_md.get("/v1/leads/LEAD-999")
+    assert get_resp.status_code == 200
+    assert get_resp.json()["full_name"] == "Legacy TblOnly"
+
+    conv_resp = await auth_client_md.post("/v1/leads/LEAD-999/convert-to-property", json=prop_payload)
+    assert conv_resp.status_code == 201
+    await db_session.refresh(unrelated_lead)
+    # Unrelated modern Lead#999 must NOT be mutated by converting TblLead#999
+    assert unrelated_lead.related_listing_id is None
+    assert unrelated_lead.stage == "NEW"
+
+    # 2. Lead-only (no TblLead row) conversion with actor attribution
+    lead_only = Lead(
+        lead_id="OB-2026-777001",
+        full_name="Modern Only Seller",
+        mobile="919829066554",
+        lead_type="RENT",
+        source="PROPERTY_INQUIRY",
+        stage="NEW",
+    )
+    db_session.add(lead_only)
+    await db_session.commit()
+
+    rent_payload = {
+        "property_type": 1,
+        "looking_type": 1,
+        "looking_subcat_type": 1,
+        "rentalallow_forid": "Family",
+        "source_type": 2,
+        "source_owner_name": "Modern Only Seller",
+        "source_owner_mobile": "9829066554",
+        "sublocality_address": "Tijara Road, Alwar",
+        "location": "Tijara Road, Alwar",
+        "pincode": "301001",
+        "expected_price": 18000,
+    }
+    conv_modern = await auth_client_md.post("/v1/leads/OB-2026-777001/convert-to-property", json=rent_payload)
+    assert conv_modern.status_code == 201
+    detail_modern = (await auth_client_md.get("/v1/leads/OB-2026-777001")).json()
+    assert detail_modern["stage"] == "WON"
+    assert detail_modern["related_listing_id"] == conv_modern.json()["propertyid_no"]
+    act = next(a for a in detail_modern["activities"] if a["action_type"] == "CONVERTED_TO_PROPERTY")
+    assert act["logged_by"] == "EMP-0001"
+
+
+@pytest.mark.asyncio
+async def test_convert_lead_to_property_rollback_on_midflight_error(auth_client_md: AsyncClient, db_session, monkeypatch):
+    from sqlalchemy import select, func
+    from app.models.leads import Lead
+    from app.models.properties import TblProperty
+    import app.api.v1.endpoints.leads as leads_ep
+
+    lead_row = Lead(
+        lead_id="OB-2026-777002",
+        full_name="Rollback Seller",
+        mobile="919829033221",
+        lead_type="BUY",
+        source="MANUAL",
+        stage="NEW",
+    )
+    db_session.add(lead_row)
+    await db_session.commit()
+
+    def boom_activity(*args, **kwargs):
+        raise RuntimeError("Simulated activity failure")
+
+    monkeypatch.setattr(leads_ep, "LeadActivity", boom_activity)
+
+    prop_payload = {
+        "property_type": 2,
+        "looking_type": 1,
+        "looking_subcat_type": 1,
+        "transaction_type": 1,
+        "source_type": 2,
+        "source_owner_name": "Rollback Seller",
+        "source_owner_mobile": "9829033221",
+        "sublocality_address": "Alwar",
+        "location": "Alwar",
+        "pincode": "301001",
+        "expected_price": 4500000,
+    }
+    with pytest.raises(RuntimeError, match="Simulated activity failure"):
+        await auth_client_md.post("/v1/leads/OB-2026-777002/convert-to-property", json=prop_payload)
+
+    prop_count = (await db_session.execute(select(func.count()).select_from(TblProperty))).scalar_one()
+    assert prop_count == 0
+
+

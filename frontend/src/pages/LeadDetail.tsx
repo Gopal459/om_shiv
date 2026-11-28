@@ -401,7 +401,7 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
 
   // Pure dynamic values from API / DB (no hardcoded static placeholders)
   const customerName = lead.full_name || lead.contact_name || 'Valued Client';
-  const leadUid = lead.lead_id || lead.lead_unique_id || `LEAD-${lead.id}`;
+  const leadUid = (lead.lead_id && !String(lead.lead_id).startsWith('LEAD-')) ? lead.lead_id : (lead.lead_unique_id || leadId);
   const phone = lead.mobile ? lead.mobile.replace(/\D/g, '').slice(-10) : '';
   const displayPhone = phone ? `+91 ${phone.slice(0, 5)} ${phone.slice(5)}` : 'Not Provided';
   const altPhone = lead.alternate_contact_mobile || '';
