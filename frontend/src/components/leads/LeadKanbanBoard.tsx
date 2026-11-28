@@ -3,19 +3,14 @@ import {
   Flame,
   Phone,
   MessageSquare,
-  ArrowRight,
-  MoreVertical,
   Clock,
   MapPin,
-  CheckCircle2,
-  AlertCircle,
-  Building,
   User,
   ChevronRight,
-  ExternalLink,
   GripVertical,
   ArrowDown,
-  Sparkles,
+  Bookmark,
+  TrendingUp,
 } from 'lucide-react';
 
 export interface KanbanLeadItem {
@@ -32,8 +27,51 @@ export interface KanbanLeadItem {
   property_address: string;
   deal_final_price?: number;
   lead_remark?: string;
-  created_date?: string;
+  created_date?: string | null;
+  requirement_title?: string;
+  source_name?: string;
+  assigned_to?: string | null;
+  assigned_to_name?: string;
+  followup_datetime?: string | null;
+  current_update?: string;
+  status_label?: string;
 }
+
+const formatCardDate = (iso?: string | null): string => {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'Asia/Kolkata',
+  }).formatToParts(d);
+  const day = parts.find((p) => p.type === 'day')?.value ?? '';
+  const month = parts.find((p) => p.type === 'month')?.value ?? '';
+  const year = parts.find((p) => p.type === 'year')?.value ?? '';
+  return `${day}-${month}-${year}`;
+};
+
+const formatCardDateTime = (iso?: string | null): string => {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  const datePart = formatCardDate(iso);
+  const timePart = new Intl.DateTimeFormat('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+    timeZone: 'Asia/Kolkata',
+  }).format(d);
+  return `${datePart} ${timePart}`;
+};
+
+const formatINRCompact = (amount: number): string => {
+  if (amount >= 10_000_000) return `₹${(amount / 10_000_000).toFixed(2)} Cr`;
+  if (amount >= 100_000) return `₹${(amount / 100_000).toFixed(2)} L`;
+  return `₹${amount.toLocaleString('en-IN')}`;
+};
 
 interface LeadKanbanBoardProps {
   boardData: {
@@ -72,23 +110,42 @@ export const LeadKanbanBoard: React.FC<LeadKanbanBoardProps> = ({
   const getTemperatureBadge = (rating: number) => {
     if (rating === 1) {
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-800">
-          <Flame className="w-3 h-3 text-rose-600 dark:text-rose-400" /> HOT
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-[#F04B42] text-white shadow-2xs shrink-0">
+          <Flame className="w-2.5 h-2.5" /> Hot
         </span>
       );
     }
     if (rating === 2) {
       return (
-        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
-          WARM
+        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500 text-white shadow-2xs shrink-0">
+          Warm
         </span>
       );
     }
     return (
-      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
-        COLD
+      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-500 text-white shadow-2xs shrink-0">
+        Cold
       </span>
     );
+  };
+
+  const getStatusPillClass = (colKey: string) => {
+    switch (colKey) {
+      case 'new':
+        return 'bg-[#291BB0] text-white';
+      case 'in_progress':
+        return 'bg-indigo-600 text-white';
+      case 'site_visit':
+        return 'bg-purple-600 text-white';
+      case 'qualified':
+        return 'bg-teal-600 text-white';
+      case 'converted':
+        return 'bg-emerald-600 text-white';
+      case 'disqualified':
+        return 'bg-[#F04B42] text-white';
+      default:
+        return 'bg-[#291BB0] text-white';
+    }
   };
 
   const handleQuickAdvance = async (e: React.MouseEvent, lead: KanbanLeadItem, currentColumnKey: string) => {
@@ -245,6 +302,19 @@ export const LeadKanbanBoard: React.FC<LeadKanbanBoardProps> = ({
                 items.map((lead: KanbanLeadItem) => {
                   const isMoving = movingLeadId === lead.lead_unique_id;
                   const isDragging = draggedLead?.leadId === lead.lead_unique_id;
+                  const dealPrice = Number(lead.deal_final_price || 0);
+                  const headline =
+                    lead.requirement_title ||
+                    (lead.lead_remark && lead.lead_remark !== 'N/A'
+                      ? lead.lead_remark
+                      : `Interested For ${lead.lead_type} Property`);
+                  const displayAddress = lead.address || lead.property_address || 'Alwar, Rajasthan';
+                  const ownerLabel = lead.assigned_to_name || lead.source_name || 'Om Shiv Properties';
+                  const followUpText = formatCardDateTime(lead.followup_datetime || lead.created_date);
+                  const updateLabel =
+                    lead.current_update ||
+                    (lead.lead_remark && lead.lead_remark !== 'N/A' ? lead.lead_remark : 'General Follow-Up');
+                  const statusLabel = lead.status_label || (col.key === 'new' ? 'New' : col.label);
 
                   return (
                     <div
@@ -257,34 +327,39 @@ export const LeadKanbanBoard: React.FC<LeadKanbanBoardProps> = ({
                           onSelectLead(lead.lead_unique_id);
                         }
                       }}
-                      className={`relative bg-white dark:bg-slate-800/90 rounded-2xl p-4 border shadow-xs transition-all duration-200 cursor-grab active:cursor-grabbing group hover:-translate-y-0.5 ${
+                      className={`relative bg-white dark:bg-slate-800/95 rounded-2xl p-3.5 border shadow-xs transition-all duration-200 cursor-grab active:cursor-grabbing group hover:-translate-y-0.5 ${
                         isDragging
-                          ? 'opacity-30 scale-95 border-2 border-dashed border-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/40 shadow-xl'
+                          ? 'opacity-30 scale-95 border-2 border-dashed border-[#291BB0] bg-[#291BB0]/5 dark:bg-[#291BB0]/20 shadow-xl'
                           : isMoving
                           ? 'opacity-50 pointer-events-none animate-pulse border-amber-300'
-                          : 'border-slate-200/80 dark:border-slate-700/80 hover:shadow-md hover:border-slate-300 dark:hover:border-slate-600'
+                          : 'border-slate-200/90 dark:border-slate-700/80 hover:shadow-md hover:border-[#291BB0]/40 dark:hover:border-[#291BB0]/60'
                       }`}
                     >
-                      {/* Top Badges & Drag Grip */}
-                      <div className="flex items-center justify-between gap-2 mb-2">
-                        <div className="flex items-center gap-1.5">
+                      {/* Row 1: Requirement Headline + Drag Grip + ID & Type */}
+                      <div className="flex items-start justify-between gap-2 pb-2 mb-2 border-b border-slate-100 dark:border-slate-700/70">
+                        <div className="flex items-center gap-1.5 min-w-0">
                           <span
                             title="Drag to move card"
-                            className="text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300 cursor-grab active:cursor-grabbing"
+                            className="text-slate-400 group-hover:text-[#291BB0] cursor-grab active:cursor-grabbing shrink-0"
                           >
                             <GripVertical className="w-3.5 h-3.5" />
                           </span>
-
-                          <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-700/80 text-slate-700 dark:text-slate-300">
-                            {lead.lead_unique_id}
-                          </span>
+                          <h4
+                            title={headline}
+                            className="text-[12.5px] font-extrabold text-slate-900 dark:text-white truncate group-hover:text-[#291BB0] dark:group-hover:text-indigo-300 transition-colors"
+                          >
+                            {headline}
+                          </h4>
                         </div>
 
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1 shrink-0">
+                          <span className="font-mono text-[9.5px] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700/80 text-slate-700 dark:text-slate-300">
+                            {lead.lead_unique_id}
+                          </span>
                           <span
-                            className={`text-[9px] font-bold px-2 py-0.5 rounded uppercase ${
+                            className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${
                               lead.lead_type === 'BUY'
-                                ? 'bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300'
+                                ? 'bg-[#291BB0]/10 dark:bg-[#291BB0]/30 text-[#291BB0] dark:text-indigo-300'
                                 : lead.lead_type === 'RENT'
                                 ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
                                 : 'bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300'
@@ -292,43 +367,75 @@ export const LeadKanbanBoard: React.FC<LeadKanbanBoardProps> = ({
                           >
                             {lead.lead_type}
                           </span>
-                          {getTemperatureBadge(lead.rating)}
                         </div>
                       </div>
 
-                      {/* Lead Title & Requirement */}
-                      <h4 className="text-xs font-bold text-slate-900 dark:text-white line-clamp-1 group-hover:text-rose-500 transition-colors">
-                        {lead.contact_name}
-                      </h4>
-
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-1 mt-0.5">
-                        {lead.lead_remark && lead.lead_remark !== 'N/A'
-                          ? lead.lead_remark
-                          : `Inquiry for ${lead.lead_type} property`}
-                      </p>
-
-                      {/* Location & Budget */}
-                      <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-700/60 space-y-1 text-[11px] text-slate-500 dark:text-slate-400">
-                        <div className="flex items-center gap-1.5 truncate">
-                          <MapPin className="w-3 h-3 text-slate-400 flex-shrink-0" />
-                          <span className="truncate">{lead.property_address || 'Alwar / Jaipur'}</span>
+                      {/* Row 2: Client Name + Created Date */}
+                      <div className="flex items-center justify-between gap-2 mb-1.5">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">
+                            {lead.contact_name}
+                          </span>
                         </div>
+                        <span className="text-[10.5px] font-medium text-slate-500 dark:text-slate-400 shrink-0">
+                          {formatCardDate(lead.created_date)}
+                        </span>
+                      </div>
 
-                        {lead.deal_final_price && lead.deal_final_price > 0 && (
-                          <div className="flex items-center gap-1.5 font-semibold text-emerald-600 dark:text-emerald-400">
-                            <span>₹ {lead.deal_final_price.toLocaleString('en-IN')}</span>
-                          </div>
+                      {/* Row 3: Location Pin + Full Address & Deal Budget (strictly > 0) */}
+                      <div className="flex items-center justify-between gap-2 text-[11px] text-slate-600 dark:text-slate-300 mb-2">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <MapPin className="w-3.5 h-3.5 text-[#F04B42] shrink-0" />
+                          <span title={displayAddress} className="truncate">
+                            {displayAddress}
+                          </span>
+                        </div>
+                        {dealPrice > 0 && (
+                          <span className="text-[10.5px] font-bold text-emerald-600 dark:text-emerald-400 shrink-0">
+                            {formatINRCompact(dealPrice)}
+                          </span>
                         )}
                       </div>
 
-                      {/* Card Footer: Quick Actions */}
-                      <div className="mt-3 pt-2 flex items-center justify-between border-t border-slate-100 dark:border-slate-700/60">
+                      {/* Row 4: Temperature Tag + Org/Assignee + Follow-up / Updated DateTime */}
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10.5px] text-slate-500 dark:text-slate-400 mb-2">
+                        {getTemperatureBadge(lead.rating)}
+                        <span className="inline-flex items-center gap-1 text-slate-700 dark:text-slate-200 font-medium truncate max-w-[130px]">
+                          <Bookmark className="w-3 h-3 text-[#291BB0] dark:text-indigo-400 shrink-0" />
+                          <span className="truncate">{ownerLabel}</span>
+                        </span>
+                        <span className="inline-flex items-center gap-1 text-[10px] text-slate-500 dark:text-slate-400 ml-auto shrink-0">
+                          <Clock className="w-3 h-3 shrink-0" />
+                          <span>{followUpText}</span>
+                        </span>
+                      </div>
+
+                      {/* Row 5: Current Update / Follow-Up Outcome + Status Pill */}
+                      <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-slate-100 dark:border-slate-700/70">
+                        <div className="flex items-center gap-1.5 min-w-0 text-[11px] text-slate-600 dark:text-slate-300 font-medium">
+                          <TrendingUp className="w-3.5 h-3.5 text-[#291BB0] dark:text-indigo-400 shrink-0" />
+                          <span title={updateLabel} className="truncate">
+                            {updateLabel}
+                          </span>
+                        </div>
+                        <span
+                          className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold shrink-0 shadow-2xs ${getStatusPillClass(
+                            col.key
+                          )}`}
+                        >
+                          {statusLabel}
+                        </span>
+                      </div>
+
+                      {/* Row 6: Quick Actions Footer */}
+                      <div className="pt-2 flex items-center justify-between">
                         <div className="flex items-center gap-1.5">
                           <a
                             href={`tel:${lead.mobile}`}
                             onClick={(e) => e.stopPropagation()}
                             title="Call Lead"
-                            className="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 transition-colors"
+                            className="p-1.5 rounded-lg bg-[#291BB0]/10 dark:bg-[#291BB0]/30 text-[#291BB0] dark:text-indigo-300 hover:bg-[#291BB0] hover:text-white transition-colors"
                           >
                             <Phone className="w-3 h-3" />
                           </a>
@@ -338,10 +445,13 @@ export const LeadKanbanBoard: React.FC<LeadKanbanBoardProps> = ({
                             rel="noreferrer"
                             onClick={(e) => e.stopPropagation()}
                             title="WhatsApp Chat"
-                            className="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 transition-colors"
+                            className="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-600 hover:text-white transition-colors"
                           >
                             <MessageSquare className="w-3 h-3" />
                           </a>
+                          <span className="text-[10px] font-mono text-slate-400 ml-1">
+                            {lead.mobile}
+                          </span>
                         </div>
 
                         {col.key !== 'converted' && col.key !== 'disqualified' && (
@@ -349,7 +459,7 @@ export const LeadKanbanBoard: React.FC<LeadKanbanBoardProps> = ({
                             type="button"
                             onClick={(e) => handleQuickAdvance(e, lead, col.key)}
                             title="Advance to Next Stage"
-                            className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-[#291BB0] hover:text-white transition-all text-[10px] font-bold"
+                            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-[#291BB0] hover:text-white transition-all text-[10px] font-bold cursor-pointer"
                           >
                             <span>Next Stage</span>
                             <ChevronRight className="w-3 h-3" />
