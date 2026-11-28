@@ -28,6 +28,7 @@ import {
   Building,
   RefreshCw,
   ShieldCheck,
+  Sparkles,
   UserCheck,
   FileText,
   Check,
@@ -709,6 +710,41 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
               </button>
             )}
 
+            {/* 7b. Convert / View Opportunity */}
+            {lead.opportunity_converted === 1 ? (
+              <button
+                type="button"
+                onClick={() =>
+                  navigate(
+                    lead.opportunity_id
+                      ? `/opportunities?id=${lead.opportunity_id}`
+                      : '/opportunities'
+                  )
+                }
+                className="group flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-950/40 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                title="View Linked Opportunity"
+              >
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span className="truncate">View Opportunity</span>
+              </button>
+            ) : (
+              lead.lead_status_num !== 2 &&
+              lead.lead_status_num !== 5 &&
+              !isPropertyLinked && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    navigate(`/opportunities?fromLead=${encodeURIComponent(leadUid)}`)
+                  }
+                  className="group flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl bg-[#F04B42] hover:bg-[#d93d35] text-white font-bold text-xs shadow-md shadow-[#F04B42]/40 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                  title="Convert Lead to Opportunity"
+                >
+                  <Sparkles className="w-4 h-4 shrink-0 transition-transform group-hover:scale-110" />
+                  <span className="truncate">Convert to Opportunity</span>
+                </button>
+              )
+            )}
+
             {/* 8. History */}
             <button
               type="button"
@@ -912,10 +948,20 @@ export const LeadDetail: React.FC<LeadDetailProps> = ({ leadId, onBack }) => {
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Opportunity Conversion</span>
                 <p className="font-medium text-slate-700 dark:text-slate-300 mt-0.5">
                   {lead.opportunity_converted === 1 ? (
-                    <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-bold">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        navigate(
+                          lead.opportunity_id
+                            ? `/opportunities?id=${lead.opportunity_id}`
+                            : '/opportunities'
+                        )
+                      }
+                      className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-bold hover:underline cursor-pointer"
+                    >
                       <CheckCircle2 className="w-3.5 h-3.5" />
-                      Converted to Opportunity
-                    </span>
+                      View Opportunity
+                    </button>
                   ) : (
                     <span className="text-slate-500">In Active Sales Funnel</span>
                   )}

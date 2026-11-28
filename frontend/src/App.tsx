@@ -18,6 +18,7 @@ import AIAgentHub from './pages/AIAgentHub';
 import AIApprovalsQueue from './pages/AIApprovalsQueue';
 import FranchiseHub from './pages/FranchiseHub';
 import WebsiteFormsHub from './pages/WebsiteFormsHub';
+import OpportunitiesHub from './pages/OpportunitiesHub';
 import { ThemeProvider } from './context/ThemeContext';
 
 const LeadDetailPage: React.FC = () => {
@@ -124,26 +125,7 @@ const AppContent: React.FC = () => {
 
         {/* 11 Enterprise Module Hub Routes */}
         <Route path="/website-forms" element={<WebsiteFormsHub />} />
-        <Route
-          path="/opportunities"
-          element={
-            <ModuleHub
-              title="Opportunities & Pipeline Conversion"
-              subtitle="Stage progression tracking, scheduled site visits, negotiations, and closed won property transactions."
-              badge="Deal Conversion"
-              stats={[
-                { label: 'Active Opportunities', value: 52, change: 'Stage in discussion' },
-                { label: 'Site Visits Scheduled', value: 19, change: 'Today & tomorrow' },
-                { label: 'In Negotiation', value: 8, change: 'High closing prob.' },
-                { label: 'Closed Won (This Month)', value: 14, change: 'Verified deals' },
-              ]}
-              shortcuts={[
-                { label: 'Prioritized Lead & Opportunity Queue', desc: 'Review leads organized by temperature and follow-up SLA', path: '/leads' },
-                { label: 'Property Inventory Cross-Match', desc: 'Match qualified buyer requirements with active properties', path: '/properties' },
-              ]}
-            />
-          }
-        />
+        <Route path="/opportunities" element={<OpportunitiesHub />} />
         <Route path="/properties" element={<PropertyHub />} />
         <Route path="/properties/create" element={<PropertyCreatePage />} />
         <Route

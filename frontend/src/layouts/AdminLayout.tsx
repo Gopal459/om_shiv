@@ -102,6 +102,11 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
         prev.WEBSITE_FORMS === true ? prev : { ...prev, WEBSITE_FORMS: true }
       );
     }
+    if (location.pathname.startsWith('/opportunities')) {
+      setOpenSubmenus((prev) =>
+        prev.OPPORTUNITIES === true ? prev : { ...prev, OPPORTUNITIES: true }
+      );
+    }
   }, [location.pathname]);
 
   // 11 Core Modules Matching Screenshot 3
@@ -143,9 +148,14 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
       label: 'Opportunities',
       icon: Filter,
       subItems: [
-        { label: 'Active Pipeline', path: '/opportunities' },
-        { label: 'Site Visits (25%)', path: '/opportunities?stage=visit' },
-        { label: 'Negotiation & Won', path: '/opportunities?stage=won' },
+        { label: 'New Opportunity', path: '/opportunities?tab=new' },
+        { label: 'Today Opportunity', path: '/opportunities?tab=today' },
+        { label: 'Open Opportunity', path: '/opportunities?tab=open' },
+        { label: 'Missing Opportunity', path: '/opportunities?tab=missing' },
+        { label: 'In-Progress', path: '/opportunities?tab=in_progress' },
+        { label: 'Closed', path: '/opportunities?tab=closed' },
+        { label: 'All Opportunity', path: '/opportunities?tab=all' },
+        { label: 'Create Opportunity', path: '/opportunities?action=create' },
       ],
     },
     {
